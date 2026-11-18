@@ -90,4 +90,6 @@ class GrimmoryProgressSyncService @Inject constructor(
 }
 
 private fun Throwable.blocksDependentRemoteArtifacts(): Boolean =
-    isRemoteServerAddressRetryableFailure() || this is com.example.unifiedreader.data.grimmory.GrimmoryUnauthorizedException
+    isRemoteServerAddressRetryableFailure() ||
+        this is com.example.unifiedreader.data.grimmory.GrimmoryUnauthorizedException ||
+        this is com.example.unifiedreader.data.grimmory.GrimmorySignedOutException
