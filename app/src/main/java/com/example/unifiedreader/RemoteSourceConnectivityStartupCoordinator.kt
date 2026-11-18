@@ -164,11 +164,19 @@ class StumpRemoteSourceHealthCheck @Inject constructor(
     }
 }
 
+/**
+ * Asks Grimmory for its libraries with the saved access token, renewing it only when the server says it
+ * expired. It used to renew the sign-in on every check (each retry while uploads wait, each new network):
+ * Grimmory replaces the refresh token at each renewal, so every check risked signing the device out when
+ * its answer was lost, and two checks within a minute had the second turned down.
+ */
 class GrimmoryRemoteSourceHealthCheck @Inject constructor(
     private val grimmoryApiFactory: GrimmoryApiFactory,
     private val grimmoryCredentialStore: GrimmoryCredentialStore,
 ) : RemoteSourceHealthCheck {
     override val sourceType: SourceType = SourceType.GRIMMORY
+
+    private val requestRunner = GrimmoryStoredSessionRequestRunner(grimmoryCredentialStore)
 
     override suspend fun check(): RemoteSourceHealthCheckResult {
         val session = grimmoryCredentialStore.sessionFlow.value ?: return RemoteSourceHealthCheckResult.NotConfigured
@@ -177,13 +185,7 @@ class GrimmoryRemoteSourceHealthCheck @Inject constructor(
             session = session,
             createApi = grimmoryApiFactory::create,
         ) { api, activeSession ->
-            val refreshedSession = api.refreshSession(activeSession.refreshToken)
-            grimmoryCredentialStore.save(
-                activeSession.copy(
-                    accessToken = refreshedSession.accessToken,
-                    refreshToken = refreshedSession.refreshToken,
-                ),
-            )
+            requestRunner.run(api, activeSession) { accessToken -> api.getLibraries(accessToken) }
         }
         return RemoteSourceHealthCheckResult.Online
     }

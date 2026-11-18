@@ -27,6 +27,12 @@ class RemoteSourceConnectivityPolicy @Inject constructor() {
         sourceType: SourceType,
     ): Boolean = reachabilityFor(sourceType) == SourceConnectivityState.Offline
 
+    /** The servers marked offline now, which a retry checks again. */
+    fun offlineRemoteSources(): Set<SourceType> =
+        reachabilityBySource.value.entries.mapNotNullTo(linkedSetOf()) { (sourceType, state) ->
+            sourceType.takeIf { sourceType != SourceType.LOCAL && state == SourceConnectivityState.Offline }
+        }
+
     fun canAttemptReaderContent(
         sourceType: SourceType,
     ): Boolean = sourceType != SourceType.LOCAL && when (reachabilityFor(sourceType)) {

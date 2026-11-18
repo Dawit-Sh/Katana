@@ -55,4 +55,18 @@ class RemoteSourceConnectivityPolicyTest {
         assertTrue(policy.canRunExplicitProbe(SourceType.KAVITA))
         assertFalse(policy.canRunExplicitProbe(SourceType.LOCAL))
     }
+
+    @Test
+    fun `offline remote sources are the servers marked offline now`() {
+        val policy = RemoteSourceConnectivityPolicy()
+        policy.markUnavailable(SourceType.GRIMMORY)
+        policy.markChecking(SourceType.KAVITA)
+        policy.markReachable(SourceType.STUMP)
+
+        assertEquals(setOf(SourceType.GRIMMORY), policy.offlineRemoteSources())
+
+        policy.markReachable(SourceType.GRIMMORY)
+
+        assertEquals(emptySet<SourceType>(), policy.offlineRemoteSources())
+    }
 }

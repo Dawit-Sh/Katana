@@ -18,7 +18,6 @@ import com.example.unifiedreader.core.model.LibraryFilterState
 import com.example.unifiedreader.core.model.LibraryFilterPanel
 import com.example.unifiedreader.core.model.LibrarySortMode
 import com.example.unifiedreader.core.model.ReadableItem
-import com.example.unifiedreader.core.model.SourceConnectivityState
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.data.repository.JournalEntrySaveUseCase
 import com.example.unifiedreader.feature.downloads.DownloadEntriesSnapshot
@@ -527,8 +526,12 @@ class AppViewModel @Inject constructor(
         comicPageSourceCacheController.trimReaderMemoryCaches(request)
     }
 
+    /** Retry (Settings, a failure notice) and the retry loop: what waits to upload, and every server marked offline. */
     fun retryPendingRemoteSync() {
-        retryPendingRemoteSync(uiState.pendingRemoteSyncSummary)
+        retryPendingRemoteSync(
+            pendingRemoteSyncSummary = uiState.pendingRemoteSyncSummary,
+            extraSourceTypes = remoteSourceConnectivityPolicy.offlineRemoteSources(),
+        )
     }
 
     /** Settings › Reading progress sync: Keep on this device, for the books no longer in the library. */
@@ -1032,8 +1035,7 @@ class AppViewModel @Inject constructor(
         )
         viewModelScope.launch {
             appNetworkChangeCoordinator.observeNewConnections {
-                val unavailableSourceTypes = remoteSourceConnectivityPolicy.reachabilityFlow.value
-                    .unavailableRemoteSourceTypes()
+                val unavailableSourceTypes = remoteSourceConnectivityPolicy.offlineRemoteSources()
                 if (unavailableSourceTypes.isEmpty()) return@observeNewConnections
                 retryPendingRemoteSync(
                     pendingRemoteSyncSummary = uiState.pendingRemoteSyncSummary,
@@ -1043,7 +1045,10 @@ class AppViewModel @Inject constructor(
             }
         }
         viewModelScope.launchPendingSyncRetries(
-            hasPendingUploads = { uiState.pendingRemoteSyncSummary.groups.isNotEmpty() },
+            hasWork = {
+                uiState.pendingRemoteSyncSummary.groups.isNotEmpty() ||
+                    remoteSourceConnectivityPolicy.offlineRemoteSources().isNotEmpty()
+            },
             retry = ::retryPendingRemoteSync,
         )
         progressSyncStartupRetryCoordinator.retryAfterHydration(
@@ -1119,14 +1124,6 @@ class AppViewModel @Inject constructor(
             failures = failures,
             updateState = ::updateUiState,
         )
-    }
-}
-
-private fun Map<SourceType, SourceConnectivityState>.unavailableRemoteSourceTypes(): Set<SourceType> {
-    return entries.mapNotNullTo(linkedSetOf()) { (sourceType, state) ->
-        sourceType.takeIf {
-            sourceType != SourceType.LOCAL && state == SourceConnectivityState.Offline
-        }
     }
 }
 
