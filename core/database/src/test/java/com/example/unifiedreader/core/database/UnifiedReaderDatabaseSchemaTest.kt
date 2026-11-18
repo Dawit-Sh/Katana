@@ -52,6 +52,31 @@ class UnifiedReaderDatabaseSchemaTest {
     }
 
     @Test
+    fun `migration 37 to 38 gives the exported 38 schema with empty highlight and word tables`() {
+        val name = "schema-37-38-${System.nanoTime()}"
+        helper.createDatabase(name, 37).use { database ->
+            database.execSQL(
+                "INSERT INTO list_settings (`key`, `value`) VALUES ('lists.sort', 'NAME')",
+            )
+        }
+
+        helper.runMigrationsAndValidate(name, 38, true, MIGRATION_37_38).use { database ->
+            database.query("SELECT `value` FROM list_settings WHERE `key` = 'lists.sort'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("NAME", cursor.getString(0))
+            }
+            database.query("SELECT COUNT(*) FROM reader_highlights").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals(0, cursor.getInt(0))
+            }
+            database.query("SELECT COUNT(*) FROM saved_words").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals(0, cursor.getInt(0))
+            }
+        }
+    }
+
+    @Test
     fun `room opens a version 36 database at the current version with every migration`() {
         val name = "schema-36-current-${System.nanoTime()}"
         helper.createDatabase(name, 36).close()

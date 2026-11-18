@@ -15,6 +15,7 @@ import com.example.unifiedreader.core.database.dao.ReadingProgressDao
 import com.example.unifiedreader.core.database.dao.ReaderSessionStateDao
 import com.example.unifiedreader.core.database.dao.RemoteCatalogDao
 import com.example.unifiedreader.core.database.dao.ListPreferenceDao
+import com.example.unifiedreader.core.database.dao.ReaderAnnotationDao
 import com.example.unifiedreader.core.database.dao.ServerListDao
 import com.example.unifiedreader.core.database.dao.UserListDao
 import com.example.unifiedreader.core.database.entity.DownloadQueueEntryEntity
@@ -35,6 +36,8 @@ import com.example.unifiedreader.core.database.entity.ReaderSessionStateEntity
 import com.example.unifiedreader.core.database.entity.ReadingProgressEntity
 import com.example.unifiedreader.core.database.entity.ListPreferenceEntity
 import com.example.unifiedreader.core.database.entity.ListSettingEntity
+import com.example.unifiedreader.core.database.entity.ReaderHighlightEntity
+import com.example.unifiedreader.core.database.entity.SavedWordEntity
 import com.example.unifiedreader.core.database.entity.ServerListEntity
 import com.example.unifiedreader.core.database.entity.ServerListItemEntity
 import com.example.unifiedreader.core.database.entity.LibraryTagChoiceEntity
@@ -66,8 +69,10 @@ import com.example.unifiedreader.core.database.entity.UserListEntryEntity
         LibraryTagChoiceEntity::class,
         ListPreferenceEntity::class,
         ListSettingEntity::class,
+        ReaderHighlightEntity::class,
+        SavedWordEntity::class,
     ],
-    version = 37,
+    version = 38,
     exportSchema = true,
 )
 abstract class UnifiedReaderDatabase : RoomDatabase() {
@@ -82,6 +87,7 @@ abstract class UnifiedReaderDatabase : RoomDatabase() {
     abstract fun serverListDao(): ServerListDao
     abstract fun libraryTagChoiceDao(): LibraryTagChoiceDao
     abstract fun listPreferenceDao(): ListPreferenceDao
+    abstract fun readerAnnotationDao(): ReaderAnnotationDao
 }
 
 object UnifiedReaderDatabaseMigrations {
@@ -1020,4 +1026,5 @@ internal val allMigrations: Array<Migration> = arrayOf(
     MIGRATION_34_35,
     MIGRATION_35_36,
     MIGRATION_36_37,
+    MIGRATION_37_38,
 )
