@@ -59,6 +59,7 @@ import com.example.unifiedreader.feature.reader.core.ReaderScreenFactory
 import com.example.unifiedreader.feature.reader.core.ReaderSessionStore
 import com.example.unifiedreader.feature.reader.core.ReaderWorkCoordinator
 import com.example.unifiedreader.feature.reader.epub.epubReaderFactory
+import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
 import com.example.unifiedreader.feature.translation.TranslationService
 import com.example.unifiedreader.feature.reader.pdf.pdfReaderFactory
 import com.example.unifiedreader.feature.settings.DataStoreSettingsPreferencesStore
@@ -828,6 +829,7 @@ object AppModule {
         readerDisplay: ReaderDisplayPreferences,
         readerWorkCoordinator: ReaderWorkCoordinator,
         translationService: TranslationService,
+        annotationStore: ReaderAnnotationStore,
         @ApplicationScope applicationScope: CoroutineScope,
         appDispatchers: AppDispatchers,
     ): List<@JvmSuppressWildcards ReaderScreenFactory> = listOf(
@@ -860,6 +862,7 @@ object AppModule {
             },
             displayPreferences = readerDisplay,
             translation = translationService,
+            annotations = annotationStore,
         ),
         pdfReaderFactory(
             sessionStore = JournalRecordingReaderSessionStore(

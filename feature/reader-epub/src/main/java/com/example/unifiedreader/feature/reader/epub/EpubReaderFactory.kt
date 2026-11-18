@@ -3,6 +3,7 @@ package com.example.unifiedreader.feature.reader.epub
 import android.net.Uri
 import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.ReadableItem
+import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
 import com.example.unifiedreader.feature.reader.core.ReaderChrome
 import com.example.unifiedreader.feature.reader.core.ReaderScreenFactory
 import com.example.unifiedreader.feature.reader.core.ReaderSessionStore
@@ -17,6 +18,7 @@ fun epubReaderFactory(
     documentUriProvider: suspend (ReadableItem) -> Uri? = { null },
     displayPreferences: ReaderDisplayPreferences = ReaderDisplayPreferences(),
     translation: TranslationService? = null,
+    annotations: ReaderAnnotationStore? = null,
 ): ReaderScreenFactory = formatReaderFactory(
     FormatType.EPUB,
     chrome = ReaderChrome.Immersive,
@@ -30,5 +32,6 @@ fun epubReaderFactory(
             onBack = onBack,
             onCompletionRequested = navigationActions.onRequestCompletion,
             translation = translation,
+            annotationStore = annotations,
         )
 }

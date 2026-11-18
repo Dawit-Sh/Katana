@@ -31,6 +31,8 @@ import com.example.unifiedreader.core.model.LocatorType
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SyncState
 import com.example.unifiedreader.core.model.primaryAuthor
+import com.example.unifiedreader.feature.annotations.AnnotatedBook
+import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
 import com.example.unifiedreader.feature.reader.core.ImmersiveReaderOverlay
 import com.example.unifiedreader.feature.reader.core.rememberReaderActiveSessionTracker
 import com.example.unifiedreader.feature.reader.core.rememberReaderSessionLifecycle
@@ -51,6 +53,7 @@ import com.example.unifiedreader.feature.reader.core.rememberReaderOverlayState
 import com.example.unifiedreader.feature.reader.preferences.ReaderDisplayPreferences
 import com.example.unifiedreader.journal.JournalReadingSessionRecorder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.withContext
 import com.example.unifiedreader.feature.translation.ReaderTranslationOverlay
 import com.example.unifiedreader.feature.translation.TranslationService
@@ -70,6 +73,7 @@ fun EpubReaderScreen(
     onBack: () -> Unit,
     onCompletionRequested: () -> Unit = {},
     translation: TranslationService? = null,
+    annotationStore: ReaderAnnotationStore? = null,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -185,6 +189,11 @@ fun EpubReaderScreen(
     var navigationRequest by remember { mutableStateOf<EpubNavigationRequest?>(null) }
     var isTocSheetOpen by rememberSaveable(item.id) { mutableStateOf(false) }
     var isPreferencesPaneOpen by rememberSaveable(item.id) { mutableStateOf(false) }
+    var isAnnotationsOpen by rememberSaveable(item.id) { mutableStateOf(false) }
+    val bookHighlightsFlow = remember(annotationStore, item.id) { annotationStore?.highlights(item.id) ?: flowOf(emptyList()) }
+    val bookWordsFlow = remember(annotationStore, item.id) { annotationStore?.words(item.id) ?: flowOf(emptyList()) }
+    val bookHighlights by bookHighlightsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+    val bookWords by bookWordsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
     var footnoteContent by remember(item.id) { mutableStateOf<EpubFootnoteContent?>(null) }
     val translationSession = translation?.let { service -> rememberTranslationSession(service) }
     val translationState = translation?.state?.collectAsStateWithLifecycle()?.value
@@ -412,6 +421,20 @@ fun EpubReaderScreen(
                     state.publication.buildEpubBookProgress()
                 }
             }
+            val annotationController = annotationStore?.let { store ->
+                rememberEpubAnnotationController(
+                    store = store,
+                    book = remember(item.id, item.title) {
+                        AnnotatedBook(itemId = item.id, title = item.title, author = item.bookMetadata?.primaryAuthor())
+                    },
+                    chapterTitleOf = { locator ->
+                        bookProgress.tocEntries.currentEpubChapterTitle(
+                            currentProgress = locator.locations.totalProgression ?: currentProgress,
+                            currentHref = locator.href.toString(),
+                        )
+                    },
+                )
+            }
             LaunchedEffect(bookProgress.pageCount) {
                 if (bookProgress.pageCount > 0) {
                     pageCount = bookProgress.pageCount
@@ -485,6 +508,10 @@ fun EpubReaderScreen(
                     )
                     if (translation != null && translationSession != null) {
                         ReaderTranslationOverlay(session = translationSession, service = translation)
+                    }
+                    annotationController?.let { controller ->
+                        EpubHighlightCardOverlay(controller = controller, highlights = bookHighlights)
+                        EpubHighlightNoteDialog(controller = controller, highlights = bookHighlights)
                     }
                 },
                 content = {
@@ -566,6 +593,16 @@ fun EpubReaderScreen(
                             navigationRequest = null
                         },
                         modifier = Modifier.fillMaxSize().onEveryTouchDown { readerTouched = true },
+                        annotations = annotationController?.let { controller ->
+                            remember(controller, bookHighlights) {
+                                EpubSelectionAnnotations(
+                                    highlights = bookHighlights,
+                                    onHighlight = controller::highlight,
+                                    onSaveWord = controller::saveWord,
+                                    onHighlightActivated = controller::open,
+                                )
+                            }
+                        },
                     )
                 },
                 overlay = {
@@ -585,16 +622,28 @@ fun EpubReaderScreen(
                             onTocClick = {
                                 overlayState.show()
                                 isPreferencesPaneOpen = false
+                                isAnnotationsOpen = false
                                 isTocSheetOpen = !isTocSheetOpen
                             },
                             onPreferencesClick = {
                                 overlayState.show()
                                 isTocSheetOpen = false
+                                isAnnotationsOpen = false
                                 isPreferencesPaneOpen = !isPreferencesPaneOpen
                             },
                             onDismissPanels = {
                                 isTocSheetOpen = false
                                 isPreferencesPaneOpen = false
+                                isAnnotationsOpen = false
+                            },
+                            isAnnotationsOpen = isAnnotationsOpen,
+                            onAnnotationsClick = annotationController?.let {
+                                {
+                                    overlayState.show()
+                                    isTocSheetOpen = false
+                                    isPreferencesPaneOpen = false
+                                    isAnnotationsOpen = !isAnnotationsOpen
+                                }
                             },
                             onProgressSelected = { selectedProgress ->
                                 currentProgress = selectedProgress.toDouble()
@@ -686,6 +735,20 @@ fun EpubReaderScreen(
                                 onPageNumbersVisibleChanged = displayPreferences.pageNumbers::setVisible,
                                 slot = slot,
                             )
+                            annotationController?.let { controller ->
+                                EpubAnnotationsPanel(
+                                    isOpen = isAnnotationsOpen,
+                                    slot = slot,
+                                    highlights = bookHighlights,
+                                    words = bookWords,
+                                    controller = controller,
+                                    onDismissRequest = { isAnnotationsOpen = false },
+                                    onJump = { locator ->
+                                        readerTouched = true
+                                        navigationRequest = EpubLocatorNavigationRequest(seekRequestId++, locator)
+                                    },
+                                )
+                            }
                         }
                     }
                 },

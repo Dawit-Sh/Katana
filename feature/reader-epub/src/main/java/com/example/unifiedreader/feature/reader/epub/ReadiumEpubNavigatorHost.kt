@@ -68,6 +68,7 @@ internal fun ReadiumEpubNavigatorHost(
     navigationRequest: EpubNavigationRequest?,
     onNavigationRequestConsumed: () -> Unit,
     modifier: Modifier = Modifier,
+    annotations: EpubSelectionAnnotations? = null,
 ) {
     val containerId = remember(item.id) { View.generateViewId() }
     val fragmentTag = remember(item.id) { "readium-epub-${item.id}" }
@@ -77,6 +78,8 @@ internal fun ReadiumEpubNavigatorHost(
     val latestOnEndNavigationRequested = rememberUpdatedState(onEndNavigationRequested)
     val latestOnFootnoteActivated = rememberUpdatedState(onFootnoteActivated)
     val footnoteNavigationScope = rememberCoroutineScope()
+    val latestAnnotations = rememberUpdatedState(annotations)
+    val highlightLayer = remember(publication) { EpubHighlightLayer(footnoteNavigationScope) }
     val latestTranslation = rememberUpdatedState(translation)
     val isLandscape = remember(
         configuration.orientation,
@@ -344,6 +347,22 @@ internal fun ReadiumEpubNavigatorHost(
                             activity.copyToClipboard(selection.text)
                         }
                     },
+                    canAnnotate = { latestAnnotations.value != null },
+                    onHighlight = {
+                        footnoteNavigationScope.withSelectionForAnnotation(curlHost.navigator) { selection, anchor ->
+                            latestAnnotations.value?.onHighlight?.invoke(selection, anchor, false)
+                        }
+                    },
+                    onNote = {
+                        footnoteNavigationScope.withSelectionForAnnotation(curlHost.navigator) { selection, anchor ->
+                            latestAnnotations.value?.onHighlight?.invoke(selection, anchor, true)
+                        }
+                    },
+                    onSaveWord = {
+                        footnoteNavigationScope.withSelectionForAnnotation(curlHost.navigator) { selection, _ ->
+                            latestAnnotations.value?.onSaveWord?.invoke(selection)
+                        }
+                    },
                 ),
                 onSameFileLink = { link ->
                     footnoteNavigationScope.launch { openAnchorLink(link, endnoteLink = null) }
@@ -356,6 +375,9 @@ internal fun ReadiumEpubNavigatorHost(
         ) as EpubNavigatorFragment
         navigatorFragment = fragment
         curlHost.navigator = fragment
+        highlightLayer.attach(fragment) { highlightId, anchor ->
+            latestAnnotations.value?.onHighlightActivated?.invoke(highlightId, anchor)
+        }
         fun turnByTap(target: PageCurlTarget, slide: () -> Unit) {
             if (!latestCurlEnabled.value) {
                 slide()
@@ -396,6 +418,7 @@ internal fun ReadiumEpubNavigatorHost(
         onDispose {
             pageTaps.handler = null
             curlHost.navigator = null
+            highlightLayer.detach(fragment)
             bookEndCheckJob?.cancel()
             footnoteNavigationJobs.toList().forEach { job -> job.cancel() }
             footnoteNavigationJobs.clear()
@@ -416,6 +439,10 @@ internal fun ReadiumEpubNavigatorHost(
             }
         }
     }
+
+    // The book's highlights, drawn on whichever navigator shows it now (EpubHighlightLayer.kt).
+    val highlights = annotations?.highlights.orEmpty()
+    LaunchedEffect(highlightLayer, highlights) { highlightLayer.show(highlights) }
 
     // When the card or sheet closes, the words stop being selected too.
     val translationOpen = translation?.isOpen == true

@@ -35,13 +35,16 @@ internal fun EpubReaderChrome(
     onDismissPanels: () -> Unit,
     onProgressSelected: (Float) -> Unit,
     modifier: Modifier = Modifier,
+    isAnnotationsOpen: Boolean = false,
+    // The highlights and saved words panel; null when the book can't keep highlights.
+    onAnnotationsClick: (() -> Unit)? = null,
     panels: @Composable BoxScope.(ReaderPanelSlot) -> Unit,
 ) {
     val chapterTitle = remember(tocEntries, currentHref, currentProgress) {
         tocEntries.currentEpubChapterTitle(currentProgress = currentProgress, currentHref = currentHref)
     }
     ReaderChromeFrame(
-        panelOpen = isTocOpen || isPreferencesOpen,
+        panelOpen = isTocOpen || isPreferencesOpen || isAnnotationsOpen,
         onDismissPanel = onDismissPanels,
         modifier = modifier,
         topBar = {
@@ -50,6 +53,14 @@ internal fun EpubReaderChrome(
                 subtitle = epubReaderSubtitle(chapterTitle = chapterTitle, author = author),
                 onBack = onBack,
             ) {
+                onAnnotationsClick?.let { onClick ->
+                    ReaderBarButton(
+                        icon = AppIcons.CollectionsBookmark,
+                        contentDescription = EpubAnnotationCopy.PanelButton,
+                        active = isAnnotationsOpen,
+                        onClick = onClick,
+                    )
+                }
                 ReaderBarButton(
                     icon = AppIcons.FormatSize,
                     contentDescription = "Reader preferences",

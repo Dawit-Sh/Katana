@@ -62,10 +62,11 @@ internal fun epubSelectionTranslation(
 
 /**
  * The toolbar over selected text. Readium hands the whole menu to the app, so without this the
- * toolbar is empty: it holds Translate (when the app has translation and doesn't open it by
- * itself) and Copy. [onSelectionChanged] runs when the toolbar opens and each time the WebView
- * refreshes it, which it does as a handle moves the selection. [delegate] is the page curl's
- * callback, which needs to know a selection is open.
+ * toolbar is empty: it holds Highlight, Note and Add to dictionary (when the book can keep
+ * highlights), Translate (when the app has translation and doesn't open it by itself) and Copy.
+ * [onSelectionChanged] runs when the toolbar opens and each time the WebView refreshes it, which
+ * it does as a handle moves the selection. [delegate] is the page curl's callback, which needs to
+ * know a selection is open.
  */
 internal class EpubSelectionActionModeCallback(
     private val delegate: ActionMode.Callback,
@@ -74,11 +75,20 @@ internal class EpubSelectionActionModeCallback(
     private val onCopy: () -> Unit,
     private val onSelectionChanged: () -> Unit,
     private val onSelectionCleared: () -> Unit,
+    private val canAnnotate: () -> Boolean = { false },
+    private val onHighlight: () -> Unit = {},
+    private val onNote: () -> Unit = {},
+    private val onSaveWord: () -> Unit = {},
 ) : ActionMode.Callback {
     override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
         delegate.onCreateActionMode(mode, menu)
-        if (canTranslate()) menu.add(Menu.NONE, TranslateItemId, 0, TranslateLabel)
-        menu.add(Menu.NONE, CopyItemId, 1, android.R.string.copy)
+        if (canAnnotate()) {
+            menu.add(Menu.NONE, HighlightItemId, 0, EpubAnnotationCopy.Highlight)
+            menu.add(Menu.NONE, NoteItemId, 1, EpubAnnotationCopy.Note)
+            menu.add(Menu.NONE, SaveWordItemId, 2, EpubAnnotationCopy.AddToDictionary)
+        }
+        if (canTranslate()) menu.add(Menu.NONE, TranslateItemId, 3, TranslateLabel)
+        menu.add(Menu.NONE, CopyItemId, 4, android.R.string.copy)
         onSelectionChanged()
         return true
     }
@@ -90,6 +100,9 @@ internal class EpubSelectionActionModeCallback(
 
     override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
         when (item.itemId) {
+            HighlightItemId -> onHighlight()
+            NoteItemId -> onNote()
+            SaveWordItemId -> onSaveWord()
             TranslateItemId -> onTranslate()
             CopyItemId -> onCopy()
             else -> return delegate.onActionItemClicked(mode, item)
@@ -106,6 +119,9 @@ internal class EpubSelectionActionModeCallback(
     private companion object {
         const val TranslateItemId = 0x7EAD01
         const val CopyItemId = 0x7EAD02
+        const val HighlightItemId = 0x7EAD03
+        const val NoteItemId = 0x7EAD04
+        const val SaveWordItemId = 0x7EAD05
         const val TranslateLabel = "Translate"
     }
 }

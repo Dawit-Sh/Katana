@@ -88,6 +88,7 @@ dependencies {
     implementation(project(":feature:navigation"))
     implementation(project(":feature:updates"))
     implementation(project(":feature:translation"))
+    implementation(project(":feature:annotations"))
 
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)
