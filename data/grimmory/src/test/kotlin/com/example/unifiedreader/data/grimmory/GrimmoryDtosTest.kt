@@ -169,14 +169,65 @@ class GrimmoryDtosTest {
             id = 7,
             libraryId = 2,
             primaryFile = GrimmoryBookFileDto(
-                bookType = "MOBI",
-                extension = "mobi",
+                bookType = "AUDIOBOOK",
+                extension = "m4b",
             ),
         ).toDomain(
             baseUrl = "https://grimmory.example",
         )
 
         assertNull(item)
+    }
+
+    @Test
+    fun mapsMobiAzwAndFb2BooksToBooks() {
+        fun formatOf(
+            bookType: String,
+            extension: String,
+        ): FormatType? = GrimmoryBookDto(
+            id = 7,
+            libraryId = 2,
+            primaryFile = GrimmoryBookFileDto(id = 70, bookType = bookType, extension = extension),
+        ).toDomain(baseUrl = "https://grimmory.example")?.also { item ->
+            assertEquals(ReadableItemKind.BOOK, item.kind)
+            assertEquals(bookType, item.remoteFileType)
+        }?.format
+
+        assertEquals(FormatType.MOBI, formatOf("MOBI", "mobi"))
+        assertEquals(FormatType.AZW3, formatOf("AZW3", "azw3"))
+        // Grimmory files .azw under AZW3; the extension says what it is.
+        assertEquals(FormatType.AZW, formatOf("AZW3", "azw"))
+        assertEquals(FormatType.FB2, formatOf("FB2", "fb2"))
+    }
+
+    @Test
+    fun takesOnlyThePercentOfAMobiPlaceFromGrimmory() {
+        val entry = GrimmoryBookDto(
+            id = 12,
+            libraryId = 4,
+            primaryFile = GrimmoryBookFileDto(bookType = "MOBI", extension = "mobi"),
+            lastReadTime = "2026-04-01T12:30:00Z",
+            epubProgress = GrimmoryEpubProgressDto(cfi = "epubcfi(/6/4!/4/2)", href = "part0001.html", percentage = 42f),
+        ).toCatalogEntry(baseUrl = "https://grimmory.example")
+
+        val progress = requireNotNull(entry?.progress)
+        assertEquals(LocatorType.PERCENT, progress.locatorType)
+        assertEquals(0.42, progress.percent ?: 0.0, 0.0001)
+        assertNull(progress.cfi)
+    }
+
+    @Test
+    fun sendsMobiProgressAsAnEbookPlaceWithoutAPosition() {
+        val request = GrimmoryProgressUpdate(
+            bookId = "12",
+            bookFileId = null,
+            bookType = "AZW3",
+            positionData = null,
+            percent = 0.5,
+        ).toRequestDto()
+
+        assertEquals(50f, request.deprecatedEpubProgress?.percentage)
+        assertNull(request.deprecatedEpubProgress?.cfi)
     }
 
     @Test

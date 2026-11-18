@@ -38,7 +38,7 @@ class ReaderOpeningTest {
             "Kavita didn’t answer. Check that you’re on the same network as your server, then try again.",
             ReaderOpenFailure.ServerUnreachable(SourceType.KAVITA).reason(),
         )
-        assertEquals("yabai can’t open CBR files", ReaderOpenFailure.Unsupported(FormatType.CBR).title())
+        assertEquals("Katana can’t open CBR files", ReaderOpenFailure.Unsupported(FormatType.CBR).title())
         assertEquals("Couldn’t open this book", ReaderOpenFailure.LocalFileGone.title())
         val everyFailure = listOf(
             ReaderOpenFailure.ServerUnreachable(SourceType.STUMP),
@@ -49,6 +49,9 @@ class ReaderOpeningTest {
             ReaderOpenFailure.NoComicPages,
             ReaderOpenFailure.NoPdfPages,
             ReaderOpenFailure.PdfUnreadable,
+            ReaderOpenFailure.DjvuUnreadable,
+            ReaderOpenFailure.DrmLocked,
+            ReaderOpenFailure.KindleFormatUnsupported,
             ReaderOpenFailure.Unsupported(FormatType.PDF),
             ReaderOpenFailure.Unknown,
         )

@@ -1,7 +1,7 @@
 package com.example.unifiedreader.feature.reader.epub
 
 import android.net.Uri
-import com.example.unifiedreader.core.model.FormatType
+import com.example.unifiedreader.core.model.EpubReaderFormats
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.feature.annotations.AnnotationJumps
 import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
@@ -20,7 +20,8 @@ fun epubReaderFactory(
     displayPreferences: ReaderDisplayPreferences = ReaderDisplayPreferences(),
     extras: EpubReaderExtras = EpubReaderExtras(),
 ): ReaderScreenFactory = formatReaderFactory(
-    FormatType.EPUB,
+    // EPUB, and the MOBI, AZW, AZW3 and FB2 books it reads as the EPUBs Katana makes from them.
+    formats = EpubReaderFormats,
     chrome = ReaderChrome.Immersive,
 ) { item, onBack, navigationActions ->
         EpubReaderScreen(

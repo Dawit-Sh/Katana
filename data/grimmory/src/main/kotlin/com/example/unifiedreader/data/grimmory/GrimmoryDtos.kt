@@ -12,6 +12,7 @@ import com.example.unifiedreader.core.model.readableFormatFromTypeOrExtension
 import com.example.unifiedreader.core.model.remoteItemId
 import com.example.unifiedreader.core.model.remoteLibraryId
 import com.example.unifiedreader.core.model.toServerEpochMillisOrNull
+import com.example.unifiedreader.core.model.isComicReaderFormat
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -395,16 +396,15 @@ internal fun grimmoryBookCoverUrl(
 }
 
 private fun GrimmoryBookFileDto.toFormatType(): FormatType? {
-    return readableFormatFromTypeOrExtension(
+    val format = readableFormatFromTypeOrExtension(
         type = bookType,
         extension = extension,
         fileName = fileName,
     )
+    // Grimmory files .azw under its AZW3 type; the file's own extension says AZW.
+    if (format == FormatType.AZW3 && extension.equals("azw", ignoreCase = true)) return FormatType.AZW
+    return format
 }
 
-private fun FormatType.defaultGrimmoryItemKind(): ReadableItemKind = when (this) {
-    FormatType.CBZ,
-    FormatType.CBR -> ReadableItemKind.COMIC
-    FormatType.EPUB,
-    FormatType.PDF -> ReadableItemKind.BOOK
-}
+private fun FormatType.defaultGrimmoryItemKind(): ReadableItemKind =
+    if (isComicReaderFormat()) ReadableItemKind.COMIC else ReadableItemKind.BOOK

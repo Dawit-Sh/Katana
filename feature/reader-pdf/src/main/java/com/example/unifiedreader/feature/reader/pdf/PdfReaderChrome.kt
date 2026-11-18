@@ -1,6 +1,5 @@
 package com.example.unifiedreader.feature.reader.pdf
 
-import android.content.Context
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -61,7 +60,7 @@ import kotlin.math.roundToInt
 internal fun PdfReaderChrome(
     title: String,
     author: String?,
-    context: Context,
+    pageRenderer: PageImageRenderer,
     documentState: ReaderDocumentState,
     pageCount: Int,
     currentPageIndex: Int,
@@ -102,7 +101,7 @@ internal fun PdfReaderChrome(
                 strip = if (pageCount > 0) {
                     {
                         PdfPagePreviewStrip(
-                            context = context,
+                            pageRenderer = pageRenderer,
                             documentState = documentState,
                             pageCount = pageCount,
                             currentPageIndex = currentPageIndex,
@@ -131,7 +130,7 @@ internal fun PdfReaderChrome(
 
 @Composable
 private fun PdfPagePreviewStrip(
-    context: Context,
+    pageRenderer: PageImageRenderer,
     documentState: ReaderDocumentState,
     pageCount: Int,
     currentPageIndex: Int,
@@ -171,7 +170,7 @@ private fun PdfPagePreviewStrip(
             key = { pageIndex -> "pdf-page-$pageIndex" },
         ) { pageIndex ->
             PdfPagePreviewItem(
-                context = context,
+                pageRenderer = pageRenderer,
                 documentUri = documentUri,
                 previewCache = previewCache,
                 pageIndex = pageIndex,
@@ -185,7 +184,7 @@ private fun PdfPagePreviewStrip(
 
 @Composable
 private fun PdfPagePreviewItem(
-    context: Context,
+    pageRenderer: PageImageRenderer,
     documentUri: Uri,
     previewCache: PdfPreviewBitmapCache,
     pageIndex: Int,
@@ -201,12 +200,7 @@ private fun PdfPagePreviewItem(
     ) {
         value = withContext(Dispatchers.IO) {
             previewCache.get(pageIndex)
-                ?: renderPdfPage(
-                    context = context,
-                    documentUri = documentUri,
-                    pageIndex = pageIndex,
-                    targetLongEdgePx = PDF_PREVIEW_RENDER_LONG_EDGE_PX,
-                ).also { renderedState ->
+                ?: pageRenderer(documentUri, pageIndex, PDF_PREVIEW_RENDER_LONG_EDGE_PX).also { renderedState ->
                     if (renderedState is PdfPageRenderState.Ready) {
                         previewCache.put(pageIndex, renderedState)
                     }

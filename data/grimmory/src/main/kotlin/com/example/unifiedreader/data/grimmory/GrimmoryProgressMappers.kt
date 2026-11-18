@@ -64,7 +64,7 @@ internal fun GrimmoryProgressUpdate.toRequestDto(): GrimmoryReadProgressRequestD
 private fun GrimmoryProgressUpdate.toDeprecatedEpubProgress(
     clampedPercent: Float,
 ): GrimmoryEpubProgressDto? {
-    if (bookType?.equals("EPUB", ignoreCase = true) != true) return null
+    if (EbookBookTypes.none { ebookType -> ebookType.equals(bookType, ignoreCase = true) }) return null
     return GrimmoryEpubProgressDto(
         cfi = positionData,
         href = positionHref,
@@ -94,6 +94,9 @@ private fun GrimmoryProgressUpdate.toDeprecatedCbxProgress(
         percentage = clampedPercent,
     )
 }
+
+// Grimmory keeps FB2, MOBI and AZW3 progress in its EPUB fields (its ebook reader reads all four).
+private val EbookBookTypes = listOf("EPUB", "FB2", "MOBI", "AZW3", "AZW")
 
 // Grimmory files comics as CBX; local items may carry the archive format instead.
 private val ComicBookTypes = listOf("CBX", "CBZ", "CBR")

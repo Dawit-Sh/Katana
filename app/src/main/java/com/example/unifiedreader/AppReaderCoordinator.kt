@@ -1,9 +1,9 @@
 package com.example.unifiedreader
 
 import android.util.Log
-import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
+import com.example.unifiedreader.core.model.isBookReaderFormat
 import com.example.unifiedreader.core.model.isKavitaSeriesContainer
 import com.example.unifiedreader.core.model.isStumpSeriesContainer
 import com.example.unifiedreader.feature.library.LibraryScrollPosition
@@ -132,7 +132,7 @@ class AppReaderCoordinator @Inject constructor(
                 }
                 // The EPUB and PDF readers restore their position once and ignore a later pull, so they
                 // open after it (bounded); comics follow a pull that lands after they open.
-                val pullFirst = item.format == FormatType.EPUB || item.format == FormatType.PDF
+                val pullFirst = item.format.isBookReaderFormat()
                 if (!pullFirst) open()
                 scope.launch {
                     withTimeoutOrNull(DOWNLOADED_PROGRESS_PULL_BEFORE_OPEN_MILLIS) {

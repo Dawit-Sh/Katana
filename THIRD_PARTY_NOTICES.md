@@ -11,6 +11,31 @@ Version 1.1; the full text follows.
 The vector drawables in `core/ui-components/src/main/res/drawable/ic_*.xml` are converted from
 https://github.com/google/material-design-icons (Apache License 2.0).
 
+## DjVuLibre (DjVu pages)
+
+`core/djvu/src/main/cpp/djvulibre/` is DjVuLibre 3.5.28's `libdjvu`
+(https://sourceforge.net/projects/djvu/files/DjVuLibre/3.5.28/), built into `libkatana_djvu.so` to draw
+DjVu pages. Copyright 1999-2001 LizardTech, Inc.; 2002-2014 Léon Bottou, Yann Le Cun and others (see
+`COPYRIGHT` there). Licensed under the GNU General Public License, version 2 or (at your option) any later
+version; the full text is `core/djvu/src/main/cpp/djvulibre/COPYING`.
+
+**What this means for releases.** Using Katana privately needs nothing. An APK that contains DjVuLibre may
+only be given to others under the GPL: with the complete source of the whole app (Katana and the yabai code
+it is built on) under GPL-compatible terms, and the same freedom to share it. yabai has no licence of its
+own, so a public release with DjVu support first needs its author's agreement to that (or a public build
+without `core:djvu`).
+
+## jsoup (MOBI and AZW3 conversion)
+
+`core:ebook-convert` uses jsoup 1.18.1 (https://jsoup.org), the copy Readium already brings. MIT License,
+Copyright (c) 2009-2024 Jonathan Hedley.
+
+## MOBI, AZW, AZW3 and FB2 conversion
+
+`core:ebook-convert` is Katana's own code, written from the public descriptions of the formats (the
+MobileRead wiki's MOBI and KF8 pages, the FictionBook 2 schema). It follows the approach of Librera Reader,
+libmobi and KindleUnpack (converting to EPUB) without using their code. MuPDF is not used.
+
 ---
 
 Copyright 2018 The Manrope Project Authors (https://github.com/googlefonts/manrope)

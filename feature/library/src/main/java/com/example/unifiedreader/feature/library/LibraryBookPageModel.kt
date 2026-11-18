@@ -1,6 +1,5 @@
 package com.example.unifiedreader.feature.library
 
-import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.ReadableItemKind
 import com.example.unifiedreader.core.model.comicVolumeLabel
@@ -14,6 +13,7 @@ import com.example.unifiedreader.core.model.ownIssueTitle
 import com.example.unifiedreader.core.model.shortDayLabel
 import com.example.unifiedreader.core.model.supportsManualReadStatusAction
 import com.example.unifiedreader.core.model.volumeNumber
+import com.example.unifiedreader.core.model.opensInEpubReader
 import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
@@ -126,7 +126,7 @@ internal fun libraryBookPageText(
         // A comic or a PDF has its pages. An EPUB has its printed edition's when its server knows
         // them, and its chapters once its reader has counted them.
         libraryItemPageCount(item, progress)?.let { count -> add("Pages" to count.toString()) }
-        if (item.format == FormatType.EPUB) {
+        if (item.format.opensInEpubReader()) {
             progress?.chapterCount?.takeIf { it > 0 }?.let { count -> add("Chapters" to count.toString()) }
         }
         facets.languages.takeIf(List<String>::isNotEmpty)?.let { languages ->

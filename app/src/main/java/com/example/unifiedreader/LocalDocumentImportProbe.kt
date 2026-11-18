@@ -71,6 +71,8 @@ internal class LocalDocumentImportProbe(
                 pageEntryNames = emptyList(),
             )
         }
+        // Before comics: a zipped FB2 is a ZIP too.
+        probeBookFile(displayName, uri, persistedUri)?.let { return it }
         val archive = resolveComicArchive(displayName, uri) ?: return null
         val pageCount = archive.pageEntryNames.size
         if (pageCount <= 0) return null
@@ -88,6 +90,27 @@ internal class LocalDocumentImportProbe(
             issueNumber = archive.comicMetadata?.issueNumber,
             author = archive.comicMetadata?.writer,
             summary = archive.comicMetadata?.summary,
+        )
+    }
+
+    private fun probeBookFile(
+        displayName: String,
+        uri: Uri,
+        persistedUri: String,
+    ): LocalDocumentRecord? {
+        val probe = runCatching { probeLocalBookFile(context, uri, displayName) }
+            .onFailure { throwable -> Log.w(LOG_TAG, "Failed to probe $displayName as a book file", throwable) }
+            .getOrNull() ?: return null
+        return LocalDocumentRecord(
+            id = buildItemId(uri, probe.format),
+            uri = persistedUri,
+            displayName = displayName,
+            title = probe.metadata?.title?.takeIf(String::isNotBlank) ?: probe.format.localImportTitleFallback(displayName),
+            format = probe.format,
+            pageCount = 0,
+            pageEntryNames = emptyList(),
+            author = probe.metadata?.authors?.takeIf(List<String>::isNotEmpty)?.joinToString(", "),
+            summary = probe.metadata?.description,
         )
     }
 

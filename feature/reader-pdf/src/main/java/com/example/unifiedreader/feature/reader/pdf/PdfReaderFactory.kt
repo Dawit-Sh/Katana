@@ -1,7 +1,7 @@
 package com.example.unifiedreader.feature.reader.pdf
 
 import android.net.Uri
-import com.example.unifiedreader.core.model.FormatType
+import com.example.unifiedreader.core.model.PageImageBookFormats
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.feature.reader.core.ReaderChrome
 import com.example.unifiedreader.feature.reader.core.ReaderSessionStore
@@ -17,7 +17,8 @@ fun pdfReaderFactory(
     documentUriProvider: suspend (ReadableItem) -> Uri? = { null },
     pageNumberPreferences: ReaderPageNumberPreferencesStore = InMemoryReaderPageNumberPreferencesStore(),
 ): ReaderScreenFactory = formatReaderFactory(
-    FormatType.PDF,
+    // PDF, and DjVu scans drawn page by page the same way.
+    formats = PageImageBookFormats,
     chrome = ReaderChrome.Immersive,
 ) { item, onBack, navigationActions ->
         PdfReaderScreen(
