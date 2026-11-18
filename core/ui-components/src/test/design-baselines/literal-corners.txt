@@ -2,7 +2,6 @@
 5 app/src/main/java/com/example/unifiedreader/ui/theme/UnifiedReaderDesignTokens.kt
 3 feature/journal/src/main/java/com/example/unifiedreader/feature/journal/JournalFinishedShelves.kt
 2 feature/journal/src/main/java/com/example/unifiedreader/feature/journal/JournalSheet.kt
-1 feature/journal/src/main/java/com/example/unifiedreader/feature/journal/JournalStatsCalendars.kt
 4 feature/journal/src/main/java/com/example/unifiedreader/feature/journal/JournalStatsDashboard.kt
 2 feature/journal/src/main/java/com/example/unifiedreader/feature/journal/JournalStatsSections.kt
 8 feature/journal/src/main/java/com/example/unifiedreader/feature/journal/JournalWhatYouRead.kt

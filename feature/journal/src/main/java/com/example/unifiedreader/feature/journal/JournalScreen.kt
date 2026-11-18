@@ -34,6 +34,10 @@ fun JournalScreen(
     // Lists read to the end, kept by the journal, and how their covers are drawn.
     finishedLists: List<JournalFinishedList> = emptyList(),
     listCover: JournalListCover? = null,
+    // The reader's highlights and saved words, for Highlights this month.
+    marks: JournalMarks = JournalMarks(),
+    // Opens the Bookmarks page from Highlights this month; null hides the link.
+    onOpenBookmarks: (() -> Unit)? = null,
 ) {
     var deleteTarget by remember { mutableStateOf<JournalDeleteTarget?>(null) }
     JournalStatsContent(
@@ -48,6 +52,8 @@ fun JournalScreen(
         modifier = modifier,
         finishedLists = finishedLists,
         listCover = listCover,
+        marks = marks,
+        onOpenBookmarks = onOpenBookmarks,
     )
     val toasts = LocalAppToastState.current
     deleteTarget?.let { target ->

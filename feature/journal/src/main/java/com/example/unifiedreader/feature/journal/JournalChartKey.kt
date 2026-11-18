@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,12 +16,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.unifiedreader.ui.components.AppLayout
 
-private val KeyDotSize = 8.dp
+private val KeySwatchSize = 10.dp
+private val KeySwatchCorner = 3.dp
 
 /** One colour of a chart and what it means. */
 internal data class JournalChartKeyEntry(val color: Color, val label: String)
 
-/** A chart's key under it: a dot in each colour with its meaning, "● Your usual hours  ● Other hours". */
+/** A chart's key under it: a small square in each colour with its meaning, "▪ Your usual hours  ▪ Other hours". */
 @Composable
 internal fun JournalChartKey(
     entries: List<JournalChartKeyEntry>,
@@ -39,8 +40,8 @@ internal fun JournalChartKey(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(KeyDotSize)
-                        .clip(CircleShape)
+                        .size(KeySwatchSize)
+                        .clip(RoundedCornerShape(KeySwatchCorner))
                         .background(entry.color),
                 )
                 Text(

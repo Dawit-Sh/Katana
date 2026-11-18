@@ -4,7 +4,7 @@
 2 feature/journal/src/main/java/com/example/unifiedreader/feature/journal/JournalFinishedScreen.kt
 5 feature/journal/src/main/java/com/example/unifiedreader/feature/journal/JournalFinishedShelves.kt
 6 feature/journal/src/main/java/com/example/unifiedreader/feature/journal/JournalSheet.kt
-6 feature/journal/src/main/java/com/example/unifiedreader/feature/journal/JournalStatsCalendars.kt
+2 feature/journal/src/main/java/com/example/unifiedreader/feature/journal/JournalStatsCalendars.kt
 1 feature/journal/src/main/java/com/example/unifiedreader/feature/journal/JournalStatsContent.kt
 9 feature/journal/src/main/java/com/example/unifiedreader/feature/journal/JournalStatsDashboard.kt
 6 feature/journal/src/main/java/com/example/unifiedreader/feature/journal/JournalStatsSections.kt

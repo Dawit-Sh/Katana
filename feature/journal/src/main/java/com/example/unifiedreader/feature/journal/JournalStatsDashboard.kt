@@ -247,7 +247,8 @@ private fun MixLegend(
 
 /**
  * When you read (Month): the time per hour of the day as 24 small bars, the hours most of it
- * falls in named in the heading's line and drawn in the warm accent.
+ * falls in named in the heading's line and drawn in the accent (the reading days' colour), the
+ * rest in grey, with a key under them.
  */
 @Composable
 internal fun JournalWhenYouReadPanel(
@@ -266,7 +267,7 @@ internal fun JournalWhenYouReadPanel(
             maxValue = maxMillis,
             labels = buckets.map { bucket -> bucket.label.takeIf { bucket.key % 6 == 0 } },
             highlighted = buckets.map { bucket -> inWindow(bucket.key) },
-            highlightColor = MaterialTheme.colorScheme.tertiary,
+            highlightColor = MaterialTheme.colorScheme.primary,
             height = 72.dp,
             gap = 4.dp,
             description = "Reading by hour of the day. ${journalReadingHoursLabel(buckets)}",
@@ -277,8 +278,8 @@ internal fun JournalWhenYouReadPanel(
             // The usual hours are the accent bars; without a key the two colours meant nothing.
             JournalChartKey(
                 entries = listOf(
-                    JournalChartKeyEntry(MaterialTheme.colorScheme.tertiary, "Your usual hours"),
-                    JournalChartKeyEntry(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f), "Other hours"),
+                    JournalChartKeyEntry(MaterialTheme.colorScheme.primary, "Your usual hours"),
+                    JournalChartKeyEntry(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = JournalBarGreyAlpha), "Other hours"),
                 ),
                 modifier = Modifier.padding(top = AppLayout.headingGap),
             )
@@ -364,7 +365,7 @@ private fun BarChart(
     modifier: Modifier = Modifier,
     stretch: Boolean = false,
 ) {
-    val barColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+    val barColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = JournalBarGreyAlpha)
     val stubColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
     Column(modifier = modifier.clearAndSetSemantics { contentDescription = description }) {
         Row(
@@ -406,3 +407,6 @@ private fun BarChart(
         }
     }
 }
+
+/** The grey of a chart's other bars, and of its key. */
+private const val JournalBarGreyAlpha = 0.45f
