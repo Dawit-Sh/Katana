@@ -38,7 +38,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8: much less code for the Fire 7 to load and check at every start. Keep rules in
+            // proguard-rules.pro; the Baseline Profile is in src/main/baselineProfiles.
+            isMinifyEnabled = true
+            isShrinkResources = true
             // Local Fire 7 (2019) build: without the release keys, sign with this PC's debug key
             // so the APK installs; the release stays a fast (non-debuggable) build.
             signingConfig = releaseSigningConfig ?: signingConfigs.getByName("debug")
@@ -94,6 +97,8 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
+    // Puts the Baseline Profile in place on the device so start-up code is compiled ahead of time.
+    implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.activity.compose)
