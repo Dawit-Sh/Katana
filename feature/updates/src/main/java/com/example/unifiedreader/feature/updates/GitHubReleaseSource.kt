@@ -42,7 +42,7 @@ class GitHubReleaseSource(
     }
 
     companion object {
-        const val DEFAULT_REPOSITORY = "bostannnn/yabai"
+        const val DEFAULT_REPOSITORY = "Dawit-Sh/yabaiSY"
     }
 }
 
@@ -54,7 +54,7 @@ internal fun parseGitHubRelease(body: String): AppRelease? {
     if (release.draft || release.prerelease) return null
     val version = AppVersion.parse(release.tagName) ?: return null
     val apks = release.assets.filter { asset -> asset.name.endsWith(".apk", ignoreCase = true) }
-    val apk = apks.firstOrNull { asset -> asset.name.startsWith("yabai-") } ?: apks.firstOrNull() ?: return null
+    val apk = apks.firstOrNull { asset -> asset.name.startsWith("yabaiSY-") } ?: apks.firstOrNull() ?: return null
     return AppRelease(
         version = version,
         tagName = release.tagName,

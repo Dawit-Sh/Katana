@@ -140,7 +140,7 @@ private fun SourceStartChoices(
             modifier = Modifier.padding(start = 4.dp, bottom = 30.dp),
         )
         AppScreenTitle(text = "Where are your books?")
-        SourceStartLead(text = "yabai reads EPUB, PDF and comics (CBZ and CBR) from your own server or from this device.")
+        SourceStartLead(text = "yabaiSY reads EPUB, PDF and comics (CBZ and CBR) from your own server or from this device.")
         Spacer(modifier = Modifier.height(30.dp))
         AppPanel(modifier = Modifier.fillMaxWidth()) {
             servers.forEachIndexed { index, entry ->

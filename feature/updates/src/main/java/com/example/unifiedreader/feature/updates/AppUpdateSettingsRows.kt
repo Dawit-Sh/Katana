@@ -88,7 +88,7 @@ fun AppUpdateAutoCheckRow(
         supporting = if (state.isDebugBuild) {
             "Off on debug builds; the button above still checks"
         } else {
-            "When yabai opens"
+            "When yabaiSY opens"
         },
         onClick = { onCheckedChange(!state.autoCheck) },
         enabled = !state.isDebugBuild,

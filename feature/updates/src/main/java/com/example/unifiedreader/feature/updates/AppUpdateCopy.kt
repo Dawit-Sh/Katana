@@ -121,20 +121,20 @@ internal fun failureCopy(failure: AppUpdateFailure, installedVersion: String): D
         )
         AppUpdateFailure.Damaged -> DialogCopy(
             title = "The download was damaged",
-            body = "The file doesn't match the checksum GitHub published for it, so yabai deleted it.",
+            body = "The file doesn't match the checksum GitHub published for it, so yabaiSY deleted it.",
             dismiss = close,
             confirm = tryAgain,
         )
         AppUpdateFailure.DifferentKey -> DialogCopy(
             title = "This copy can't update itself",
-            body = "The update is signed with the release key and this copy of yabai $installedVersion isn't " +
+            body = "The update is signed with the release key and this copy of yabaiSY $installedVersion isn't " +
                 "(a debug build, for one). Android would refuse it, so nothing was installed.",
             dismiss = close,
             confirm = openOnGitHub,
         )
         AppUpdateFailure.NotThisApp -> DialogCopy(
-            title = "This release isn't yabai",
-            body = "The file attached to the release is a different app, so yabai deleted it.",
+            title = "This release isn't yabaiSY",
+            body = "The file attached to the release is a different app, so yabaiSY deleted it.",
             dismiss = close,
             confirm = openOnGitHub,
         )

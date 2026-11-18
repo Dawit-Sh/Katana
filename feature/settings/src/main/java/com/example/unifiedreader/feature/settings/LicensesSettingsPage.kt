@@ -42,7 +42,7 @@ internal fun LicensesSettingsPage(
         modifier = modifier,
         horizontalPadding = horizontalPadding,
     ) {
-        SettingsPageLine("yabai is built with these. Tap one to read its license.")
+        SettingsPageLine("yabaiSY is built with these. Tap one to read its license.")
         notices?.let { loaded ->
             AppSettingsGroup {
                 loaded.components.forEachIndexed { index, component ->

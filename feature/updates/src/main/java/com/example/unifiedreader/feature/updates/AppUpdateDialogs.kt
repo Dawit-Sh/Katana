@@ -51,7 +51,7 @@ fun AppUpdateDialogs(
         AppUpdateDialog.None -> Unit
         AppUpdateDialog.Update -> UpdateDialog(state = state, actions = actions)
         AppUpdateDialog.InstallPermission -> UpdateDialogCard(
-            title = "Allow yabai to install updates",
+            title = "Allow yabaiSY to install updates",
             onDismissRequest = actions.onCloseDialog,
             dismiss = AppUpdateButton("Not now", AppUpdateAction.Close),
             confirm = AppUpdateButton("Open settings", AppUpdateAction.Install, filled = true),
@@ -96,7 +96,7 @@ private fun UpdateDialog(
     val onAction: (AppUpdateAction) -> Unit = { action -> actions.perform(action, state) }
     when (val status = state.status) {
         is AppUpdateStatus.Available -> UpdateDialogCard(
-            title = "yabai ${status.release.version} is ready",
+            title = "yabaiSY ${status.release.version} is ready",
             subtitle = "You have ${state.currentVersion} · ${formatUpdateSize(status.release.apk.sizeBytes)}",
             // Tapping outside is Later: the offer waits for the next version, Settings keeps it.
             onDismissRequest = actions.onLater,
@@ -129,7 +129,7 @@ private fun UpdateDialog(
             confirm = AppUpdateButton("Install", AppUpdateAction.Install, filled = true),
             onAction = onAction,
         ) {
-            DialogBody("Android closes yabai while it installs. Your library, journal and reading positions stay.")
+            DialogBody("Android closes yabaiSY while it installs. Your library, journal and reading positions stay.")
         }
         is AppUpdateStatus.Installing -> UpdateDialogCard(
             title = "Installing ${status.release.version}",
@@ -138,7 +138,7 @@ private fun UpdateDialog(
             confirm = null,
             onAction = onAction,
         ) {
-            DialogBody("Android's installer takes it from here. yabai closes while the update goes in.")
+            DialogBody("Android's installer takes it from here. yabaiSY closes while the update goes in.")
         }
         is AppUpdateStatus.Failed -> {
             val copy = failureCopy(status.failure, state.currentVersion)
