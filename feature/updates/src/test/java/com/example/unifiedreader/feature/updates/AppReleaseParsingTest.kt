@@ -94,7 +94,7 @@ class AppReleaseParsingTest {
 
         val release = GitHubReleaseSource(client).latestRelease()
 
-        assertEquals("https://api.github.com/repos/Dawit-Sh/yabaiSY/releases/latest", requestedUrl)
+        assertEquals("https://api.github.com/repos/Dawit-Sh/Katana/releases/latest", requestedUrl)
         assertEquals("application/vnd.github+json", acceptHeader)
         assertEquals("0.13.0", release?.version.toString())
     }

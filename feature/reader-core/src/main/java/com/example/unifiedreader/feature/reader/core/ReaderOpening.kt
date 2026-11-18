@@ -108,7 +108,7 @@ fun readerOpeningWords(
 
 /** The error screen's heading. */
 fun ReaderOpenFailure.title(): String = when (this) {
-    is ReaderOpenFailure.Unsupported -> "yabaiSY can’t open ${format.name} files"
+    is ReaderOpenFailure.Unsupported -> "Katana can’t open ${format.name} files"
     else -> "Couldn’t open this book"
 }
 
@@ -119,8 +119,8 @@ fun ReaderOpenFailure.reason(): String = when (this) {
     is ReaderOpenFailure.ServerNotConnected -> "This book’s server isn’t connected. Connect it in Settings, then try again."
     ReaderOpenFailure.LocalFileGone -> "The file was moved or deleted. Import it again from where it is now."
     ReaderOpenFailure.DownloadGone -> "The downloaded file is gone. Download it again."
-    ReaderOpenFailure.NotReadable -> "This file isn’t a book yabaiSY can read. It may be damaged."
-    ReaderOpenFailure.NoComicPages -> "This archive has no pages yabaiSY can show."
+    ReaderOpenFailure.NotReadable -> "This file isn’t a book Katana can read. It may be damaged."
+    ReaderOpenFailure.NoComicPages -> "This archive has no pages Katana can show."
     ReaderOpenFailure.NoPdfPages -> "This PDF has no pages."
     ReaderOpenFailure.PdfUnreadable -> "This PDF is damaged or locked with a password."
     is ReaderOpenFailure.Unsupported -> "It reads EPUB, PDF, CBZ and CBR."

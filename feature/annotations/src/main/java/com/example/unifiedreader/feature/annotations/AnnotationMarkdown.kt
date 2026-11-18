@@ -29,7 +29,7 @@ object AnnotationMarkdown {
         words: List<SavedWord>,
         exportedOn: LocalDate,
     ): String = buildString {
-        appendLine("# yabaiSY notebook")
+        appendLine("# Katana notebook")
         appendLine()
         appendLine(summary(exportedOn, highlights.size, words.size))
         val highlightsByBook = highlights.groupBy { it.book.itemId }
@@ -51,7 +51,7 @@ object AnnotationMarkdown {
 
     /** A file name for the export: the book's title, or the notebook's, and the day. */
     fun fileName(book: AnnotatedBook?, exportedOn: LocalDate): String {
-        val name = book?.title?.let(::safeFileName)?.takeIf(String::isNotEmpty) ?: "yabaiSY notebook"
+        val name = book?.title?.let(::safeFileName)?.takeIf(String::isNotEmpty) ?: "Katana notebook"
         return "$name ${exportedOn.format(DateTimeFormatter.ISO_LOCAL_DATE)}.md"
     }
 
@@ -98,7 +98,7 @@ object AnnotationMarkdown {
     }
 
     private fun summary(exportedOn: LocalDate, highlights: Int, words: Int): String =
-        "Exported from yabaiSY on ${exportedOn.format(DayFormat)}: " +
+        "Exported from Katana on ${exportedOn.format(DayFormat)}: " +
             "${count(highlights, "highlight")}, ${count(words, "saved word")}."
 
     private fun count(n: Int, noun: String): String = if (n == 1) "1 $noun" else "$n ${noun}s"

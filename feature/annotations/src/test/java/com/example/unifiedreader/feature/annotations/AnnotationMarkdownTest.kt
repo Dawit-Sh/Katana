@@ -26,7 +26,7 @@ class AnnotationMarkdownTest {
             # The Hole
             *Hiroko Oyamada*
 
-            Exported from yabaiSY on 18 November 2026: 3 highlights, 1 saved word.
+            Exported from Katana on 18 November 2026: 3 highlights, 1 saved word.
 
             ## Highlights
 
@@ -63,9 +63,9 @@ class AnnotationMarkdownTest {
 
         assertEquals(
             """
-            # yabaiSY notebook
+            # Katana notebook
 
-            Exported from yabaiSY on 18 November 2026: 1 highlight, 1 saved word.
+            Exported from Katana on 18 November 2026: 1 highlight, 1 saved word.
 
             ## the Factory
             *Hiroko Oyamada*
@@ -93,7 +93,7 @@ class AnnotationMarkdownTest {
             "Who Am I Really 2026-11-18.md",
             AnnotationMarkdown.fileName(hole.copy(title = "Who Am I: Really?"), day),
         )
-        assertEquals("yabaiSY notebook 2026-11-18.md", AnnotationMarkdown.fileName(null, day))
+        assertEquals("Katana notebook 2026-11-18.md", AnnotationMarkdown.fileName(null, day))
     }
 
     private fun highlight(id: String, text: String, chapter: String?, at: Double?, note: String? = null) = ReaderHighlight(

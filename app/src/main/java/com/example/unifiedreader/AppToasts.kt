@@ -15,7 +15,7 @@ internal object AppToasts {
         AppToastMessage(text = "Added to ${item.sourceType.displayName()}", icon = AppToastIcon.Added)
 
     fun unreadableFile(): AppToastMessage = AppToastMessage(
-        text = "That file isn't a book yabaiSY can open",
+        text = "That file isn't a book Katana can open",
         supportingText = "EPUB, PDF, CBZ or CBR",
         icon = AppToastIcon.Error,
     )

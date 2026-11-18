@@ -21,7 +21,7 @@ import kotlinx.coroutines.flow.map
 data class TranslationPreferences(
     val targetLanguage: String? = null,
     val otherLanguage: String? = null,
-    // Off by default in yabaiSY: the selection toolbar holds Highlight, Note and Add to dictionary now.
+    // Off by default in Katana: the selection toolbar holds Highlight, Note and Add to dictionary now.
     val openOnSelect: Boolean = false,
     val provider: TranslationProvider = TranslationProvider.Device,
 )
