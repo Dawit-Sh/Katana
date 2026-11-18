@@ -87,6 +87,7 @@ class MobiToEpubTest {
         val second = epub.getValue("OEBPS/part0001.xhtml")
         assertTrue(first, first.contains("<h1 id=\"start\">One</h1>"))
         assertTrue(first, first.contains("<link href=\"flow0001.css\" rel=\"stylesheet\" type=\"text/css\" />"))
+        // srcset names files Kindlegen didn't keep, so only src stays.
         assertTrue(first, first.contains("<img src=\"image00001.png\" />"))
         // The kindle:pos link lands on the fragment's div, which gets the id the link needs.
         assertTrue(first, first.contains("href=\"part0001.xhtml#aid-3\""))
@@ -169,7 +170,7 @@ private object Kf8Sample {
     private const val SKELETON_0 = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><html xmlns=\"http://www.w3.org/1999/xhtml\"><head>" +
         "<link href=\"kindle:flow:0001?mime=text/css\" rel=\"stylesheet\" type=\"text/css\"/></head><body aid=\"0\"></body></html>"
     private const val FRAGMENT_0 = "<div aid=\"1\"><h1 id=\"start\">One</h1><p>To <a href=\"kindle:pos:fid:0001:off:0000000000\">two</a>." +
-        "<img src=\"kindle:embed:0001?mime=image/png\"/></p></div>"
+        "<img src=\"kindle:embed:0001?mime=image/png\" srcset=\"../images/a-2x.png 2x\"/></p></div>"
     private const val SKELETON_1 = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><html xmlns=\"http://www.w3.org/1999/xhtml\"><head></head>" +
         "<body aid=\"2\"></body></html>"
     private const val FRAGMENT_1 = "<div aid=\"3\"><h1>Two</h1><p>Text.</p></div>"

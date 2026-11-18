@@ -18,7 +18,7 @@ import java.util.zip.CRC32
  */
 object EbookConverter {
     /** Bumped whenever the EPUBs made change, so copies made by an older converter are made again. */
-    const val VERSION: Int = 1
+    const val VERSION: Int = 2
 
     /** Which kind [book] is, from its first bytes, or null when it is neither. */
     fun detectKind(book: ByteArray): ConvertibleBookKind? = when {

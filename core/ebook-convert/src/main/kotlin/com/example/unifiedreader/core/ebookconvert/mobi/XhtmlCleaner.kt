@@ -38,6 +38,8 @@ private fun cleanElement(element: Element) {
         val prefix = key.substringBefore(':', missingDelimiterValue = "").lowercase()
         if (prefix.isNotEmpty() && prefix !in KeptPrefixes && prefix != "xmlns") element.removeAttr(key)
     }
+    // Kindlegen keeps an EPUB's srcset but not the files it names; the WebView would pick those over src.
+    element.removeAttr("srcset")
     if (name.equals("svg", ignoreCase = true)) declareSvgNamespaces(element)
     if (name.equals("math", ignoreCase = true) && !element.hasAttr("xmlns")) element.attr("xmlns", MATHML_NAMESPACE)
     SvgAttributeCase.forEach { (lower, proper) ->
