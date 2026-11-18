@@ -220,6 +220,9 @@ Use this ownership map when deciding where code goes.
   - download workflows and download-facing UI
 - `feature:journal`
   - journal entries, journal stats, and journal-facing UI/state
+- `feature:annotations`
+  - the reader's own marks: highlights, page bookmarks and saved words (the Room-backed store, the
+    Markdown export, the word review schedule), the Bookmarks screen and the quote image card
 - `feature:lists`
   - the user's own lists and reading orders (Want to read, Stalled, lists that mix sources):
     the Room-backed store, list logic (order, next to read, Stalled) and the Lists screens and sheets

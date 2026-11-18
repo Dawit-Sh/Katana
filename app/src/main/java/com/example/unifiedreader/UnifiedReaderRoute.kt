@@ -63,8 +63,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 @Composable
 fun UnifiedReaderRoute(
-    // Settings' look for new books, Storage, backup, Sign out, and the Downloads sheet's "On this tablet".
+    // Settings' look for new books, Storage, backup, Sign out, and the Downloads sheet's "On this device".
     settingsTools: AppSettingsToolsViewModel = hiltViewModel(),
+    // Every book's marks, for the Bookmarks screen.
+    bookmarks: AppBookmarksViewModel = hiltViewModel(),
 ) {
     val viewModel: AppViewModel = hiltViewModel()
     val updates: AppUpdatesViewModel = hiltViewModel()
@@ -98,6 +100,7 @@ fun UnifiedReaderRoute(
             updateController = updates.controller,
             listsViewModel = lists,
             tagsViewModel = tags,
+            bookmarks = bookmarks.screen,
         )
     }
 }
@@ -109,6 +112,7 @@ fun UnifiedReaderAppContent(
     updateController: AppUpdateController? = null,
     listsViewModel: AppListsViewModel? = null,
     tagsViewModel: AppLibraryTagsViewModel? = null,
+    bookmarks: AppBookmarksScreen? = null,
 ) {
     val uiState = viewModel.uiState
     val updateStateFlow = remember(updateController) {
@@ -232,6 +236,7 @@ fun UnifiedReaderAppContent(
                                     onStartSource = { request -> sourceStartRequest = request },
                                     listsViewModel = listsViewModel,
                                     tagsViewModel = tagsViewModel,
+                                    bookmarks = bookmarks,
                                 )
                             }
                         }

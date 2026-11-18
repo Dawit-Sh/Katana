@@ -1,6 +1,8 @@
 package com.example.unifiedreader.feature.annotations
 
 import com.example.unifiedreader.core.database.dao.ReaderAnnotationDao
+import com.example.unifiedreader.core.database.dao.ReaderBookmarkDao
+import com.example.unifiedreader.core.database.dao.SavedWordStudyDao
 import com.example.unifiedreader.core.database.entity.ReaderHighlightEntity
 import com.example.unifiedreader.core.database.entity.SavedWordEntity
 import java.util.UUID
@@ -11,8 +13,8 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
-/** The reader's highlights and saved words on this device. */
-interface ReaderAnnotationStore {
+/** The reader's highlights, bookmarks and saved words on this device. */
+interface ReaderAnnotationStore : ReaderBookmarkStore, SavedWordStudyStore {
     /** One book's highlights in reading order. */
     fun highlights(itemId: String): Flow<List<ReaderHighlight>>
 
@@ -58,10 +60,14 @@ interface ReaderAnnotationStore {
 
 class RoomReaderAnnotationStore(
     private val dao: ReaderAnnotationDao,
+    bookmarkDao: ReaderBookmarkDao,
+    studyDao: SavedWordStudyDao,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val now: () -> Long = System::currentTimeMillis,
     private val newId: () -> String = { UUID.randomUUID().toString() },
-) : ReaderAnnotationStore {
+) : ReaderAnnotationStore,
+    ReaderBookmarkStore by RoomReaderBookmarkStore(bookmarkDao, ioDispatcher, now, newId),
+    SavedWordStudyStore by RoomSavedWordStudyStore(studyDao, ioDispatcher, now) {
     override fun highlights(itemId: String): Flow<List<ReaderHighlight>> =
         dao.observeHighlights(itemId).map { rows -> rows.map(ReaderHighlightEntity::toModel) }.flowOn(ioDispatcher)
 
@@ -194,4 +200,7 @@ internal fun SavedWordEntity.toModel(): SavedWord = SavedWord(
     },
     note = note,
     createdAtEpochMillis = createdAtEpochMillis,
+    reviewLevel = reviewLevel,
+    reviewDueAtEpochMillis = reviewDueAtEpochMillis,
+    reviewedAtEpochMillis = reviewedAtEpochMillis,
 )

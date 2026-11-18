@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.yabai.android.library)
+    alias(libs.plugins.yabai.android.compose)
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -13,6 +14,14 @@ android {
 
 dependencies {
     implementation(project(":core:database"))
+    implementation(project(":core:ui-theme"))
+    implementation(project(":core:ui-components"))
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
 

@@ -83,7 +83,11 @@ data class ReaderHighlight(
     val updatedAtEpochMillis: Long,
 )
 
-/** A word saved from a book to look up later, with the sentence it came from. */
+/**
+ * A word saved from a book to look up later, with the sentence it came from. [reviewLevel] counts
+ * the flashcard reviews it was known in a row; it is next due at [reviewDueAtEpochMillis] (null:
+ * never reviewed, so due now).
+ */
 data class SavedWord(
     val id: String,
     val book: AnnotatedBook,
@@ -91,6 +95,23 @@ data class SavedWord(
     val sentence: String?,
     val place: AnnotationPlace?,
     val note: String?,
+    val createdAtEpochMillis: Long,
+    val reviewLevel: Int = 0,
+    val reviewDueAtEpochMillis: Long? = null,
+    val reviewedAtEpochMillis: Long? = null,
+)
+
+/**
+ * A page bookmarked in a book: where it starts ([place]), which page of how many it was when it
+ * was made, and the page's first words ([text]) to recognise it by.
+ */
+data class ReaderBookmark(
+    val id: String,
+    val book: AnnotatedBook,
+    val place: AnnotationPlace,
+    val page: Int?,
+    val pageCount: Int?,
+    val text: String?,
     val createdAtEpochMillis: Long,
 )
 

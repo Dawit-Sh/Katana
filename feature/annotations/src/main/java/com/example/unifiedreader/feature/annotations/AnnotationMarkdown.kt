@@ -3,11 +3,12 @@ package com.example.unifiedreader.feature.annotations
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.roundToInt
 
 /**
- * Highlights, their notes and saved words as Markdown, for one book or for every book: quotes in
- * reading order under their chapter, each note under its quote, then the words with the sentence
- * they came from.
+ * Bookmarks, highlights, their notes and saved words as Markdown, for one book or for every book:
+ * the bookmarked pages, then quotes in reading order under their chapter, each note under its
+ * quote, then the words with the sentence they came from.
  */
 object AnnotationMarkdown {
     fun book(
@@ -15,26 +16,29 @@ object AnnotationMarkdown {
         highlights: List<ReaderHighlight>,
         words: List<SavedWord>,
         exportedOn: LocalDate,
+        bookmarks: List<ReaderBookmark> = emptyList(),
     ): String = buildString {
         appendLine("# ${book.title.oneLine()}")
         book.author?.takeIf(String::isNotBlank)?.let { author -> appendLine("*${author.oneLine()}*") }
         appendLine()
-        appendLine(summary(exportedOn, highlights.size, words.size))
-        appendBookBody(highlights, words, headingLevel = 2)
+        appendLine(summary(exportedOn, highlights.size, words.size, bookmarks.size))
+        appendBookBody(highlights, words, bookmarks, headingLevel = 2)
     }.trimEnd() + "\n"
 
-    /** Every book with a highlight or a saved word, in title order. */
+    /** Every book with a highlight, a bookmark or a saved word, in title order. */
     fun library(
         highlights: List<ReaderHighlight>,
         words: List<SavedWord>,
         exportedOn: LocalDate,
+        bookmarks: List<ReaderBookmark> = emptyList(),
     ): String = buildString {
         appendLine("# Katana notebook")
         appendLine()
-        appendLine(summary(exportedOn, highlights.size, words.size))
+        appendLine(summary(exportedOn, highlights.size, words.size, bookmarks.size))
         val highlightsByBook = highlights.groupBy { it.book.itemId }
         val wordsByBook = words.groupBy { it.book.itemId }
-        val books = (highlights.map(ReaderHighlight::book) + words.map(SavedWord::book))
+        val bookmarksByBook = bookmarks.groupBy { it.book.itemId }
+        val books = (highlights.map(ReaderHighlight::book) + bookmarks.map(ReaderBookmark::book) + words.map(SavedWord::book))
             .distinctBy(AnnotatedBook::itemId)
             .sortedBy { it.title.lowercase(Locale.ROOT) }
         books.forEach { book ->
@@ -44,6 +48,7 @@ object AnnotationMarkdown {
             appendBookBody(
                 highlights = highlightsByBook[book.itemId].orEmpty().inReadingOrder(),
                 words = wordsByBook[book.itemId].orEmpty().inReadingOrderWords(),
+                bookmarks = bookmarksByBook[book.itemId].orEmpty(),
                 headingLevel = 3,
             )
         }
@@ -58,10 +63,21 @@ object AnnotationMarkdown {
     private fun StringBuilder.appendBookBody(
         highlights: List<ReaderHighlight>,
         words: List<SavedWord>,
+        bookmarks: List<ReaderBookmark>,
         headingLevel: Int,
     ) {
         val section = "#".repeat(headingLevel)
         val chapter = "#".repeat(headingLevel + 1)
+        if (bookmarks.isNotEmpty()) {
+            appendLine()
+            appendLine("$section Bookmarks")
+            appendLine()
+            bookmarks.inReadingOrderBookmarks().forEach { bookmark ->
+                val text = bookmark.text?.oneLine()?.takeIf(String::isNotBlank)?.let { ": \"$it\"" }.orEmpty()
+                val chapterTitle = bookmark.place.chapterTitle?.oneLine()?.takeIf(String::isNotBlank)?.let { " ($it)" }.orEmpty()
+                appendLine("- ${bookmarkPlace(bookmark)}$text$chapterTitle")
+            }
+        }
         if (highlights.isNotEmpty()) {
             appendLine()
             appendLine("$section Highlights")
@@ -97,9 +113,24 @@ object AnnotationMarkdown {
         text.trim().lines().forEach { line -> appendLine(if (line.isBlank()) ">" else "> ${line.trim()}") }
     }
 
-    private fun summary(exportedOn: LocalDate, highlights: Int, words: Int): String =
+    private fun summary(exportedOn: LocalDate, highlights: Int, words: Int, bookmarks: Int): String =
         "Exported from Katana on ${exportedOn.format(DayFormat)}: " +
-            "${count(highlights, "highlight")}, ${count(words, "saved word")}."
+            listOfNotNull(
+                count(highlights, "highlight"),
+                bookmarks.takeIf { it > 0 }?.let { count(it, "bookmark") },
+                count(words, "saved word"),
+            ).joinToString(", ") + "."
+
+    /** "Page 8 of 78", or how far through the book when the page is unknown. */
+    fun bookmarkPlace(bookmark: ReaderBookmark): String {
+        val page = bookmark.page?.takeIf { it > 0 }
+        val pages = bookmark.pageCount?.takeIf { it > 0 }
+        return when {
+            page != null && pages != null -> "Page $page of $pages"
+            page != null -> "Page $page"
+            else -> bookmark.place.progression?.let { "${(it * PERCENT).roundToInt().coerceIn(0, PERCENT)}%" } ?: "Bookmark"
+        }
+    }
 
     private fun count(n: Int, noun: String): String = if (n == 1) "1 $noun" else "$n ${noun}s"
 
@@ -109,4 +140,5 @@ object AnnotationMarkdown {
     private val DayFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ENGLISH)
 
     private const val MAX_FILE_NAME = 80
+    private const val PERCENT = 100
 }

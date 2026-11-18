@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.unifiedreader.feature.annotations.HighlightColor
 import com.example.unifiedreader.feature.annotations.HighlightStyle
+import com.example.unifiedreader.feature.annotations.QuoteShareDialog
 import com.example.unifiedreader.feature.annotations.ReaderHighlight
 import com.example.unifiedreader.ui.components.AppAnchoredCard
 import com.example.unifiedreader.ui.components.AppChip
@@ -51,13 +52,19 @@ import com.example.unifiedreader.ui.components.AppTextField
 
 /**
  * The card on a highlight, at the highlight: its style and colour (a tap changes it at once), its
- * note, Copy and Delete. Placed in a full-size slot over the page; the anchor comes in window pixels.
+ * note, Copy, Share as an image and Delete. Placed in a full-size slot over the page; the anchor
+ * comes in window pixels. The share card opens from it, in a dialog of its own.
  */
 @Composable
 internal fun EpubHighlightCardOverlay(
     controller: EpubAnnotationController,
     highlights: List<ReaderHighlight>,
 ) {
+    controller.sharing.highlightId?.let { sharingId ->
+        highlights.firstOrNull { it.id == sharingId }?.let { highlight ->
+            QuoteShareDialog(highlight = highlight, onDismiss = controller.sharing::close)
+        }
+    }
     var origin by remember { mutableStateOf(Offset.Zero) }
     Box(modifier = Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInWindow() })
     val state = controller.card ?: return
@@ -115,7 +122,7 @@ private fun HighlightColorRow(highlight: ReaderHighlight, onColor: (HighlightCol
     }
 }
 
-/** Note, Copy and Delete, at the card's end. */
+/** Note, Copy, Share as an image and Delete, at the card's end. */
 @Composable
 private fun HighlightCardActions(highlight: ReaderHighlight, controller: EpubAnnotationController) {
     val context = LocalContext.current
@@ -133,6 +140,14 @@ private fun HighlightCardActions(highlight: ReaderHighlight, controller: EpubAnn
             },
         ) {
             Icon(imageVector = AppIcons.ContentCopy, contentDescription = EpubAnnotationCopy.Copy)
+        }
+        AppIconButton(
+            onClick = {
+                controller.closeCard()
+                controller.sharing.open(highlight.id)
+            },
+        ) {
+            Icon(imageVector = AppIcons.Share, contentDescription = EpubAnnotationCopy.ShareImage)
         }
         AppIconButton(onClick = { controller.delete(highlight) }) {
             Icon(imageVector = AppIcons.Delete, contentDescription = EpubAnnotationCopy.Delete)

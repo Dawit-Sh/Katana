@@ -46,6 +46,9 @@ internal data class AppCatalogSnapshot(
 enum class TopLevelDestination {
     Library,
     Lists,
+
+    /** Every book's highlights, bookmarks and saved words (feature:annotations). */
+    Bookmarks,
     Journal,
     Settings,
 }

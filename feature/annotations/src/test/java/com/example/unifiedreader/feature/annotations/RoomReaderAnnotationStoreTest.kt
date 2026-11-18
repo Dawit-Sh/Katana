@@ -35,6 +35,8 @@ class RoomReaderAnnotationStoreTest {
             .build()
         store = RoomReaderAnnotationStore(
             dao = database.readerAnnotationDao(),
+            bookmarkDao = database.readerBookmarkDao(),
+            studyDao = database.savedWordStudyDao(),
             ioDispatcher = Dispatchers.Unconfined,
             now = { clock++ },
             newId = { "h${++ids}" },
@@ -95,5 +97,59 @@ class RoomReaderAnnotationStoreTest {
         store.deleteWord(word.id)
 
         assertTrue(store.words(hole.itemId).first().isEmpty())
+    }
+
+    @Test
+    fun `a bookmark keeps its page and first words, and a deleted one leaves the lists`() = runBlocking {
+        val made = store.addBookmark(hole, place, page = 8, pageCount = 78, text = "  home looked like.\n All I could   remember ")
+
+        val saved = store.bookmarks(hole.itemId).first().single()
+        assertEquals(made, saved)
+        assertEquals(8, saved.page)
+        assertEquals(78, saved.pageCount)
+        assertEquals("home looked like. All I could remember", saved.text)
+        assertEquals(listOf(saved), store.allBookmarks.first())
+
+        store.deleteBookmark(made.id)
+
+        assertTrue(store.bookmarks(hole.itemId).first().isEmpty())
+        assertTrue(store.allBookmarks.first().isEmpty())
+    }
+
+    @Test
+    fun `a bookmark without a page keeps none, and its first words are cut to a line's worth`() = runBlocking {
+        store.addBookmark(hole, place, page = 0, pageCount = null, text = "word ".repeat(100))
+
+        val saved = store.bookmarks(hole.itemId).first().single()
+        assertNull(saved.page)
+        assertNull(saved.pageCount)
+        assertEquals(240, saved.text?.length)
+    }
+
+    @Test
+    fun `a word's note is kept, and a blank one removes it`() = runBlocking {
+        val word = store.saveWord(hole, "solar", "solar panels on the roof", place)
+
+        store.setWordNote(word.id, "  of the sun  ")
+        assertEquals("of the sun", store.words(hole.itemId).first().single().note)
+
+        store.setWordNote(word.id, " ")
+        assertNull(store.words(hole.itemId).first().single().note)
+    }
+
+    @Test
+    fun `knowing a word sends it away for a day, Again brings it back at once`() = runBlocking {
+        val word = store.saveWord(hole, "solar", "solar panels on the roof", place)
+        assertEquals(0, word.reviewLevel)
+        assertNull(word.reviewDueAtEpochMillis)
+
+        val known = store.reviewWord(word.id, known = true)!!
+        assertEquals(1, known.reviewLevel)
+        assertEquals(known.reviewedAtEpochMillis!! + 24L * 60 * 60 * 1000, known.reviewDueAtEpochMillis)
+
+        val again = store.reviewWord(word.id, known = false)!!
+        assertEquals(0, again.reviewLevel)
+        assertEquals(again.reviewedAtEpochMillis, again.reviewDueAtEpochMillis)
+        assertNull(store.reviewWord("missing", known = true))
     }
 }

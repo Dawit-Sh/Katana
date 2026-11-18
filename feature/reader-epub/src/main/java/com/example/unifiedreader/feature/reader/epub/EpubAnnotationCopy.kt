@@ -1,9 +1,11 @@
 package com.example.unifiedreader.feature.reader.epub
 
+import com.example.unifiedreader.feature.annotations.BookmarksCopy
 import com.example.unifiedreader.feature.annotations.HighlightColor
+import com.example.unifiedreader.feature.annotations.MarkCounts
 import com.example.unifiedreader.feature.annotations.HighlightStyle
 
-/** What the reader's highlights, notes and saved words say on screen. */
+/** What the reader's highlights, bookmarks, notes and saved words say on screen. */
 internal object EpubAnnotationCopy {
     const val Highlight = "Highlight"
     const val Note = "Note"
@@ -16,14 +18,18 @@ internal object EpubAnnotationCopy {
     const val NotePlaceholder = "What this makes you think"
     const val Save = "Save"
     const val Cancel = "Cancel"
-    const val Panel = "Highlights & words"
-    const val PanelButton = "Highlights and saved words"
+    const val Panel = "Marks in this book"
+    const val PanelButton = "Highlights, bookmarks and words"
+    const val BookmarksSection = "Bookmarks"
     const val HighlightsSection = "Highlights"
     const val WordsSection = "Saved words"
-    const val Export = "Export"
-    const val ExportBook = "This book (Markdown)"
-    const val ExportAll = "Every book (Markdown)"
-    const val Empty = "Select words in the book, then Highlight or Add to dictionary."
+    const val ExportHighlights = "Export highlights"
+    const val Empty = "Bookmark a page with the ribbon button, or select words, then Highlight or Add to dictionary."
+    const val AddBookmark = "Bookmark this page"
+    const val RemoveBookmark = "Remove this page's bookmark"
+    const val Bookmarked = "Page bookmarked"
+    const val BookmarkRemoved = "Bookmark removed"
+    const val ShareImage = "Share as an image"
     const val LookUp = "Look up"
     const val Removed = "Highlight removed"
     const val Undo = "Undo"
@@ -33,17 +39,13 @@ internal object EpubAnnotationCopy {
 
     fun wordSaved(word: String): String = "“$word” added to Saved words"
 
-    fun count(highlights: Int, words: Int): String = listOf(
-        if (highlights == 1) "1 highlight" else "$highlights highlights",
-        if (words == 1) "1 word" else "$words words",
+    fun count(highlights: Int, words: Int, bookmarks: Int = 0): String = listOf(
+        MarkCounts.highlights(highlights),
+        MarkCounts.bookmarks(bookmarks),
+        MarkCounts.words(words),
     ).joinToString(" · ")
 
-    fun style(style: HighlightStyle): String = when (style) {
-        HighlightStyle.Highlight -> "Highlight"
-        HighlightStyle.Underline -> "Underline"
-        HighlightStyle.Strikethrough -> "Strike"
-        HighlightStyle.Squiggly -> "Squiggle"
-    }
+    fun style(style: HighlightStyle): String = BookmarksCopy.style(style)
 
     fun color(color: HighlightColor): String = when (color) {
         HighlightColor.Yellow -> "Yellow"

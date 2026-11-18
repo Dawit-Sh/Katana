@@ -41,6 +41,7 @@ import com.example.unifiedreader.core.model.shortDayLabel
 import com.example.unifiedreader.data.repository.RemoteSyncArtifact
 import com.example.unifiedreader.feature.lists.ListLibraryMode
 import com.example.unifiedreader.feature.downloads.DownloadsSheet
+import com.example.unifiedreader.feature.journal.JournalReadingCard
 import com.example.unifiedreader.feature.journal.JournalScreen
 import com.example.unifiedreader.feature.library.LocalLibraryCoverAsPrinted
 import com.example.unifiedreader.feature.library.LibraryViewMode
@@ -110,6 +111,8 @@ fun UnifiedReaderScaffold(
     listsViewModel: AppListsViewModel? = null,
     // Where you put each tag in Filters; without it every tag is in About and Settings has no Tags.
     tagsViewModel: AppLibraryTagsViewModel? = null,
+    // Every book's highlights, bookmarks and saved words; without it the Bookmarks screen is empty.
+    bookmarks: AppBookmarksScreen? = null,
 ) {
     val themeColors = UnifiedReaderThemeTokens.colors
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -392,9 +395,16 @@ fun UnifiedReaderScaffold(
         sourceOrder = navigationSources(uiState.sourceOrder, connectedServers),
         showAddSource = canAddNavigationSource(connectedServers),
         settingsBadge = waitingUpdateVersion,
+        readingCard = {
+            JournalReadingCard(snapshot = uiState.journalSnapshot, onClick = {
+                drawerScope.launch { drawerState.close() }
+                viewModel.onTopLevelSelected(TopLevelDestination.Journal)
+            })
+        },
         selectedDestination = when (uiState.topLevel) {
             TopLevelDestination.Library -> SourceNavigationDestination.Source(uiState.selectedSource)
             TopLevelDestination.Lists -> SourceNavigationDestination.Lists
+            TopLevelDestination.Bookmarks -> SourceNavigationDestination.Bookmarks
             TopLevelDestination.Journal -> SourceNavigationDestination.Journal
             TopLevelDestination.Settings -> SourceNavigationDestination.Settings
         },
@@ -406,6 +416,11 @@ fun UnifiedReaderScaffold(
                 is SourceNavigationDestination.Source -> viewModel.openLibrarySource(destination.sourceType)
                 SourceNavigationDestination.AddSource -> onStartSource(SourceStartRequest(SourceStartMode.AddSource))
                 SourceNavigationDestination.Lists -> viewModel.onTopLevelSelected(TopLevelDestination.Lists)
+                SourceNavigationDestination.Bookmarks -> {
+                    // Like Settings: picking it in the menu always lands on the books.
+                    bookmarks?.state?.home()
+                    viewModel.onTopLevelSelected(TopLevelDestination.Bookmarks)
+                }
                 SourceNavigationDestination.Journal -> viewModel.onTopLevelSelected(TopLevelDestination.Journal)
                 SourceNavigationDestination.Settings -> {
                     // Picking Settings in the drawer always lands on the hub, even if a page was open.
@@ -560,6 +575,18 @@ fun UnifiedReaderScaffold(
                                 )
                             }
 
+                            TopLevelDestination.Bookmarks -> if (bookmarks != null) {
+                                BookmarksRoute(
+                                    bookmarks = bookmarks,
+                                    uiState = uiState,
+                                    coverImageUrlFor = viewModel::coverImageUrlFor,
+                                    onCoverVisible = viewModel::ensureCoverCached,
+                                    onOpenBook = viewModel::onItemSelected,
+                                    contentTopInset = AppTopBarDefaults.contentInset,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
+
                             TopLevelDestination.Journal -> {
                                 // The heavy full journal snapshot (stats/timelines/catalog join) is
                                 // built in the background once the library has loaded (see
@@ -581,6 +608,12 @@ fun UnifiedReaderScaffold(
                                     finishedLists = listsViewModel?.let { rememberJournalFinishedLists(it, uiState) }.orEmpty(),
                                     listCover = rememberJournalListCover(viewModel),
                                     marks = rememberJournalMarks(),
+                                    onOpenBookmarks = bookmarks?.let {
+                                        {
+                                            it.state.home()
+                                            viewModel.onTopLevelSelected(TopLevelDestination.Bookmarks)
+                                        }
+                                    },
                                 )
                             }
 
@@ -710,6 +743,10 @@ fun UnifiedReaderScaffold(
                                         onDrawerClick = openDrawer,
                                         catalog = uiState.items,
                                     )
+                                }
+
+                                TopLevelDestination.Bookmarks -> if (bookmarks != null) {
+                                    BookmarksTopBar(bookmarks, uiState, onOpenBook = viewModel::onItemSelected, onDrawerClick = openDrawer)
                                 }
 
                                 TopLevelDestination.Journal -> JournalTopBar(

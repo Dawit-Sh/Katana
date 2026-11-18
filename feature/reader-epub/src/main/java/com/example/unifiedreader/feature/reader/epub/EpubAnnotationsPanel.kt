@@ -1,12 +1,5 @@
 package com.example.unifiedreader.feature.reader.epub
 
-import android.app.SearchManager
-import android.content.ActivityNotFoundException
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,11 +19,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,8 +26,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.unifiedreader.feature.annotations.AnnotationMarkdown
+import com.example.unifiedreader.feature.annotations.MarkTint
+import com.example.unifiedreader.feature.annotations.ReaderBookmark
 import com.example.unifiedreader.feature.annotations.ReaderHighlight
 import com.example.unifiedreader.feature.annotations.SavedWord
+import com.example.unifiedreader.feature.annotations.lookUpWord
+import com.example.unifiedreader.feature.annotations.rememberMarkdownSaver
 import com.example.unifiedreader.feature.reader.core.ReaderChromeDefaults
 import com.example.unifiedreader.feature.reader.core.ReaderPanel
 import com.example.unifiedreader.feature.reader.core.ReaderPanelSlot
@@ -47,18 +41,15 @@ import com.example.unifiedreader.ui.components.AppIconButton
 import com.example.unifiedreader.ui.components.AppIcons
 import com.example.unifiedreader.ui.components.AppLayout
 import com.example.unifiedreader.ui.components.AppPanelHeader
-import com.example.unifiedreader.ui.components.AppTextButton
-import java.io.IOException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import com.example.unifiedreader.ui.components.AppTonalButton
 import org.json.JSONException
 import org.json.JSONObject
 import org.readium.r2.shared.publication.Locator
 
 /**
- * This book's highlights (in reading order; a tap goes there) and saved words (Look up, remove),
- * with the Markdown export of this book or of every book at the foot.
+ * This book's marks: its bookmarks and highlights (in reading order; a tap goes there) and saved
+ * words (Look up, remove), with Export highlights (this book, Markdown) at the foot. Every book's
+ * export is on the Bookmarks page.
  */
 @Composable
 internal fun EpubAnnotationsPanel(
@@ -69,6 +60,7 @@ internal fun EpubAnnotationsPanel(
     controller: EpubAnnotationController,
     onDismissRequest: () -> Unit,
     onJump: (Locator) -> Unit,
+    bookmarks: List<ReaderBookmark> = emptyList(),
 ) {
     ReaderPanel(
         visible = isOpen,
@@ -79,29 +71,33 @@ internal fun EpubAnnotationsPanel(
     ) {
         AppPanelHeader(
             title = EpubAnnotationCopy.Panel,
-            subtitle = EpubAnnotationCopy.count(highlights.size, words.size),
+            subtitle = EpubAnnotationCopy.count(highlights.size, words.size, bookmarks.size),
             onClose = onDismissRequest,
         )
         AnnotationsList(
+            bookmarks = bookmarks,
             highlights = highlights,
             words = words,
-            onHighlightClick = { highlight ->
-                highlight.locatorOrNull()?.let(onJump)
+            onJump = { locatorJson ->
+                locatorJson.toLocatorOrNull()?.let(onJump)
                 onDismissRequest()
             },
+            onDeleteBookmark = { bookmark -> controller.bookmarks.delete(bookmark.id) },
             onDeleteWord = { word -> controller.deleteWord(word.id) },
             modifier = Modifier.weight(1f),
         )
-        ExportFooter(exports = controller.exports)
+        ExportFooter(controller = controller)
     }
 }
 
-/** The book's highlights in reading order, then its saved words. */
+/** The book's bookmarks, its highlights in reading order, then its saved words. */
 @Composable
 private fun AnnotationsList(
+    bookmarks: List<ReaderBookmark>,
     highlights: List<ReaderHighlight>,
     words: List<SavedWord>,
-    onHighlightClick: (ReaderHighlight) -> Unit,
+    onJump: (String) -> Unit,
+    onDeleteBookmark: (ReaderBookmark) -> Unit,
     onDeleteWord: (SavedWord) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -111,7 +107,7 @@ private fun AnnotationsList(
         contentPadding = PaddingValues(horizontal = AppLayout.menuInset, vertical = AppLayout.headingGap),
         verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
     ) {
-        if (highlights.isEmpty() && words.isEmpty()) {
+        if (bookmarks.isEmpty() && highlights.isEmpty() && words.isEmpty()) {
             item {
                 Text(
                     text = EpubAnnotationCopy.Empty,
@@ -120,49 +116,39 @@ private fun AnnotationsList(
                 )
             }
         }
+        if (bookmarks.isNotEmpty()) {
+            item { PanelSectionTitle(EpubAnnotationCopy.BookmarksSection) }
+            items(bookmarks, key = { "b-${it.id}" }) { bookmark ->
+                BookmarkRow(
+                    bookmark = bookmark,
+                    onClick = { onJump(bookmark.place.locatorJson) },
+                    onDelete = { onDeleteBookmark(bookmark) },
+                )
+            }
+        }
         if (highlights.isNotEmpty()) {
             item { PanelSectionTitle(EpubAnnotationCopy.HighlightsSection) }
             items(highlights, key = { "h-${it.id}" }) { highlight ->
-                HighlightRow(highlight = highlight, onClick = { onHighlightClick(highlight) })
+                HighlightRow(highlight = highlight, onClick = { onJump(highlight.place.locatorJson) })
             }
         }
         if (words.isNotEmpty()) {
             item { PanelSectionTitle(EpubAnnotationCopy.WordsSection) }
             items(words, key = { "w-${it.id}" }) { word ->
-                WordRow(word = word, onLookUp = { context.lookUp(word.word) }, onDelete = { onDeleteWord(word) })
+                WordRow(word = word, onLookUp = { context.lookUpWord(word.word) }, onDelete = { onDeleteWord(word) })
             }
         }
     }
 }
 
-/** Export: this book or every book, as Markdown, saved where the reader picks. */
+/** Export highlights: this book's marks as Markdown, saved where the reader picks. */
 @Composable
-private fun ExportFooter(exports: EpubAnnotationExports) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var pending by remember { mutableStateOf<EpubMarkdownExport?>(null) }
-    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(MarkdownMime)) { uri ->
-        val export = pending
-        pending = null
-        if (uri == null || export == null) return@rememberLauncherForActivityResult
-        scope.launch { exports.exported(context.writeText(uri, export.text)) }
-    }
-    fun startExport(make: suspend () -> EpubMarkdownExport) {
-        scope.launch {
-            val export = make()
-            pending = export
-            saveLauncher.launch(export.fileName)
-        }
-    }
-    Column(modifier = Modifier.fillMaxWidth().padding(AppLayout.menuInset)) {
-        Text(
-            text = EpubAnnotationCopy.Export,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap)) {
-            AppTextButton(onClick = { startExport(exports::bookExport) }) { Text(EpubAnnotationCopy.ExportBook) }
-            AppTextButton(onClick = { startExport(exports::libraryExport) }) { Text(EpubAnnotationCopy.ExportAll) }
+private fun ExportFooter(controller: EpubAnnotationController) {
+    val save = rememberMarkdownSaver(onSaved = controller.export::saved)
+    Box(modifier = Modifier.fillMaxWidth().padding(AppLayout.menuInset)) {
+        AppTonalButton(onClick = { save(controller.export::book) }, modifier = Modifier.fillMaxWidth()) {
+            Icon(imageVector = AppIcons.Download, contentDescription = null, modifier = Modifier.size(ButtonIcon))
+            Text(text = EpubAnnotationCopy.ExportHighlights, modifier = Modifier.padding(start = AppLayout.headingGap))
         }
     }
 }
@@ -174,6 +160,43 @@ private fun PanelSectionTitle(text: String) {
         style = MaterialTheme.typography.titleSmall,
         modifier = Modifier.padding(top = AppLayout.headingGap),
     )
+}
+
+@Composable
+private fun BookmarkRow(bookmark: ReaderBookmark, onClick: () -> Unit, onDelete: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = AppIcons.BookmarkFilled,
+            contentDescription = null,
+            tint = MarkTint.Bookmark,
+            modifier = Modifier.size(ButtonIcon),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = AnnotationMarkdown.bookmarkPlace(bookmark),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            (bookmark.text ?: bookmark.place.chapterTitle)?.let { line ->
+                Text(
+                    text = line,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        AppIconButton(onClick = onDelete) {
+            Icon(imageVector = AppIcons.Delete, contentDescription = EpubAnnotationCopy.Delete)
+        }
+    }
 }
 
 @Composable
@@ -246,39 +269,14 @@ private fun WordRow(word: SavedWord, onLookUp: () -> Unit, onDelete: () -> Unit)
     }
 }
 
-private fun ReaderHighlight.locatorOrNull(): Locator? = try {
-    Locator.fromJSON(JSONObject(place.locatorJson))
+private fun String.toLocatorOrNull(): Locator? = try {
+    Locator.fromJSON(JSONObject(this))
 } catch (_: JSONException) {
     null
 }
 
-/** A web search for the word, in whatever the tablet searches with; a browser when nothing takes it. */
-private fun Context.lookUp(word: String) {
-    val search = Intent(Intent.ACTION_WEB_SEARCH).putExtra(SearchManager.QUERY, "define $word")
-    try {
-        startActivity(search)
-    } catch (_: ActivityNotFoundException) {
-        val page = Intent(Intent.ACTION_VIEW, Uri.parse("https://duckduckgo.com/?q=" + Uri.encode("define $word")))
-        try {
-            startActivity(page)
-        } catch (_: ActivityNotFoundException) {
-            // Nothing on the tablet opens a web page; the word stays saved.
-        }
-    }
-}
-
-private suspend fun Context.writeText(uri: Uri, text: String): Boolean = withContext(Dispatchers.IO) {
-    try {
-        contentResolver.openOutputStream(uri, "wt")?.use { stream -> stream.write(text.toByteArray(Charsets.UTF_8)) } != null
-    } catch (_: IOException) {
-        false
-    } catch (_: SecurityException) {
-        false
-    }
-}
-
-private const val MarkdownMime = "text/markdown"
 private const val HighlightLines = 4
 private const val NoteLines = 2
 private val MarkWidth = 3.dp
 private val MarkHeight = 40.dp
+private val ButtonIcon = 18.dp
