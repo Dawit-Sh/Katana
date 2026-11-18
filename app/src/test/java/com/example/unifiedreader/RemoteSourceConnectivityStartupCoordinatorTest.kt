@@ -10,6 +10,7 @@ import com.example.unifiedreader.data.grimmory.GrimmoryBookCatalogEntry
 import com.example.unifiedreader.data.grimmory.GrimmoryEpubProgressUpdate
 import com.example.unifiedreader.data.grimmory.GrimmoryProgressUpdate
 import com.example.unifiedreader.data.grimmory.GrimmorySession
+import com.example.unifiedreader.data.grimmory.GrimmoryUnauthorizedException
 import com.example.unifiedreader.data.kavita.KavitaApi
 import com.example.unifiedreader.data.kavita.KavitaChapterCatalogEntry
 import com.example.unifiedreader.data.kavita.KavitaChapterInfoDto
@@ -268,22 +269,12 @@ class RemoteSourceConnectivityStartupCoordinatorTest {
     }
 
     @Test
-    fun `non-kavita source startup health checks refresh sessions without fetching catalogs`() = runTest {
+    fun `stump startup health check refreshes the session without fetching catalogs`() = runTest {
         val stumpApi = RecordingStartupStumpApi()
-        val grimmoryApi = RecordingStartupGrimmoryApi()
         val stumpStore = FakeStumpCredentialStore(
             initialSession = StumpStoredSession(
                 displayName = "Stump",
                 baseUrl = "https://stump",
-                username = "reader",
-                accessToken = "old-access",
-                refreshToken = "old-refresh",
-            ),
-        )
-        val grimmoryStore = FakeGrimmoryCredentialStore(
-            initialSession = GrimmoryStoredSession(
-                displayName = "Grimmory",
-                baseUrl = "https://grimmory",
                 username = "reader",
                 accessToken = "old-access",
                 refreshToken = "old-refresh",
@@ -294,18 +285,54 @@ class RemoteSourceConnectivityStartupCoordinatorTest {
             stumpApiFactory = StumpApiFactory { stumpApi },
             stumpCredentialStore = stumpStore,
         ).check()
+
+        assertEquals(1, stumpApi.refreshSessionCalls)
+        assertEquals(0, stumpApi.getLibrariesCalls)
+        assertEquals("new-access", stumpStore.sessionFlow.value?.accessToken)
+    }
+
+    // Grimmory replaces the refresh token at each renewal: a check that renewed every time risked the sign-in.
+    @Test
+    fun `grimmory health check uses the saved access token without renewing the sign-in`() = runTest {
+        val grimmoryApi = RecordingStartupGrimmoryApi()
+        val grimmoryStore = grimmoryStore()
+
         GrimmoryRemoteSourceHealthCheck(
             grimmoryApiFactory = GrimmoryApiFactory { grimmoryApi },
             grimmoryCredentialStore = grimmoryStore,
         ).check()
 
-        assertEquals(1, stumpApi.refreshSessionCalls)
-        assertEquals(0, stumpApi.getLibrariesCalls)
-        assertEquals("new-access", stumpStore.sessionFlow.value?.accessToken)
-        assertEquals(1, grimmoryApi.refreshSessionCalls)
-        assertEquals(0, grimmoryApi.getLibrariesCalls)
-        assertEquals("new-access", grimmoryStore.sessionFlow.value?.accessToken)
+        assertEquals(1, grimmoryApi.getLibrariesCalls)
+        assertEquals(0, grimmoryApi.refreshSessionCalls)
+        assertEquals("old-access", grimmoryStore.sessionFlow.value?.accessToken)
+        assertEquals("old-refresh", grimmoryStore.sessionFlow.value?.refreshToken)
     }
+
+    @Test
+    fun `grimmory health check renews once after an expired access token and saves the new tokens`() = runTest {
+        val grimmoryApi = RecordingStartupGrimmoryApi(unauthorizedLibraryTokens = setOf("old-access"))
+        val grimmoryStore = grimmoryStore()
+
+        GrimmoryRemoteSourceHealthCheck(
+            grimmoryApiFactory = GrimmoryApiFactory { grimmoryApi },
+            grimmoryCredentialStore = grimmoryStore,
+        ).check()
+
+        assertEquals(2, grimmoryApi.getLibrariesCalls)
+        assertEquals(1, grimmoryApi.refreshSessionCalls)
+        assertEquals("new-access", grimmoryStore.sessionFlow.value?.accessToken)
+        assertEquals("new-refresh", grimmoryStore.sessionFlow.value?.refreshToken)
+    }
+
+    private fun grimmoryStore() = FakeGrimmoryCredentialStore(
+        initialSession = GrimmoryStoredSession(
+            displayName = "Grimmory",
+            baseUrl = "https://grimmory",
+            username = "reader",
+            accessToken = "old-access",
+            refreshToken = "old-refresh",
+        ),
+    )
 }
 
 private class FakeRemoteSourceHealthCheck(
@@ -402,7 +429,9 @@ private class RecordingStartupStumpApi : StumpApi {
     override suspend fun downloadMediaFile(accessToken: String, mediaId: String, destination: File) = error("Not used")
 }
 
-private class RecordingStartupGrimmoryApi : GrimmoryApi {
+private class RecordingStartupGrimmoryApi(
+    private val unauthorizedLibraryTokens: Set<String> = emptySet(),
+) : GrimmoryApi {
     var refreshSessionCalls = 0
     var getLibrariesCalls = 0
 
@@ -418,6 +447,7 @@ private class RecordingStartupGrimmoryApi : GrimmoryApi {
 
     override suspend fun getLibraries(accessToken: String): List<Library> {
         getLibrariesCalls += 1
+        if (accessToken in unauthorizedLibraryTokens) throw GrimmoryUnauthorizedException()
         return emptyList()
     }
 

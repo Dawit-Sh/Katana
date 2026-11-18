@@ -276,9 +276,8 @@ class KtorGrimmoryApi(
             setBody(GrimmoryRefreshTokenRequestDto(refreshToken = refreshToken))
         }
         val responseBody = response.bodyAsText()
-        if (!response.status.isSuccess()) {
-            error(responseBody.toGrimmoryErrorMessage(response.status.description))
-        }
+        if (response.status == HttpStatusCode.Unauthorized) throw GrimmorySignedOutException()
+        if (!response.status.isSuccess()) error(responseBody.toGrimmoryErrorMessage(response.status.description))
         return Json.decodeFromString<JsonObject>(responseBody).toLoginSession()
     }
 

@@ -15,7 +15,6 @@ import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.core.network.buildHttpClient
 import com.example.unifiedreader.data.grimmory.GrimmoryRemoteJournalPusher
-import com.example.unifiedreader.data.grimmory.KtorGrimmoryApi
 import com.example.unifiedreader.data.kavita.KavitaRemoteJournalPusher
 import com.example.unifiedreader.data.kavita.KtorKavitaApi
 import com.example.unifiedreader.core.model.progress.ProgressSyncStore
@@ -413,13 +412,8 @@ object AppModule {
 
     @Provides
     fun provideGrimmoryApiFactory(
-        httpClient: HttpClient,
-    ): GrimmoryApiFactory = GrimmoryApiFactory { baseUrl ->
-        KtorGrimmoryApi(
-            httpClient = httpClient,
-            baseUrl = baseUrl,
-        )
-    }
+        factory: RenewingGrimmoryApiFactory,
+    ): GrimmoryApiFactory = factory
 
     @Provides
     fun provideKavitaApiFactory(

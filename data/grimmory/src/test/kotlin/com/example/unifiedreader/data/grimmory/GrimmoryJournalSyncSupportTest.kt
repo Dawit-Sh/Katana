@@ -654,7 +654,7 @@ class GrimmoryJournalSyncSupportTest {
     }
 }
 
-private class RecordingJournalRepository(
+internal class RecordingJournalRepository(
     private val dirtyEntries: List<ItemJournalEntry> = emptyList(),
     private val dirtySessions: List<JournalReadingSession> = emptyList(),
     private val cleanEntries: List<ItemJournalEntry> = emptyList(),
@@ -732,7 +732,7 @@ private class RecordingJournalRepository(
 }
 
 
-private class FakeGrimmoryApi(
+internal class FakeGrimmoryApi(
     private val notesByBook: Map<String, List<GrimmoryBookNoteV2Dto>> = emptyMap(),
     private val sessionsByBook: Map<String, List<GrimmoryReadingSessionDto>> = emptyMap(),
     private val sessionFailuresByBook: Map<String, Throwable> = emptyMap(),

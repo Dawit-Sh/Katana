@@ -15,6 +15,7 @@ import com.example.unifiedreader.journal.JournalRepository
 import com.example.unifiedreader.journal.journalMediaType
 import java.time.Instant
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.math.abs
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -308,10 +309,10 @@ suspend fun pushDirtyGrimmoryJournalEntries(
         .forEach { session ->
             runSuspendCatching {
                 val item = itemById[session.itemId] ?: error("No Grimmory catalog item for reading session ${session.itemId}")
-                api.createReadingSession(
-                    accessToken = accessToken,
-                    session = session.toGrimmoryReadingSessionRequest(item),
-                )
+                val request = session.toGrimmoryReadingSessionRequest(item)
+                if (!api.hasReadingSession(accessToken, request)) {
+                    api.createReadingSession(accessToken = accessToken, session = request)
+                }
             }.onSuccess {
                 repository.markReadingSessionSyncState(session.id, SyncState.CLEAN)
             }.onFailure { error ->
@@ -325,6 +326,40 @@ suspend fun pushDirtyGrimmoryJournalEntries(
             }
         }
     return failures
+}
+
+/**
+ * Whether the server already holds [request]: an upload whose answer was lost (the Wi-Fi dropping just after the
+ * server saved it) stays waiting, and posting it again would count that reading time twice. Matched by its start
+ * and end, to the second the server keeps. A list that can't be read for another reason than the network or the
+ * sign-in doesn't hold the upload back.
+ */
+private suspend fun GrimmoryApi.hasReadingSession(
+    accessToken: String,
+    request: GrimmoryReadingSessionRequest,
+): Boolean {
+    val start = request.startTime.toServerEpochMillisOrNull()
+    val end = request.endTime.toServerEpochMillisOrNull()
+    if (start == null || end == null) return false
+    return readingSessionsOrNone(accessToken, request.bookId.toString()).any { session -> session.spans(start, end) }
+}
+
+private suspend fun GrimmoryApi.readingSessionsOrNone(
+    accessToken: String,
+    bookId: String,
+): List<GrimmoryReadingSessionDto> = runSuspendCatching {
+    getReadingSessionsForBook(accessToken = accessToken, bookId = bookId)
+}.getOrElse { error ->
+    if (error is GrimmoryUnauthorizedException || error.isRetryableNetworkFailure()) throw error
+    emptyList()
+}
+
+private fun GrimmoryReadingSessionDto.spans(start: Long, end: Long): Boolean {
+    val serverStart = sessionStartTime.toServerEpochMillisOrNull()
+    val serverEnd = sessionEndTime.toServerEpochMillisOrNull()
+    return serverStart != null && serverEnd != null &&
+        abs(serverStart - start) < SAME_SESSION_TOLERANCE_MILLIS &&
+        abs(serverEnd - end) < SAME_SESSION_TOLERANCE_MILLIS
 }
 
 private fun JournalReadingSession.toGrimmoryReadingSessionRequest(
@@ -590,5 +625,7 @@ private fun List<GrimmoryNotebookEntryDto>.firstReservedReviewNoteForBook(
     entry.updatedAt.toServerEpochMillisOrNull() ?: entry.createdAt.toServerEpochMillisOrNull() ?: 0L
 }
 
+// The server keeps a session's times to the second; the app sends milliseconds.
+private const val SAME_SESSION_TOLERANCE_MILLIS = 1_500L
 private const val GRIMMORY_READING_SESSION_FETCH_CONCURRENCY = 4
 private const val GRIMMORY_READING_HISTORY_PROGRESS_REPORTS = 40
