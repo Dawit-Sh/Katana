@@ -2,7 +2,6 @@ package com.example.unifiedreader.feature.reader.epub
 
 import androidx.compose.runtime.State
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import com.example.unifiedreader.feature.reader.preferences.InMemoryReaderComfortPreferencesStore
 import com.example.unifiedreader.feature.reader.preferences.ReaderComfort
 import org.junit.Assert.assertEquals
@@ -57,11 +56,11 @@ class EpubReaderComfortTest {
         comfort.previewBrightness(0.7f)
         comfort.commit()
 
-        comfort.followTablet(true)
+        comfort.followDevice(true)
 
         assertNull(comfort.windowBrightness)
         assertEquals(0.7f, store.comfortFlow.value.brightness!!, 0.0001f)
-        comfort.followTablet(false)
+        comfort.followDevice(false)
         assertEquals(0.7f, comfort.windowBrightness!!, 0.0001f)
     }
 
@@ -93,9 +92,9 @@ class EpubReaderComfortTest {
 
     @Test
     fun `the Light row says what is set`() {
-        assertEquals("Tablet", epubLightSummary(ReaderComfort()))
+        assertEquals("Device", epubLightSummary(ReaderComfort()))
         assertEquals("40%", epubLightSummary(ReaderComfort(ownBrightness = true, brightness = 0.4f)))
-        assertEquals("Tablet, warm", epubLightSummary(ReaderComfort(warmth = 0.3f)))
+        assertEquals("Device, warm", epubLightSummary(ReaderComfort(warmth = 0.3f)))
         val evening = ReaderComfort(ownBrightness = true, brightness = 0.4f, warmth = 0.3f, warmthAtNightOnly = true)
         assertEquals("40%, warm from 21:00", epubLightSummary(evening))
     }
@@ -108,10 +107,11 @@ class EpubReaderComfortTest {
     }
 
     @Test
-    fun `no warmth multiplies by white, full warmth takes blue out most`() {
-        assertEquals(Color.White, epubWarmthColor(0f))
+    fun `no warmth draws nothing, full warmth a see-through amber`() {
+        assertEquals(0f, epubWarmthColor(0f).alpha)
         val warmest = epubWarmthColor(1f)
-        assertEquals(1f, warmest.red, 0.01f)
+        assertEquals(0.3f, warmest.alpha, 0.01f)
         assertTrue(warmest.blue < warmest.green && warmest.green < warmest.red)
+        assertEquals(0.15f, epubWarmthColor(0.5f).alpha, 0.01f)
     }
 }

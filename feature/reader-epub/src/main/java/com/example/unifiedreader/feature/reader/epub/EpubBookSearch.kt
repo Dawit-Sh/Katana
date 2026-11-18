@@ -20,17 +20,20 @@ import org.readium.r2.navigator.Decoration
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.Publication
+import org.readium.r2.shared.publication.services.positionsByReadingOrder
 import org.readium.r2.shared.publication.services.search.SearchIterator
 import org.readium.r2.shared.publication.services.search.search
 import org.readium.r2.shared.util.Try
 
-/** One match: where it is (Readium's locator, with the words and the text around them) and its snippet. */
+/**
+ * One match: where it is (Readium's locator, with the words and the text around them), its snippet,
+ * and its page as the dock counts them (null when the book has no positions).
+ */
 internal data class EpubSearchResult(
     val locator: Locator,
     val snippet: EpubSearchSnippet,
+    val page: Int? = null,
 ) {
-    /** The book's page, as the dock counts them; null when Readium didn't say. */
-    val page: Int? get() = locator.locations.position
     val progression: Double? get() = locator.locations.totalProgression
 }
 
@@ -142,6 +145,8 @@ internal class EpubBookSearch(
     /** Takes Readium's matches a chapter at a time into [results], up to [EpubSearchResultLimit]. */
     @OptIn(ExperimentalReadiumApi::class)
     private suspend fun collectMatches(iterator: SearchIterator): EpubSearchStatus {
+        // Readium's matches say where in the book they are but not on which page; its positions do.
+        val positions = withContext(Dispatchers.IO) { publication.positionsByReadingOrder() }
         val found = mutableListOf<EpubSearchResult>()
         var finished: EpubSearchStatus? = null
         while (finished == null) {
@@ -151,6 +156,10 @@ internal class EpubBookSearch(
                 EpubSearchResult(
                     locator = locator,
                     snippet = epubSearchSnippet(locator.text.before, locator.text.highlight, locator.text.after),
+                    page = epubSearchPage(
+                        resourcePositions = publication.readingOrderIndexOf(locator)?.let(positions::getOrNull).orEmpty(),
+                        progression = locator.locations.progression,
+                    ),
                 )
             }
             if (page != null) results = found.toList()
@@ -171,6 +180,16 @@ internal fun rememberEpubBookSearch(publication: Publication): EpubBookSearch {
     val search = remember(publication) { EpubBookSearch(publication, scope) }
     DisposableEffect(search) { onDispose(search::dispose) }
     return search
+}
+
+/** The page a match is on: the last of its file's positions that starts at or before it. */
+internal fun epubSearchPage(
+    resourcePositions: List<Locator>,
+    progression: Double?,
+): Int? {
+    val at = progression ?: 0.0
+    val start = resourcePositions.lastOrNull { (it.locations.progression ?: 0.0) <= at } ?: resourcePositions.firstOrNull()
+    return start?.locations?.position
 }
 
 /** Two letters at least, or one character of a script without spaces between words (Chinese, Japanese). */

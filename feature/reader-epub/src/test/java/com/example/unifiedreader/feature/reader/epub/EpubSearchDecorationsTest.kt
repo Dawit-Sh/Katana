@@ -27,9 +27,10 @@ class EpubSearchDecorationsTest {
 
         val currentElement = searchMatchElement(current)
         val otherElement = searchMatchElement(other)
-        assertTrue(currentElement, currentElement.startsWith("<div style=\"background-color: rgba(232, 163, 61, 0.55);"))
+        val fill = "<div style=\"background-color: rgba(232, 163, 61,"
+        assertTrue(currentElement, currentElement.startsWith("$fill 0.55) !important;"))
         assertTrue(currentElement, "box-shadow" in currentElement)
-        assertTrue(otherElement, otherElement.startsWith("<div style=\"background-color: rgba(232, 163, 61, 0.22);"))
+        assertTrue(otherElement, otherElement.startsWith("$fill 0.22) !important;"))
         assertFalse(otherElement, "box-shadow" in otherElement)
         // One element, no child: a child inside Readium's box didn't show on the Fire's WebView 98.
         assertFalse(currentElement.substringAfter('>').contains('<' + "div"))
@@ -50,6 +51,23 @@ class EpubSearchDecorationsTest {
             groups,
         )
     }
+
+    @Test
+    fun `a match is on the last page of its file that starts at or before it`() {
+        val pages = listOf(position(3, 0.0), position(4, 0.25), position(5, 0.5), position(6, 0.75))
+
+        assertEquals(3, epubSearchPage(pages, progression = 0.1))
+        assertEquals(5, epubSearchPage(pages, progression = 0.5))
+        assertEquals(6, epubSearchPage(pages, progression = 0.99))
+        assertEquals(3, epubSearchPage(pages, progression = null))
+        assertEquals(null, epubSearchPage(emptyList(), progression = 0.4))
+    }
+
+    private fun position(page: Int, progression: Double) = Locator(
+        href = checkNotNull(Url("a.xhtml")),
+        mediaType = MediaType.XHTML,
+        locations = Locator.Locations(progression = progression, position = page),
+    )
 
     private fun match(href: String) = EpubSearchResult(
         locator = Locator(

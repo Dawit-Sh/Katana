@@ -68,10 +68,11 @@ internal fun searchMatchElement(decoration: Decoration): String {
     val style = decoration.style as? EpubSearchMatchStyle
     val tint = style?.tint ?: EpubSearchTint
     val rgb = "${Color.red(tint)}, ${Color.green(tint)}, ${Color.blue(tint)}"
+    // !important, as Readium's own highlight has it: a dark page's Readium CSS clears every other background.
     val css = if (style?.current == true) {
-        "background-color: rgba($rgb, $CurrentMatchAlpha); box-shadow: inset 0 -2px 0 rgb($rgb); border-radius: 2px;"
+        "background-color: rgba($rgb, $CurrentMatchAlpha) !important; box-shadow: inset 0 -2px 0 rgb($rgb); border-radius: 2px;"
     } else {
-        "background-color: rgba($rgb, $OtherMatchAlpha); border-radius: 2px;"
+        "background-color: rgba($rgb, $OtherMatchAlpha) !important; border-radius: 2px;"
     }
     return "<div style=\"$css\"></div>"
 }

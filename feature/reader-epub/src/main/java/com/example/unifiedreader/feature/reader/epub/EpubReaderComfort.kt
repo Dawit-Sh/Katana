@@ -12,6 +12,7 @@ import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -26,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.unifiedreader.feature.reader.preferences.ReaderComfort
 import com.example.unifiedreader.feature.reader.preferences.ReaderComfortPreferencesStore
+import com.example.unifiedreader.ui.components.LocalAppScreenLeaving
 import kotlin.math.abs
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -95,7 +97,7 @@ internal class EpubReaderComfort(
 
     fun previewBrightness(level: Float) = preview { it.copy(ownBrightness = true, brightness = clampEpubBrightness(level)) }
 
-    fun followTablet(follow: Boolean) {
+    fun followDevice(follow: Boolean) {
         val start = shownBrightness
         change { it.copy(ownBrightness = !follow, brightness = it.brightness ?: start) }
     }
@@ -123,7 +125,9 @@ internal fun rememberEpubReaderComfort(store: ReaderComfortPreferencesStore): Ep
 /**
  * What the comfort settings do to the reader's window while a book is open: its own brightness
  * (`screenBrightness`, never the tablet's setting) and keeping the screen on until
- * [EpubKeepScreenOnIdleMillis] pass without a touch. Leaving the book gives both back.
+ * [EpubKeepScreenOnIdleMillis] pass without a touch. Both go back to the tablet's as soon as the
+ * reader starts to leave ([LocalAppScreenLeaving]), so the library never has them, and again when
+ * the reader is gone.
  */
 @Composable
 internal fun EpubReaderComfortEffects(
@@ -131,18 +135,20 @@ internal fun EpubReaderComfortEffects(
     activity: Activity,
 ) {
     val window = activity.window
-    val brightness = comfort.windowBrightness
-    LaunchedEffect(window, brightness) {
-        window.attributes = window.attributes.apply {
-            screenBrightness = brightness ?: WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+    val leaving = LocalAppScreenLeaving.current
+    val brightness = comfort.windowBrightness.takeUnless { leaving }
+    val keepScreenOn = comfort.comfort.keepScreenOn && !leaving
+    // In the frame that changes them, not from a coroutine: after Back, one would wait seconds behind
+    // the library's first frames, and the library would have the reader's brightness meanwhile.
+    SideEffect {
+        val level = brightness ?: WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        if (window.attributes.screenBrightness != level) {
+            window.attributes = window.attributes.apply { screenBrightness = level }
         }
+        if (!keepScreenOn) window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
-    val keepScreenOn = comfort.comfort.keepScreenOn
     LaunchedEffect(window, keepScreenOn) {
-        if (!keepScreenOn) {
-            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            return@LaunchedEffect
-        }
+        if (!keepScreenOn) return@LaunchedEffect
         comfort.interactions.collectLatest {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             delay(EpubKeepScreenOnIdleMillis)

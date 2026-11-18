@@ -33,9 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -84,17 +82,17 @@ internal fun EpubLightCard(
             value = comfort.shownBrightness,
             onValueChange = comfort::previewBrightness,
             onValueChangeFinished = comfort::commit,
-            valueLabel = if (saved.ownBrightness) epubBrightnessLabel(comfort.shownBrightness) else EpubLightCopy.Tablet,
+            valueLabel = if (saved.ownBrightness) epubBrightnessLabel(comfort.shownBrightness) else EpubLightCopy.Device,
         )
         AppSegmentedRow(modifier = Modifier.fillMaxWidth().padding(horizontal = AppLayout.inset)) {
             AppSegment(
                 selected = !saved.ownBrightness,
-                onClick = { comfort.followTablet(true) },
-                label = { Text(text = EpubLightCopy.FollowTablet, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                onClick = { comfort.followDevice(true) },
+                label = { Text(text = EpubLightCopy.FollowDevice, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             )
             AppSegment(
                 selected = saved.ownBrightness,
-                onClick = { comfort.followTablet(false) },
+                onClick = { comfort.followDevice(false) },
                 label = { Text(text = EpubLightCopy.OwnLevel, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             )
         }
@@ -180,9 +178,10 @@ internal fun EpubLightRow(
 }
 
 /**
- * The warm tint over the page: the page's colours multiplied by a warm white, so black stays black and
- * white turns amber. Drawn straight over the page, never in a layer of its own (a layer has nothing
- * under it to multiply with). With the night-only choice it looks at the clock once a minute.
+ * The warm tint over the page: a see-through amber, stronger as the warmth goes up, under the bars and
+ * panels. (Multiplying the page by a warm white would keep black black, but over the Fire's WebView the
+ * blend doesn't reach the page and the amber covers the text.) With the night-only choice it looks at
+ * the clock once a minute.
  */
 @Composable
 internal fun EpubWarmthTint(comfort: EpubReaderComfort) {
@@ -199,12 +198,12 @@ internal fun EpubWarmthTint(comfort: EpubReaderComfort) {
     if (warmth <= 0f) return
     val tint = epubWarmthColor(warmth)
     Canvas(modifier = Modifier.fillMaxSize()) {
-        drawRect(color = tint, blendMode = BlendMode.Multiply)
+        drawRect(color = tint)
     }
 }
 
-/** The multiplier for [warmth]: white at none, [EpubWarmestTint] at full. */
-internal fun epubWarmthColor(warmth: Float): Color = lerp(Color.White, EpubWarmestTint, warmth.coerceIn(0f, 1f))
+/** The tint for [warmth]: none at 0, [EpubWarmTint] at [EpubWarmTintMaxAlpha] at full. */
+internal fun epubWarmthColor(warmth: Float): Color = EpubWarmTint.copy(alpha = EpubWarmTintMaxAlpha * warmth.coerceIn(0f, 1f))
 
 /**
  * The slim bar and the level by the left edge while a swipe changes the brightness, fading out
@@ -286,9 +285,9 @@ private fun EpubBrightnessGauge(level: Float) {
     }
 }
 
-/** The Light row's value: "Tablet", "40%", "Tablet, warm from 21:00". */
+/** The Light row's value: "Device", "40%", "Device, warm from 21:00". */
 internal fun epubLightSummary(comfort: ReaderComfort): String {
-    val brightness = comfort.brightness?.takeIf { comfort.ownBrightness }?.let(::epubBrightnessLabel) ?: EpubLightCopy.Tablet
+    val brightness = comfort.brightness?.takeIf { comfort.ownBrightness }?.let(::epubBrightnessLabel) ?: EpubLightCopy.Device
     val warmth = when {
         comfort.warmth <= 0f -> null
         comfort.warmthAtNightOnly -> "warm from 21:00"
@@ -309,8 +308,8 @@ private fun currentMinuteOfDay(): Int = LocalTime.now().let { it.hour * MinutesP
 internal object EpubLightCopy {
     const val Title = "Light"
     const val Brightness = "Brightness"
-    const val Tablet = "Tablet"
-    const val FollowTablet = "Follow the tablet"
+    const val Device = "Device"
+    const val FollowDevice = "Follow the device"
     const val OwnLevel = "Own for reading"
     const val SwipeHint = "Or slide a finger up or down the left edge of the page."
     const val Warmth = "Warmth"
@@ -320,8 +319,9 @@ internal object EpubLightCopy {
     const val KeepScreenOnSupporting = "While a book is open, until 10 minutes without a touch"
 }
 
-/** Full warmth: blue down to 42%, green to 72%, like a tablet's night light at its warmest. */
-private val EpubWarmestTint = Color(red = 1f, green = 0.72f, blue = 0.42f)
+/** Candlelight amber, at most this see-through: enough to warm a white page without hiding black text. */
+private val EpubWarmTint = Color(red = 1f, green = 0.54f, blue = 0.16f)
+private const val EpubWarmTintMaxAlpha = 0.3f
 private val EpubLightRowVerticalPadding = 12.dp
 private val EpubLightRowGap = 12.dp
 private val EpubBrightnessBarWidth = 6.dp
