@@ -45,6 +45,8 @@ class AnnotationBackupStoreTest {
 
     private fun store(database: UnifiedReaderDatabase, prefix: String) = RoomReaderAnnotationStore(
         dao = database.readerAnnotationDao(),
+        bookmarkDao = database.readerBookmarkDao(),
+        studyDao = database.savedWordStudyDao(),
         ioDispatcher = Dispatchers.Unconfined,
         now = { clock++ },
         newId = { "$prefix${++ids}" },

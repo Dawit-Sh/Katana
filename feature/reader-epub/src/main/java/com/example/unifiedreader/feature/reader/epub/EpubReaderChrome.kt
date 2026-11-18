@@ -61,22 +61,12 @@ internal fun EpubReaderChrome(
                 subtitle = epubReaderSubtitle(chapterTitle = chapterTitle, author = author, bookTitle = title),
                 onBack = onBack,
             ) {
-                onSearchClick?.let { onClick ->
-                    ReaderBarButton(
-                        icon = AppIcons.Search,
-                        contentDescription = EpubSearchCopy.Button,
-                        active = isSearchOpen,
-                        onClick = onClick,
-                    )
-                }
-                onBookmarkClick?.let { onClick ->
-                    ReaderBarButton(
-                        icon = if (isPageBookmarked) AppIcons.BookmarkFilled else AppIcons.Bookmark,
-                        contentDescription = if (isPageBookmarked) EpubAnnotationCopy.RemoveBookmark else EpubAnnotationCopy.AddBookmark,
-                        active = isPageBookmarked,
-                        onClick = onClick,
-                    )
-                }
+                EpubSearchAndBookmarkButtons(
+                    isSearchOpen = isSearchOpen,
+                    onSearchClick = onSearchClick,
+                    isPageBookmarked = isPageBookmarked,
+                    onBookmarkClick = onBookmarkClick,
+                )
                 onAnnotationsClick?.let { onClick ->
                     ReaderBarButton(
                         icon = AppIcons.CollectionsBookmark,
@@ -113,6 +103,32 @@ internal fun EpubReaderChrome(
         },
         panels = panels,
     )
+}
+
+/** Search, then the page's bookmark (filled while the page has one); each left out when it's null. */
+@Composable
+private fun EpubSearchAndBookmarkButtons(
+    isSearchOpen: Boolean,
+    onSearchClick: (() -> Unit)?,
+    isPageBookmarked: Boolean,
+    onBookmarkClick: (() -> Unit)?,
+) {
+    onSearchClick?.let { onClick ->
+        ReaderBarButton(
+            icon = AppIcons.Search,
+            contentDescription = EpubSearchCopy.Button,
+            active = isSearchOpen,
+            onClick = onClick,
+        )
+    }
+    onBookmarkClick?.let { onClick ->
+        ReaderBarButton(
+            icon = if (isPageBookmarked) AppIcons.BookmarkFilled else AppIcons.Bookmark,
+            contentDescription = if (isPageBookmarked) EpubAnnotationCopy.RemoveBookmark else EpubAnnotationCopy.AddBookmark,
+            active = isPageBookmarked,
+            onClick = onClick,
+        )
+    }
 }
 
 /** The top bar's second line: where you are, "Глава 3 · Анна Лесная", never the page. */
