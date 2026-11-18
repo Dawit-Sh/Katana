@@ -152,7 +152,7 @@ fun applyLibrarySearch(
     preserveInputOrder: Boolean = false,
 ): List<ReadableItem> {
     val tokens = query.normalizedSearchText()
-        .split(Regex("\\s+"))
+        .split(Whitespace)
         .filter(String::isNotBlank)
     if (tokens.isEmpty()) return items
     val phrase = tokens.joinToString(" ")
@@ -486,7 +486,7 @@ private fun String.containsWordPrefixSequence(
     tokens: List<String>,
 ): Boolean {
     if (tokens.isEmpty()) return true
-    val words = split(Regex("\\s+"))
+    val words = split(Whitespace)
         .filter(String::isNotBlank)
     if (tokens.size > words.size) return false
     return words.windowed(tokens.size).any { candidate ->
@@ -561,20 +561,31 @@ private fun List<String>.distinctByTextOrder(): List<String> =
 
 private fun List<String>.distinctByAuthorOrder(): List<String> =
     distinctBy(String::lowercase)
-        .sortedWith(
-            compareBy<String> { it.authorFacetKey().lowercase() }
-                .thenBy { it.lowercase() },
-        )
+        // Each name's keys once, not in every comparison: sorting a 6,000-book library's authors
+        // compares each name a dozen times or more, and that ran on the main thread.
+        .map { name -> AuthorOrderEntry(name, name.authorFacetKey().lowercase(), name.lowercase()) }
+        .sortedWith(compareBy<AuthorOrderEntry> { it.surnameKey }.thenBy { it.lowercaseName })
+        .map(AuthorOrderEntry::name)
+
+private class AuthorOrderEntry(
+    val name: String,
+    val surnameKey: String,
+    val lowercaseName: String,
+)
 
 fun String.authorFacetKey(): String {
     val tokens = trim()
-        .split(Regex("\\s+"))
+        .split(Whitespace)
         .filter(String::isNotBlank)
     if (tokens.size >= 2 && tokens[tokens.lastIndex - 1].lowercase() in surnameParticles) {
         return "${tokens[tokens.lastIndex - 1]} ${tokens.last()}"
     }
     return tokens.lastOrNull() ?: trim()
 }
+
+// Compiled once: a Regex built inside a function is compiled again on every call (ICU, native
+// memory), which on the Fire 7 made sorting the author facets take seconds.
+private val Whitespace = Regex("""\s+""")
 
 private val surnameParticles = setOf(
     "da",

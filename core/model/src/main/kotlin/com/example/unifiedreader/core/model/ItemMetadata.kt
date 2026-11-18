@@ -53,7 +53,9 @@ fun BookMetadata.normalizedAuthors(): List<String> = normalizedMetadataValues(
     listOf(author) + authors,
 )
 
-fun ReadableItem.facetMetadata(): ReadableItemFacetMetadata = ReadableItemFacetMetadata(
+fun ReadableItem.facetMetadata(): ReadableItemFacetMetadata = facetMetadataOnce
+
+internal fun ReadableItem.computeFacetMetadata(): ReadableItemFacetMetadata = ReadableItemFacetMetadata(
     authors = bookMetadata?.normalizedAuthors().orEmpty(),
     writers = normalizedMetadataValues(comicMetadata?.writers.orEmpty()),
     pencillers = normalizedMetadataValues(comicMetadata?.pencillers.orEmpty()),

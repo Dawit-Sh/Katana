@@ -88,7 +88,14 @@ data class ReadableItem(
     val issueCount: Int? = null,
     val bookMetadata: BookMetadata? = null,
     val comicMetadata: ComicMetadata? = null,
-)
+) {
+    // facetMetadata(), worked out once per book: the library's filters and facets ask for it many
+    // times per book on every recompute (on the main thread for most servers). Not part of
+    // equals, hashCode or copy; it depends only on the metadata above, which never changes.
+    internal val facetMetadataOnce: ReadableItemFacetMetadata by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        computeFacetMetadata()
+    }
+}
 
 data class ReadingProgress(
     val itemId: String,
