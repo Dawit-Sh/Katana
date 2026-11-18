@@ -47,4 +47,5 @@ include(
     ":feature:settings",
     ":feature:updates",
     ":feature:translation",
+    ":feature:annotations",
 )

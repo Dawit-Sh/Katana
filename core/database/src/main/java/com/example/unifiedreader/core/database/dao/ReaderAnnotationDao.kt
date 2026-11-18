@@ -25,6 +25,10 @@ abstract class ReaderAnnotationDao {
     @Query("SELECT * FROM reader_highlights WHERE id = :id")
     abstract fun getHighlight(id: String): ReaderHighlightEntity?
 
+    /** The highlight made or changed last, in any book; its look is the next one's. */
+    @Query("SELECT * FROM reader_highlights WHERE deleted = 0 ORDER BY updatedAtEpochMillis DESC LIMIT 1")
+    abstract fun getLatestHighlight(): ReaderHighlightEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract fun upsertHighlight(highlight: ReaderHighlightEntity)
 
