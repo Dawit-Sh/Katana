@@ -96,6 +96,12 @@ export ANDROID_HOME=~/Library/Android/sdk_new
 
 ## Release build (signed)
 
+Release builds run R8 (`app/proguard-rules.pro`; `-dontobfuscate`, so crash logs keep real names) and
+ship a Baseline Profile (`app/src/main/baselineProfiles/`), made on the Fire 7 from Android's own record
+of what runs (`tools/baseline-profile/profman_to_baseline_prof.py` says how). A screen that breaks only in
+a release build usually needs a keep rule. The Fire runs release builds only: a debug build can't use
+compiled code on Android 9 and starts ~6 times slower.
+
 `app/build.gradle.kts` signs release builds from `ANDROID_SIGNING_*` env vars (CI uses the
 same contract). Locally, the passwords live in the macOS Keychain and a helper outside the
 repo supplies them without printing them:

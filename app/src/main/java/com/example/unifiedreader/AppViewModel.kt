@@ -37,6 +37,7 @@ import com.example.unifiedreader.feature.reader.preferences.ComicReadingDirectio
 import com.example.unifiedreader.feature.reader.core.ReaderSessionStore
 import com.example.unifiedreader.feature.reader.core.ReaderWorkCoordinator
 import com.example.unifiedreader.feature.settings.ThemeMode
+import com.example.unifiedreader.ui.components.AppStartupLog
 import com.example.unifiedreader.ui.components.AppToastState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -91,6 +92,7 @@ class AppViewModel @Inject constructor(
     private var lastDownloadedAvailabilitySignature: Set<String>? = null
 
     init {
+        AppStartupLog.mark("appViewModel.init")
         viewModelScope.launch { remoteSourceConnectivityStartupCoordinator.checkConfiguredSources() }
         remoteSourcesCoordinator.initialize(::updateUiState)
         settingsController.restoreState(updateState = ::updateUiState)
@@ -111,6 +113,7 @@ class AppViewModel @Inject constructor(
         coldStartLibraryViewCoordinator.startCapture(viewModelScope, snapshotFlow { uiState })
         viewModelScope.launch { initialUiStateFactory.hydrateAfterInitialState() }
         viewModelScope.launch { libraryGridPager.rebuildGridRootsIfEmpty() }
+        AppStartupLog.mark("appViewModel.init.done")
     }
 
     private val libraryGridPagingCache = LibraryGridPagingCache(viewModelScope, libraryGridPager)

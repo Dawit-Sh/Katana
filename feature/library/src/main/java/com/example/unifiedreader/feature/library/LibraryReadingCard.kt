@@ -20,6 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +36,7 @@ import com.example.unifiedreader.core.model.librarySecondaryText
 import com.example.unifiedreader.ui.components.AppIconButton
 import com.example.unifiedreader.ui.components.AppIcons
 import com.example.unifiedreader.ui.components.AppLayout
+import com.example.unifiedreader.ui.components.AppStartupLog
 import com.example.unifiedreader.ui.components.appPressScale
 import com.example.unifiedreader.ui.theme.UnifiedReaderDefaultPresentationTokens
 import com.example.unifiedreader.ui.theme.UnifiedReaderThemeTokens
@@ -68,6 +70,7 @@ fun LibraryReadingCard(
     footnote: String? = null,
     tall: Boolean = false,
 ) {
+    SideEffect { AppStartupLog.mark("library.readingCard") }
     val lastReadAt = progress?.lastReadAtEpochMillis ?: 0L
     val headline = remember(overline, lastReadAt) {
         val day = libraryLastReadDay(lastReadAt, nowMillis = System.currentTimeMillis(), zone = ZoneId.systemDefault())

@@ -1,6 +1,7 @@
 package com.example.unifiedreader.core.model
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 class LibraryFilterFacetCountsTest {
@@ -72,6 +73,32 @@ class LibraryFilterFacetCountsTest {
 
         assertEquals(listOf("Ruth Amari", "Lena Aster"), facets.authors)
         assertEquals(listOf(FormatType.EPUB, FormatType.PDF).sortedBy { it.ordinal }, facets.formats)
+    }
+
+    @Test
+    fun `authors sort by surname with its particle, then by the whole name`() {
+        val books = listOf(
+            book(id = "a", format = FormatType.EPUB, authors = listOf("Neeti  Nair")),
+            book(id = "b", format = FormatType.EPUB, authors = listOf("Ludwig van Beethoven")),
+            book(id = "c", format = FormatType.EPUB, authors = listOf("MT Vasudevan Nair")),
+            book(id = "d", format = FormatType.EPUB, authors = listOf("Vladimir Nabokov")),
+            book(id = "e", format = FormatType.EPUB, authors = listOf("Naivo")),
+        )
+
+        val facets = buildContextualLibraryFilterFacets(items = books, filters = LibraryFilterState())
+
+        assertEquals(
+            listOf("Vladimir Nabokov", "MT Vasudevan Nair", "Neeti  Nair", "Naivo", "Ludwig van Beethoven"),
+            facets.authors,
+        )
+    }
+
+    @Test
+    fun `a book's facet metadata is worked out once`() {
+        val item = book(id = "e1", format = FormatType.EPUB, authors = listOf("Ruth Amari"))
+
+        assertSame(item.facetMetadata(), item.facetMetadata())
+        assertEquals(item.facetMetadata(), item.copy().facetMetadata())
     }
 }
 
