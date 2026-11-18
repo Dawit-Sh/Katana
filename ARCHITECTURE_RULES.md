@@ -189,6 +189,10 @@ Use this ownership map when deciding where code goes.
   - HTTP client setup and generic network support
 - `core:database`
   - Room database, entities, DAOs, migrations
+- `core:ebook-convert`
+  - plain Kotlin: MOBI, AZW, AZW3 and FB2 books turned into EPUBs for the EPUB reader, and their metadata
+- `core:djvu`
+  - DjVuLibre (GPL, native, built with the NDK) and its JNI binding: open a DjVu file, draw its pages
 - `data:kavita`
   - Kavita DTOs, API client, source-specific mapping
 - `data:stump`

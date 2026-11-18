@@ -28,6 +28,8 @@ include(
     ":core:model",
     ":core:network",
     ":core:database",
+    ":core:ebook-convert",
+    ":core:djvu",
     ":data:kavita",
     ":data:stump",
     ":data:grimmory",
