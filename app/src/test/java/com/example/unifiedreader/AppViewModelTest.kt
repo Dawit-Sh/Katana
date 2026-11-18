@@ -2540,7 +2540,7 @@ class AppViewModelTest {
         assertEquals("api-key", credentialStore.sessionFlow.value?.apiKey)
         assertEquals(TopLevelDestination.Library, viewModel.uiState.topLevel)
         assertEquals(
-            "Connected to Kavita. Tap Sync now to get your library. $HTTP_WARNING_MESSAGE",
+            "Connected to Kavita. Tap Sync now to get your library.",
             viewModel.uiState.kavitaConnection.message,
         )
         assertEquals(true, viewModel.uiState.kavitaConnection.hasStoredSession)
@@ -2853,7 +2853,7 @@ class AppViewModelTest {
         assertEquals("access-token", credentialStore.sessionFlow.value?.accessToken)
         assertEquals("refresh-token", credentialStore.sessionFlow.value?.refreshToken)
         assertEquals(
-            "Connected to Stump. Tap Sync now to get your library. $HTTP_WARNING_MESSAGE",
+            "Connected to Stump. Tap Sync now to get your library.",
             viewModel.uiState.stumpConnection.message,
         )
         assertTrue(viewModel.uiState.stumpConnection.hasStoredSession)
@@ -3248,7 +3248,7 @@ class AppViewModelTest {
         assertEquals(true, viewModel.uiState.grimmoryConnection.hasStoredSession)
         assertEquals(false, viewModel.uiState.grimmoryConnection.isError)
         assertEquals(
-            "Connected to Grimmory. Tap Sync now to get your library. $HTTP_WARNING_MESSAGE",
+            "Connected to Grimmory. Tap Sync now to get your library.",
             viewModel.uiState.grimmoryConnection.message,
         )
     }

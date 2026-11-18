@@ -230,6 +230,7 @@ class EpubTableOfContentsModelTest {
         assertEquals("Глава 3 · Анна Лесная", epubReaderSubtitle(chapterTitle = "Глава 3", author = "Анна Лесная"))
         assertEquals("Анна Лесная", epubReaderSubtitle(chapterTitle = null, author = "Анна Лесная"))
         assertNull(epubReaderSubtitle(chapterTitle = " ", author = null))
+        assertEquals("Hiroko Oyamada", epubReaderSubtitle(chapterTitle = "The Hole", author = "Hiroko Oyamada", bookTitle = "The Hole"))
         assertEquals("p. 37 / 412", buildEpubDockPositionLabel(position = 37, pageCount = 412))
         assertEquals("412 pages", buildEpubDockPositionLabel(position = 0, pageCount = 412))
         assertEquals("A Short History of Rain · 6 chapters", epubTocSubtitle(bookTitle = "A Short History of Rain", chapterCount = 6))

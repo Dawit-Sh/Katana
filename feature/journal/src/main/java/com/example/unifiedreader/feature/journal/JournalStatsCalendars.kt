@@ -390,9 +390,10 @@ private fun monthStartInYear(
     set(Calendar.DAY_OF_MONTH, 1)
 }.timeInMillis
 
-// A day in Month: a little wider than tall, and no taller than 64, however wide the panel.
-private const val MonthCellAspect = 1.2f
-private val MonthCellMaxHeight = 64.dp
+// A day in Month: half again as wide as tall (about 45 tall on the Fire, room for the minutes),
+// and no taller than 52 however wide the panel, so the month fits the first screen.
+private const val MonthCellAspect = 1.5f
+private val MonthCellMaxHeight = 52.dp
 private val MonthCellGap = 5.dp
 private val YearCellMaxHeight = 22.dp
 private val YearCellGap = 3.dp

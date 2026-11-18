@@ -54,8 +54,9 @@ internal data class EpubReaderPreferences(
 
 internal fun restoreEpubPreferences(
     session: ReaderSessionSnapshot?,
+    newBookLook: Map<String, String> = emptyMap(),
 ): EpubReaderPreferences {
-    val preferences = session?.preferences.orEmpty()
+    val preferences = epubOpeningPreferences(session?.preferences.orEmpty(), newBookLook)
     return EpubReaderPreferences(
         typographyMode = preferences[EpubTypographyModeKey]
             ?.enumValueOrNull<EpubTypographyMode>()

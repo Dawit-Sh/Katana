@@ -11,8 +11,8 @@ import com.example.unifiedreader.ui.components.AppStatusTone
 data class RemoteSourceConnectionUiState(
     val source: SourceType,
     val displayName: String = source.defaultServerName(),
-    val baseUrl: String = source.defaultServerUrl(),
-    val backupBaseUrl: String = source.defaultBackupServerUrl(),
+    val baseUrl: String = "",
+    val backupBaseUrl: String = "",
     val username: String = "",
     val password: String = "",
     /** The server's libraries after a sign-in; Kavita and Stump list them, Grimmory does not. */
@@ -36,24 +36,18 @@ data class RemoteSourceConnectionUiState(
             (password.isNotBlank() || hasStoredSession)
 }
 
+/** An example address for the empty Server URL field: the server's usual port on a home network. */
+internal fun SourceType.exampleServerUrl(): String = when (this) {
+    SourceType.KAVITA -> "http://192.168.1.10:5000"
+    SourceType.STUMP -> "http://192.168.1.10:10801"
+    SourceType.GRIMMORY -> "http://192.168.1.10:6060"
+    SourceType.LOCAL -> ""
+}
+
 private fun SourceType.defaultServerName(): String = when (this) {
     SourceType.KAVITA -> "Kavita"
     SourceType.STUMP -> "Stump"
     SourceType.GRIMMORY -> "Grimmory"
-    SourceType.LOCAL -> ""
-}
-
-private fun SourceType.defaultServerUrl(): String = when (this) {
-    SourceType.KAVITA -> DefaultKavitaServerUrl
-    SourceType.STUMP -> DefaultStumpServerUrl
-    SourceType.GRIMMORY -> DefaultGrimmoryServerUrl
-    SourceType.LOCAL -> ""
-}
-
-private fun SourceType.defaultBackupServerUrl(): String = when (this) {
-    SourceType.KAVITA -> DefaultKavitaBackupServerUrl
-    SourceType.STUMP -> DefaultStumpBackupServerUrl
-    SourceType.GRIMMORY -> DefaultGrimmoryBackupServerUrl
     SourceType.LOCAL -> ""
 }
 
@@ -131,4 +125,5 @@ internal fun RemoteSourceConnectionUiState.toFormState(): ServerConnectionFormSt
     message = message,
     isError = isError,
     canConnect = canSubmit,
+    exampleUrl = source.exampleServerUrl(),
 )

@@ -157,6 +157,7 @@ internal fun BoxScope.EpubPageFrameLabels(
             chapterEndPosition = tocEntries.epubChapterEndPosition(location.currentProgress, location.currentHref, location.pageCount),
         )
     }
+    EpubPageStatus(color = color, height = stripHeight, isRightToLeft = isRightToLeft)
     if (chapterPagesLeft != null) {
         EpubChapterPagesLeft(
             pagesLeft = chapterPagesLeft,

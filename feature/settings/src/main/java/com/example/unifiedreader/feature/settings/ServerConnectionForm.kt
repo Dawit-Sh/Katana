@@ -42,6 +42,8 @@ internal data class ServerConnectionFormState(
     val message: String?,
     val isError: Boolean,
     val canConnect: Boolean,
+    /** A sample address for the empty Server URL field, with this kind of server's usual port. */
+    val exampleUrl: String = "",
 )
 
 enum class ServerConnectionAction {
@@ -116,6 +118,7 @@ internal fun ServerConnectionForm(
                             enabled = fieldsEnabled,
                             singleLine = true,
                             label = { Text("Server URL") },
+                            placeholder = { Text(state.exampleUrl) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                         )
                     },

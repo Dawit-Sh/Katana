@@ -31,7 +31,7 @@ internal object EpubAnnotationCopy {
     const val Exported = "Exported"
     const val ExportFailed = "Couldn't save the file"
 
-    fun wordSaved(word: String): String = "“$word” saved to My words"
+    fun wordSaved(word: String): String = "“$word” added to Saved words"
 
     fun count(highlights: Int, words: Int): String = listOf(
         if (highlights == 1) "1 highlight" else "$highlights highlights",

@@ -3,6 +3,7 @@ package com.example.unifiedreader
 import android.content.Context
 import com.example.unifiedreader.core.common.AppDispatchers
 import com.example.unifiedreader.core.common.ApplicationScope
+import com.example.unifiedreader.feature.reader.preferences.DataStoreReaderBookLookPreferencesStore
 import com.example.unifiedreader.feature.reader.preferences.DataStoreReaderPageColorPreferencesStore
 import com.example.unifiedreader.feature.reader.preferences.DataStoreReaderPageNumberPreferencesStore
 import com.example.unifiedreader.feature.reader.preferences.ReaderDisplayPreferences
@@ -28,5 +29,6 @@ object ReaderDisplayPreferencesModule {
     ): ReaderDisplayPreferences = ReaderDisplayPreferences(
         pageNumbers = DataStoreReaderPageNumberPreferencesStore(context, scope = applicationScope + appDispatchers.io),
         pageColor = DataStoreReaderPageColorPreferencesStore(context, scope = applicationScope + appDispatchers.io),
+        bookLook = DataStoreReaderBookLookPreferencesStore(context, scope = applicationScope + appDispatchers.io),
     )
 }

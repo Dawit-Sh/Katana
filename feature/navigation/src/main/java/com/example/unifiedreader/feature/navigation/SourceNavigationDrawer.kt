@@ -95,6 +95,7 @@ fun SourceNavigationDrawer(
                             .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
+                        KatanaDrawerHeader()
                         AppGroupLabel(
                             text = "Sources",
                             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),

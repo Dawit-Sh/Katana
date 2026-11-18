@@ -9,17 +9,18 @@ import org.junit.Test
 
 class ServerConnectionFormTest {
     @Test
-    fun `remote source connection states use default server addresses`() {
+    fun `remote source connection states start with empty server addresses and a sample`() {
         val kavita = RemoteSourceConnectionUiState(SourceType.KAVITA)
         val grimmory = RemoteSourceConnectionUiState(SourceType.GRIMMORY)
         val stump = RemoteSourceConnectionUiState(SourceType.STUMP)
 
-        assertEquals("http://192.168.50.60:5000/", kavita.baseUrl)
-        assertEquals("http://100.84.32.88:5000/", kavita.backupBaseUrl)
-        assertEquals("http://192.168.50.60:6060/", grimmory.baseUrl)
-        assertEquals("http://100.84.32.88:6060/", grimmory.backupBaseUrl)
-        assertEquals("http://192.168.50.60:10801/", stump.baseUrl)
-        assertEquals("http://100.84.32.88:10801/", stump.backupBaseUrl)
+        listOf(kavita, grimmory, stump).forEach { state ->
+            assertEquals("", state.baseUrl)
+            assertEquals("", state.backupBaseUrl)
+        }
+        assertEquals("http://192.168.1.10:5000", kavita.toFormState().exampleUrl)
+        assertEquals("http://192.168.1.10:6060", grimmory.toFormState().exampleUrl)
+        assertEquals("http://192.168.1.10:10801", stump.toFormState().exampleUrl)
     }
 
     @Test

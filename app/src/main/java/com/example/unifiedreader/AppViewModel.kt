@@ -1031,6 +1031,10 @@ class AppViewModel @Inject constructor(
                 )
             }
         }
+        viewModelScope.launchPendingSyncRetries(
+            hasPendingUploads = { uiState.pendingRemoteSyncSummary.groups.isNotEmpty() },
+            retry = ::retryPendingRemoteSync,
+        )
         progressSyncStartupRetryCoordinator.retryAfterHydration(
             scope = viewModelScope,
             onSyncFailures = ::reportProgressSyncFailures,

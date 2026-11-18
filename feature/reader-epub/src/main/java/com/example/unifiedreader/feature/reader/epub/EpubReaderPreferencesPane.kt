@@ -94,6 +94,7 @@ internal fun ColumnScope.EpubPreferencesPaneContent(
     onUseOrientationLayoutDefault: () -> Unit,
     onPageTurnStyleChanged: (PageTurnStyle) -> Unit,
     onPageNumbersVisibleChanged: (Boolean) -> Unit,
+    onUseForNewBooks: (() -> Unit)? = null,
 ) {
     val compact = currentAppWindowWidth() == AppWindowWidth.Compact
     val layoutDirection = LocalLayoutDirection.current
@@ -217,6 +218,9 @@ internal fun ColumnScope.EpubPreferencesPaneContent(
                                 onUseOrientationLayoutDefault = onUseOrientationLayoutDefault,
                                 onPageTurnStyleChanged = onPageTurnStyleChanged,
                             )
+                        }
+                        if (onUseForNewBooks != null && typographyMode == EpubTypographyMode.Custom) {
+                            EpubUseForNewBooksRow(onUseForNewBooks = onUseForNewBooks)
                         }
                     }
                 }

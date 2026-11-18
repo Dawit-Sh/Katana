@@ -96,7 +96,10 @@ fun DownloadsSheet(
         if (snapshot.entries.isEmpty()) {
             AppEmptyState(
                 title = "Nothing downloaded",
-                body = "Downloaded books open without the server. Use Download on a book's page, or long-press covers to pick several.",
+                // A book opened once is kept too, but it isn't a download: saying nothing about it
+                // read as "the book you opened is gone".
+                body = "Books you open stay on this tablet and read offline. Download keeps books you " +
+                    "haven't opened yet: use it on a book's page, or long-press covers to pick several.",
             )
             return@AppSideSheet
         }

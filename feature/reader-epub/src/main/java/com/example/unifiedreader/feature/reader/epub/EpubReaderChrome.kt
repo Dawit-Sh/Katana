@@ -50,7 +50,7 @@ internal fun EpubReaderChrome(
         topBar = {
             ReaderTopBar(
                 title = title,
-                subtitle = epubReaderSubtitle(chapterTitle = chapterTitle, author = author),
+                subtitle = epubReaderSubtitle(chapterTitle = chapterTitle, author = author, bookTitle = title),
                 onBack = onBack,
             ) {
                 onAnnotationsClick?.let { onClick ->
@@ -95,7 +95,9 @@ internal fun EpubReaderChrome(
 internal fun epubReaderSubtitle(
     chapterTitle: String?,
     author: String?,
+    bookTitle: String? = null,
 ): String? = listOfNotNull(
-    chapterTitle?.trim()?.takeIf(String::isNotEmpty),
+    // A chapter named like the book (a one-chapter book) would read as the title twice.
+    chapterTitle?.trim()?.takeIf { it.isNotEmpty() && !it.equals(bookTitle?.trim(), ignoreCase = true) },
     author?.trim()?.takeIf(String::isNotEmpty),
 ).joinToString(" · ").ifEmpty { null }

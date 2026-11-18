@@ -273,6 +273,16 @@ internal fun JournalWhenYouReadPanel(
             stretch = stretch,
             modifier = Modifier.padding(top = 16.dp).then(if (stretch) Modifier.weight(1f) else Modifier),
         )
+        if (window != null) {
+            // The usual hours are the accent bars; without a key the two colours meant nothing.
+            JournalChartKey(
+                entries = listOf(
+                    JournalChartKeyEntry(MaterialTheme.colorScheme.tertiary, "Your usual hours"),
+                    JournalChartKeyEntry(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f), "Other hours"),
+                ),
+                modifier = Modifier.padding(top = AppLayout.headingGap),
+            )
+        }
     }
 }
 

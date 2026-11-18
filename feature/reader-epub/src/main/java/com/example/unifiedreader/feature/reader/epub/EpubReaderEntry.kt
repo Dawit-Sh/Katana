@@ -103,7 +103,8 @@ fun EpubReaderScreen(
     val progressSnapshot = progressByItemId[item.id]
     val sessionSnapshot = sessionByItemId[item.id]
     val pageColorPick by displayPreferences.pageColor.pickFlow.collectAsStateWithLifecycle()
-    if (!hydrated || !pageColorPick.isLoaded) {
+    val newBookLook by displayPreferences.bookLook.lookFlow.collectAsStateWithLifecycle()
+    if (!hydrated || !pageColorPick.isLoaded || !newBookLook.isLoaded) {
         ReportReaderOpening(ReaderOpenStatus.Opening(ReaderOpeningStep.Opening))
         return
     }
@@ -125,7 +126,7 @@ fun EpubReaderScreen(
         }
     }
     val serializedInitialLocator = restoreProgressSnapshot?.toReadiumLocator()
-    val restoredPreferences = restoreEpubPreferences(restoreSessionSnapshot)
+    val restoredPreferences = restoreEpubPreferences(restoreSessionSnapshot, newBookLook.values)
     val defaultPageColor = defaultEpubPageColor(pageColorPick.name, appBackgroundIsLight)
     val restoredThemeSelection = remember(restoreSessionSnapshot, restoredPreferences, defaultPageColor) {
         resolveRestoredPageColor(
@@ -734,6 +735,7 @@ fun EpubReaderScreen(
                                 },
                                 onPageNumbersVisibleChanged = displayPreferences.pageNumbers::setVisible,
                                 slot = slot,
+                                onUseForNewBooks = { displayPreferences.bookLook.save(readerPreferences.newBookLook()) },
                             )
                             annotationController?.let { controller ->
                                 EpubAnnotationsPanel(

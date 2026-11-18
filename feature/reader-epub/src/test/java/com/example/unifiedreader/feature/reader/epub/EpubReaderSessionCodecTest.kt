@@ -389,4 +389,24 @@ class EpubReaderSessionCodecTest {
         assertEquals(EpubTapAction.Next, resolveEpubTapAction(ReaderTapSide.Left, ReadingProgression.RTL))
         assertEquals(EpubTapAction.Previous, resolveEpubTapAction(ReaderTapSide.Right, ReadingProgression.RTL))
     }
+    @Test
+    fun aBookWithoutSettingsOpensWithTheLookSavedForNewBooks() {
+        val look = EpubReaderPreferences(fontFamily = EpubReaderFontFamily.Literata, fontSize = 1.3).newBookLook()
+
+        val restored = restoreEpubPreferences(ReaderSessionSnapshot(itemId = "new", preferences = emptyMap()), look)
+
+        assertEquals(EpubReaderFontFamily.Literata, restored.fontFamily)
+        assertEquals(1.3, restored.fontSize, 0.0)
+        assertEquals(false, look.containsKey(EpubThemeKey))
+    }
+
+    @Test
+    fun aBookWithItsOwnSettingsIgnoresTheLookForNewBooks() {
+        val own = buildEpubPreferencesMap(EpubReaderPreferences(fontSize = 1.1))
+        val look = EpubReaderPreferences(fontSize = 1.6).newBookLook()
+
+        val restored = restoreEpubPreferences(ReaderSessionSnapshot(itemId = "old", preferences = own), look)
+
+        assertEquals(1.1, restored.fontSize, 0.0)
+    }
 }

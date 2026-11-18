@@ -80,10 +80,14 @@ class InMemoryReaderPageColorPreferencesStore(
     }
 }
 
-/** What the readers' settings change about the reading page beyond one book: the page number, and the page colour new books open on. */
+/**
+ * What the readers' settings change about the reading page beyond one book: the page number, the
+ * page colour new books open on, and the font and spacing they open with.
+ */
 class ReaderDisplayPreferences(
     val pageNumbers: ReaderPageNumberPreferencesStore = InMemoryReaderPageNumberPreferencesStore(),
     val pageColor: ReaderPageColorPreferencesStore = InMemoryReaderPageColorPreferencesStore(),
+    val bookLook: ReaderBookLookPreferencesStore = InMemoryReaderBookLookPreferencesStore(),
 )
 
 private val Context.readerPageColorPreferencesDataStore: DataStore<Preferences> by preferencesDataStore(

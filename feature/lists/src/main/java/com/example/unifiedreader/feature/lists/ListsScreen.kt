@@ -124,7 +124,10 @@ fun ListsScreen(
     val gap = AppLayout.gridGap
     BoxWithConstraints(modifier = modifier) {
         val available = maxWidth - gutter * 2
-        val columns = ((available + gap) / (cellSizeDp.dp + gap)).toInt().coerceAtLeast(1)
+        // A list is a mosaic of four covers: at the library's larger cover sizes two lists filled a
+        // tablet's screen, so list tiles stop at a smaller size and more of them fit across.
+        val tileSize = minOf(cellSizeDp.dp, ListsTileMaxSize)
+        val columns = ((available + gap) / (tileSize + gap)).toInt().coerceAtLeast(1)
         val cellWidth = (available - gap * (columns - 1)) / columns
         val page = remember(catalog, shown, choices) {
             if (shown == ListsFilter.All) null else catalog.placePage(shown, choices.placeChoice(shown))
@@ -386,3 +389,6 @@ private fun PanelSegment(
         }
     }
 }
+
+/** The widest a list tile gets on the Lists page: three across on a 7-inch tablet. */
+private val ListsTileMaxSize = 170.dp

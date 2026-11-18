@@ -35,13 +35,6 @@ import com.example.unifiedreader.ui.components.AppScreenTransition
 import com.example.unifiedreader.ui.components.appGutter
 import com.example.unifiedreader.ui.components.currentAppWindowWidth
 
-internal const val DefaultKavitaServerUrl = "http://192.168.50.60:5000/"
-internal const val DefaultKavitaBackupServerUrl = "http://100.84.32.88:5000/"
-internal const val DefaultGrimmoryServerUrl = "http://192.168.50.60:6060/"
-internal const val DefaultGrimmoryBackupServerUrl = "http://100.84.32.88:6060/"
-internal const val DefaultStumpServerUrl = "http://192.168.50.60:10801/"
-internal const val DefaultStumpBackupServerUrl = "http://100.84.32.88:10801/"
-
 /**
  * The settings route: a hub of grouped rows and one page per thing that needs a form. On a
  * wide window the hub stays as a side column; on a narrow one the open [page] slides in over
