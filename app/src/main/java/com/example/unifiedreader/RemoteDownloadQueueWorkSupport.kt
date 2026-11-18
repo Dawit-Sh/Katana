@@ -1,10 +1,12 @@
 package com.example.unifiedreader
 
 import android.content.Context
+import android.os.Build
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
@@ -28,15 +30,7 @@ class WorkManagerDownloadScheduler(
         workManager.enqueueUniqueWork(
             uniqueWorkName(entryId),
             ExistingWorkPolicy.KEEP,
-            OneTimeWorkRequestBuilder<RemoteDownloadWorker>()
-                .setInputData(workDataOf(RemoteDownloadWorker.EntryIdKey to entryId))
-                .setConstraints(
-                    Constraints.Builder()
-                        .setRequiredNetworkType(NetworkType.CONNECTED)
-                        .build(),
-                )
-                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-                .build(),
+            remoteDownloadWorkRequest(entryId, Build.VERSION.SDK_INT),
         )
     }
 
@@ -94,6 +88,27 @@ class RemoteDownloadWorker(
 interface RemoteDownloadWorkerEntryPoint {
     fun remoteDownloadWorkerRunner(): RemoteDownloadWorkerRunner
 }
+
+/**
+ * Expedited only on Android 12 and later, where it is a plain expedited job. Before 12 WorkManager runs
+ * expedited work as a foreground service and asks the worker for its notification, which
+ * [RemoteDownloadWorker] doesn't have (CoroutineWorker throws "Not implemented"), so every queued
+ * download on Android 9-11 failed before it started.
+ */
+internal fun remoteDownloadWorkRequest(
+    entryId: String,
+    sdkInt: Int,
+): OneTimeWorkRequest = OneTimeWorkRequestBuilder<RemoteDownloadWorker>()
+    .setInputData(workDataOf(RemoteDownloadWorker.EntryIdKey to entryId))
+    .setConstraints(
+        Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build(),
+    )
+    .apply {
+        if (sdkInt >= Build.VERSION_CODES.S) setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+    }
+    .build()
 
 private fun uniqueWorkName(
     entryId: String,
