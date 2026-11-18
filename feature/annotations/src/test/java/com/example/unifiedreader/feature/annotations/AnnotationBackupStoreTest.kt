@@ -3,6 +3,7 @@ package com.example.unifiedreader.feature.annotations
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.unifiedreader.core.database.UnifiedReaderDatabase
+import com.example.unifiedreader.core.database.entity.ReaderBookmarkEntity
 import java.time.ZoneOffset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -51,6 +52,7 @@ class AnnotationBackupStoreTest {
 
     private fun backups(database: UnifiedReaderDatabase) = AnnotationBackupStore(
         dao = database.readerAnnotationDao(),
+        bookmarkDao = database.readerBookmarkDao(),
         ioDispatcher = Dispatchers.Unconfined,
         now = { 1_763_424_000_000L },
     )
@@ -125,7 +127,50 @@ class AnnotationBackupStoreTest {
     }
 
     @Test
+    fun `bookmarks and a word's review state come back, once`() = runBlocking {
+        source.readerBookmarkDao().upsertBookmark(bookmark("p1", progression = 0.2))
+        source.readerBookmarkDao().upsertBookmark(bookmark("p2", progression = 0.5))
+        val word = store(source, "a").saveWord(hole, "solar", "A solar flare.", place)
+        val dao = source.readerAnnotationDao()
+        dao.upsertWord(dao.observeAllWords().first().single().copy(reviewLevel = 3, reviewDueAtEpochMillis = 9_000L))
+        target.readerBookmarkDao().upsertBookmark(bookmark("other-id", progression = 0.5))
+        val text = backups(source).backUp().text
+
+        val result = backups(target).restore(text)
+
+        assertEquals(AnnotationRestoreResult(addedHighlights = 0, addedWords = 1, alreadyHere = 1, addedBookmarks = 1), result)
+        assertEquals(
+            listOf("other-id", "p1"),
+            target.readerBookmarkDao().observeAllBookmarks().first().map(ReaderBookmarkEntity::id).sorted(),
+        )
+        val restoredWord = target.readerAnnotationDao().observeAllWords().first().single()
+        assertEquals(word.id, restoredWord.id)
+        assertEquals(3, restoredWord.reviewLevel)
+        assertEquals(9_000L, restoredWord.reviewDueAtEpochMillis)
+    }
+
+    private fun bookmark(id: String, progression: Double) = ReaderBookmarkEntity(
+        id = id,
+        itemId = hole.itemId,
+        bookTitle = hole.title,
+        bookAuthor = hole.author,
+        href = "c1.xhtml",
+        locatorJson = "{\"href\":\"c1.xhtml\"}",
+        chapterTitle = "Chapter 1",
+        progression = progression,
+        page = null,
+        pageCount = null,
+        text = null,
+        createdAtEpochMillis = 5L,
+        updatedAtEpochMillis = 5L,
+        deleted = false,
+        syncState = "DIRTY",
+        remoteId = null,
+    )
+
+    @Test
     fun `the restore message counts what was added`() {
+        assertEquals("Added 1 highlight, 2 words and 3 bookmarks", AnnotationRestoreResult(1, 2, 0, 3).message)
         assertEquals("Added 2 highlights and 1 word", AnnotationRestoreResult(2, 1, 0).message)
         assertEquals("Added 1 highlight", AnnotationRestoreResult(1, 0, 3).message)
         assertEquals("Nothing new: this tablet has it all", AnnotationRestoreResult(0, 0, 3).message)

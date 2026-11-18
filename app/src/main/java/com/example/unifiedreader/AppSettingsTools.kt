@@ -54,7 +54,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-/** The backup of highlights and words; kept out of [AppModule], which should not grow. */
+/** The backup of highlights, words and bookmarks; kept out of [AppModule], which should not grow. */
 @Module
 @InstallIn(SingletonComponent::class)
 object AppSettingsToolsModule {
@@ -62,7 +62,10 @@ object AppSettingsToolsModule {
     @Singleton
     fun provideAnnotationBackupStore(
         database: UnifiedReaderDatabase,
-    ): AnnotationBackupStore = AnnotationBackupStore(dao = database.readerAnnotationDao())
+    ): AnnotationBackupStore = AnnotationBackupStore(
+        dao = database.readerAnnotationDao(),
+        bookmarkDao = database.readerBookmarkDao(),
+    )
 }
 
 /** The Downloads sheet's "On this tablet": the books and what Remove does; no actions without the tools. */

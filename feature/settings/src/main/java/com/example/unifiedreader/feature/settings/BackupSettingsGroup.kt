@@ -81,7 +81,7 @@ internal fun BackupSettingsGroup(settings: BackupSettings) {
         AppSettingsRow(
             title = "Back up to a file",
             icon = AppIcons.Download,
-            supporting = "Highlights, notes and saved words",
+            supporting = "Highlights, notes, saved words and bookmarks",
             enabled = !busy,
             onClick = { start(settings.backUp) { name -> saveBackup.launch(name) } },
         )
