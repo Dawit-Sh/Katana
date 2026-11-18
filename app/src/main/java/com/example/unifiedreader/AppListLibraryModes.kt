@@ -29,7 +29,6 @@ import com.example.unifiedreader.feature.library.sortedInCanonicalSeriesIssueOrd
 import com.example.unifiedreader.feature.lists.ListLibraryMode
 import com.example.unifiedreader.feature.lists.ListsRouteState
 import com.example.unifiedreader.feature.lists.UserList
-import com.example.unifiedreader.feature.lists.UserListKind
 import com.example.unifiedreader.feature.lists.toDraft
 import com.example.unifiedreader.feature.lists.toSmartDraft
 import com.example.unifiedreader.ui.components.AppDialogCard
@@ -191,15 +190,6 @@ internal fun addingChange(
 
 /** The library Add books opens for [list]: its server's for a server's list, else the one last open. */
 internal fun addBooksSource(list: UserList, uiState: AppUiState): SourceType = list.server?.sourceType ?: uiState.selectedSource
-
-/** Whether books are added to [list] by hand, so its page offers Add books and selecting. */
-internal val UserList.takesBooksByHand: Boolean
-    get() = isEditable && (
-        kind == UserListKind.User ||
-            kind == UserListKind.WantToRead ||
-            kind == UserListKind.ServerShelf ||
-            kind == UserListKind.ServerReadingList
-        )
 
 /** Whether [list]'s smart list keeps the Filters picks it was saved from, so Filters can change it. */
 internal val UserList.changesInFilters: Boolean

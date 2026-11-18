@@ -60,7 +60,9 @@ class ListsBrowseTest {
         ).overview()
 
         assertEquals(listOf("Eclipse War", "Short Russian classics"), overview.pinned.map(UserList::name))
-        assertEquals(listOf("Want to read", "Night Run", "Short reads"), overview.yours.map(UserList::name))
+        assertEquals("Want to read", overview.wantToRead?.name)
+        assertEquals(listOf("Night Run", "Short reads"), overview.yours.map(UserList::name))
+        assertEquals(emptyStalled, overview.stalled)
         val kavita = overview.servers.first()
         assertEquals(1, kavita.count)
         assertTrue(kavita.lists.isEmpty())
@@ -69,6 +71,59 @@ class ListsBrowseTest {
         assertEquals(ServerRowLimit, grimmory.lists.size)
         assertEquals(listOf("Shelf 4", "Shelf 15", "Biographies", "Shelf 1"), grimmory.lists.take(4).map(UserList::name))
         assertEquals(1, overview.hiddenCount)
+    }
+
+    @Test
+    fun `Want to read joins the pinned lists, Stalled goes to Made for you unless hidden`() {
+        val pinned = catalog(preferences = mapOf(mine.id to ListPreference(pinnedAtEpochMillis = 1))).overview()
+        assertEquals(listOf("Night Run"), pinned.pinned.map(UserList::name))
+        assertEquals("Want to read", pinned.wantToRead?.name)
+        assertEquals(listOf("Short reads"), pinned.yours.map(UserList::name))
+
+        val wantToReadPinned = catalog(preferences = mapOf(wantToRead.id to ListPreference(pinnedAtEpochMillis = 1))).overview()
+        assertEquals(listOf("Want to read"), wantToReadPinned.pinned.map(UserList::name))
+        assertNull(wantToReadPinned.wantToRead)
+
+        assertNull(catalog(preferences = mapOf(emptyStalled.id to ListPreference(hidden = true))).overview().stalled)
+    }
+
+    @Test
+    fun `All shows the hint while your lists are empty, the servers' lists as rows and Made for you last`() {
+        val empty = wantToRead.copy(entries = emptyList())
+        val cells = buildListsCells(
+            catalog = catalog(own = listOf(empty, emptyStalled, smart), servers = listOf(shelf)),
+            filter = ListsFilter.All,
+            page = null,
+            underWay = null,
+            query = "",
+            openFold = null,
+            columns = 3,
+            rowColumns = 1,
+        ).map(PlacedListsCell::cell)
+
+        assertEquals(
+            listOf(
+                ListsCell.Places::class, ListsCell.Hint::class,
+                ListsCell.Heading::class, ListsCell.Tile::class, ListsCell.Tile::class,
+                ListsCell.Heading::class, ListsCell.Rows::class,
+                ListsCell.Heading::class, ListsCell.MadeForYou::class,
+            ),
+            cells.map { it::class },
+        )
+        assertEquals(listOf("Want to read", "Short reads"), cells.filterIsInstance<ListsCell.Tile>().map { it.list.name })
+        assertEquals("Empty", cells.filterIsInstance<ListsCell.Tile>().first().caption)
+        assertEquals(listOf("Biographies"), cells.filterIsInstance<ListsCell.Rows>().single().lists.map(UserList::name))
+        assertEquals(emptyStalled, cells.filterIsInstance<ListsCell.MadeForYou>().single().stalled)
+
+        // A book in a list of yours: no more hint.
+        val filled = buildListsCells(catalog(), ListsFilter.All, null, null, "", null, columns = 3, rowColumns = 1)
+        assertTrue(filled.none { it.cell is ListsCell.Hint })
+    }
+
+    @Test
+    fun `Stalled's line says how long and how many now`() {
+        assertEquals("Started, then not opened for 21 days · none now", emptyStalled.stalledLine())
+        assertEquals("Started, then not opened for 21 days · 2 now", emptyStalled.copy(entries = mine.entries).stalledLine())
     }
 
     @Test
@@ -164,6 +219,7 @@ class ListsBrowseTest {
         assertEquals(0.5f, readingList.readFraction(progress))
         assertEquals("Collection · 1 series", collection.rowLine(emptyMap()))
         assertEquals("Shelf · 3 books", shelf.rowLine(emptyMap()))
+        assertEquals("Shelf · empty", shelf.copy(entries = emptyList()).rowLine(emptyMap()))
         assertEquals("2021", readingList.copy(startYear = 2021, endYear = 2021).yearsLabel())
         assertEquals("Kavita · reading list · 2 issues", readingList.placeCaption(emptyMap()))
         assertEquals("This device · 2 books", wantToRead.placeCaption(emptyMap()))

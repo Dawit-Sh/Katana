@@ -17,15 +17,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -41,7 +38,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -74,11 +70,16 @@ class ListsScreenActions(
     val onEdit: (UserList) -> Unit,
     val onSelectionChange: (Set<String>?) -> Unit,
     val onShowWhatListsShows: () -> Unit,
+    /** An empty list's Add books tile: the library opens to pick its books. */
+    val onAddBooks: (UserList) -> Unit = {},
+    /** Made for you › New smart list. */
+    val onNewSmartList: () -> Unit = {},
 )
 
 /**
- * Every list in one place. The place row at the top; on All, the overview (the reading order under
- * way, Pinned, Your lists, a row per server); under a place, its tool row and all its lists, as rows
+ * Every list in one place. The place row at the top; on All, the overview (a hint while your lists
+ * are empty, the reading order under way, Pinned with Want to read, Your lists, each server's lists
+ * as rows, Made for you); under a place, its tool row and all its lists, as rows
  * (Recent, then A to Z under letters with the letter strip) or covers, then Finished and Hidden
  * folded. [searchQuery] turns it into the search: lists by name, then the books in your lists.
  * [selection] is non-null while several lists are being picked.
@@ -128,7 +129,6 @@ fun ListsScreen(
         // tablet's screen, so list tiles stop at a smaller size and more of them fit across.
         val tileSize = minOf(cellSizeDp.dp, ListsTileMaxSize)
         val columns = ((available + gap) / (tileSize + gap)).toInt().coerceAtLeast(1)
-        val cellWidth = (available - gap * (columns - 1)) / columns
         val page = remember(catalog, shown, choices) {
             if (shown == ListsFilter.All) null else catalog.placePage(shown, choices.placeChoice(shown))
         }
@@ -164,16 +164,19 @@ fun ListsScreen(
 
         @Composable
         fun Tile(section: String, list: UserList, caption: String, modifier: Modifier = Modifier) {
+            // An empty list you fill by hand is an Add books tile: a tap opens the library to pick.
+            val addBooks = list.entries.isEmpty() && list.takesBooksByHand
             WithMenu("$section:${list.id}", list) { onLongClick, _ ->
                 ListTile(
                     list = list,
                     caption = caption,
                     itemsById = itemsById,
                     cover = cover,
-                    onClick = { tap(list) },
+                    onClick = { if (addBooks && selection == null) actions.onAddBooks(list) else tap(list) },
                     onLongClick = onLongClick,
                     selected = selection?.contains(list.id),
                     modifier = modifier,
+                    emptyAction = if (addBooks) "Add books" else null,
                 )
             }
         }
@@ -237,20 +240,13 @@ fun ListsScreen(
                         modifier = cellModifier,
                     )
                     is ListsCell.Tile -> Tile(cell.section, cell.list, cell.caption, cellModifier)
-                    is ListsCell.Strip -> LazyRow(
-                        // Runs past the end gutter, so the row reads as one that scrolls.
-                        modifier = cellModifier.layout { measurable, constraints ->
-                            val wide = constraints.maxWidth + gutter.roundToPx()
-                            val placeable = measurable.measure(constraints.copy(minWidth = wide, maxWidth = wide))
-                            layout(constraints.maxWidth, placeable.height) { placeable.placeRelative(0, 0) }
-                        },
-                        horizontalArrangement = Arrangement.spacedBy(gap),
-                        contentPadding = PaddingValues(end = gutter),
-                    ) {
-                        items(cell.row.lists, key = { list -> list.id }) { list ->
-                            Tile("strip", list, list.tileCaption(progress), Modifier.width(cellWidth))
-                        }
-                    }
+                    is ListsCell.Hint -> ListsHint(modifier = cellModifier)
+                    is ListsCell.MadeForYou -> ListsMadeForYou(
+                        stalled = cell.stalled,
+                        onOpenStalled = { list -> actions.onOpenList(list) },
+                        onNewSmartList = actions.onNewSmartList,
+                        modifier = cellModifier,
+                    )
                     is ListsCell.Rows -> PanelSegment(cell.top, cell.nextCount, rowColumns, cell.lists.size, cellModifier) { index ->
                         val list = cell.lists[index]
                         WithMenu("${cell.section}:${list.id}", list) { onLongClick, pressed ->

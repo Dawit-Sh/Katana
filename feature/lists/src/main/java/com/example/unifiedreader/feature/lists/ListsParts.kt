@@ -66,23 +66,31 @@ import com.example.unifiedreader.ui.components.AppWindowWidth
 import com.example.unifiedreader.ui.components.currentAppWindowWidth
 import com.example.unifiedreader.ui.theme.UnifiedReaderThemeTokens
 
-/** A list's cover: its first four books in its order, or the copy of each kept for a book that has left the library. */
+/**
+ * A list's cover: its first four books in its order, or the copy of each kept for a book that has
+ * left the library. Empty, it is the kit's dashed outline, saying [emptyAction] when there is one.
+ */
 @Composable
 internal fun ListCoverOf(
     list: UserList,
     itemsById: Map<String, ReadableItem>,
     cover: ListCover,
     modifier: Modifier = Modifier,
+    emptyAction: String? = null,
+    emptyMark: Boolean = true,
 ) {
     val items = remember(list, itemsById) {
         list.sortedEntries().take(4).map { entry -> itemsById[entry.itemId] ?: entry.asReadableItem() }
     }
-    AppListCover(count = items.size, modifier = modifier) { index, cellModifier -> cover(items[index], cellModifier) }
+    AppListCover(count = items.size, modifier = modifier, emptyAction = emptyAction, emptyMark = emptyMark) { index, cellModifier ->
+        cover(items[index], cellModifier)
+    }
 }
 
 /**
  * A list as a cover tile: its [AppListCover] (with the `tune` badge when it updates itself, a
- * round check while selecting), its name and [caption]. A long press opens its menu.
+ * round check while selecting; empty, the dashed outline with [emptyAction]), its name and
+ * [caption]. A long press opens its menu.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -95,6 +103,7 @@ internal fun ListTile(
     onLongClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
     selected: Boolean? = null,
+    emptyAction: String? = null,
 ) {
     Column(
         modifier = modifier
@@ -103,7 +112,7 @@ internal fun ListTile(
         verticalArrangement = Arrangement.spacedBy(ListTileGap),
     ) {
         Box {
-            ListCoverOf(list, itemsById, cover)
+            ListCoverOf(list, itemsById, cover, emptyAction = emptyAction)
             if (list.isBuiltFromRules) {
                 Box(
                     modifier = Modifier
@@ -164,7 +173,7 @@ internal fun ListRow(
     AppListRow(
         name = list.name,
         line = line,
-        cover = { coverModifier -> ListCoverOf(list, itemsById, cover, coverModifier) },
+        cover = { coverModifier -> ListCoverOf(list, itemsById, cover, coverModifier, emptyMark = false) },
         onClick = onClick,
         onLongClick = onLongClick,
         onLongClickLabel = "More for this list",
