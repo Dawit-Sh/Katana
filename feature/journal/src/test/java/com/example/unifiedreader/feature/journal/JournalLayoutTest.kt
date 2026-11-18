@@ -45,7 +45,7 @@ class JournalLayoutTest {
         assertEquals(
             listOf(
                 JournalSlot.Summary, JournalSlot.ReadingDays, JournalSlot.WhenYouRead, JournalSlot.Pages,
-                JournalSlot.WhatYouRead, JournalSlot.Finished, JournalSlot.NeedsRating, JournalSlot.Lists,
+                JournalSlot.Highlights, JournalSlot.WhatYouRead, JournalSlot.Finished, JournalSlot.NeedsRating, JournalSlot.Lists,
                 JournalSlot.Ratings, JournalSlot.MostRead,
             ),
             groups.flatMap { group -> group.rows.map { row -> row.single().slots.single() } },
@@ -64,5 +64,14 @@ class JournalLayoutTest {
             groups[0].rows[1],
         )
         assertEquals(false, groups.any { group -> group.rows.flatten().any { cell -> JournalSlot.WhatYouRead in cell.slots } })
+        // Highlights this month is the month's only.
+        assertEquals(false, groups.any { group -> group.rows.flatten().any { cell -> JournalSlot.Highlights in cell.slots } })
+    }
+
+    @Test
+    fun `the month's highlights open Books, a row of their own`() {
+        val groups = journalLayout(month = true, wide = true, present = everything)
+
+        assertEquals(listOf(JournalCellLayout(12, listOf(JournalSlot.Highlights))), groups[1].rows.first())
     }
 }

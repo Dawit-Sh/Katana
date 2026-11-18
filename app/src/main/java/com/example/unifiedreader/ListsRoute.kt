@@ -27,6 +27,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -281,6 +282,8 @@ internal fun ListsRoute(
         }
         else -> {
             val underWay = remember(stored, itemsById, progress) { readingOrderUnderWay(stored, itemsById, progress) }
+            // An empty list's Add books tile picks from the library the list takes books from now.
+            val addBooksNow by rememberUpdatedState { list: UserList -> addBooks(list) }
             val actions = remember(state, listsViewModel, onOpenBookPage) {
                 ListsScreenActions(
                     onFilterChange = { filter -> state.filter = filter },
@@ -293,6 +296,8 @@ internal fun ListsRoute(
                     onEdit = { list -> editList(list) },
                     onSelectionChange = { selection -> state.selection = selection },
                     onShowWhatListsShows = { state.isWhatListsShowsOpen = true },
+                    onAddBooks = { list -> addBooksNow(list) },
+                    onNewSmartList = { state.isSmartSourcePickOpen = true },
                 )
             }
             ListsScreen(

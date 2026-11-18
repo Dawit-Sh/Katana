@@ -81,6 +81,10 @@ fun JournalStatsContent(
     // Lists read to the end; the period's show under its finished books.
     finishedLists: List<JournalFinishedList> = emptyList(),
     listCover: JournalListCover? = null,
+    // The reader's highlights and saved words; the month's show in Highlights this month.
+    marks: JournalMarks = JournalMarks(),
+    // Opens the Bookmarks page; without one, Highlights this month has no See all.
+    onOpenBookmarks: (() -> Unit)? = null,
 ) {
     val now = rememberJournalNowEpochMillis()
     val firstJournalAt = remember(snapshot) { snapshot.firstJournalAtEpochMillis() }
@@ -131,12 +135,16 @@ fun JournalStatsContent(
             val (start, end) = periodBounds(period, selected)
             finishedLists.filter { list -> list.finishedAtEpochMillis in start until end }
         }
-        val groups = remember(overview, loading, periodLists, listCover, mostRead, wide) {
+        val monthMarks = remember(marks, overview) {
+            if (month) journalMonthMarks(marks, overview.periodStartEpochMillis, overview.periodEndEpochMillis) else null
+        }
+        val groups = remember(overview, loading, periodLists, listCover, mostRead, wide, monthMarks) {
             val reading = overview.whatYouRead()
             val present = buildSet {
                 add(JournalSlot.Summary)
                 add(JournalSlot.ReadingDays)
                 if (loading || reading.read.isNotEmpty() || reading.opened.isNotEmpty()) add(JournalSlot.WhatYouRead)
+                if (monthMarks != null) add(JournalSlot.Highlights)
                 if (month && overview.averageReadingTimeBuckets.any { bucket -> bucket.totalMillis > 0L }) add(JournalSlot.WhenYouRead)
                 if (!month && journalBusiestMonth(overview.averageReadingTimeBuckets) != null) add(JournalSlot.TimeByMonth)
                 if (overview.pagesBars().any { bar -> bar.pages > 0 }) add(JournalSlot.Pages)
@@ -167,6 +175,14 @@ fun JournalStatsContent(
                     onOpenItem = openItem,
                     modifier = slotModifier,
                 )
+                JournalSlot.Highlights -> monthMarks?.let { marksOfMonth ->
+                    JournalHighlightsPanel(
+                        marks = marksOfMonth,
+                        title = journalHighlightsTitle(overview, now),
+                        onOpenBookmarks = onOpenBookmarks,
+                        modifier = slotModifier,
+                    )
+                }
                 JournalSlot.Finished -> JournalFinishedPanel(
                     overview = overview,
                     coverImageUrlProvider = coverImageUrlProvider,

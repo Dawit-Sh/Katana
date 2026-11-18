@@ -60,6 +60,9 @@ class ListsCatalog(
     val showing: ListsShowing,
     val progressByItemId: Map<String, ItemProgressSummary>,
 ) {
+    /** Stalled as it is now, empty or not: All's Made for you names it either way. */
+    val stalled: UserList? = own.firstOrNull { list -> list.kind == UserListKind.Stalled }
+
     /** The user's lists that can show at all: Stalled only while it holds a book. */
     val own: List<UserList> = own.filter { list -> list.kind != UserListKind.Stalled || list.entries.isNotEmpty() }
 
@@ -111,18 +114,25 @@ data class ListsServerRow(
     val lists: List<UserList>,
 )
 
-/** All, the overview: pinned lists, your lists, a row per server, and how many lists are hidden. */
+/**
+ * All, the overview: pinned lists with Want to read beside them, the rest of your lists, a row per
+ * server, Stalled for Made for you (null while hidden), and how many lists are hidden.
+ */
 data class ListsOverview(
     val pinned: List<UserList>,
     val yours: List<UserList>,
     val servers: List<ListsServerRow>,
     val hiddenCount: Int,
+    /** Want to read, on top with the pinned lists; null when it is pinned itself, hidden or finished away. */
+    val wantToRead: UserList? = null,
+    val stalled: UserList? = null,
 )
 
 /**
- * The overview: every pinned list in the order pinned; your lists in the screen's order; then
- * each server's lists opened lately first and the rest by name, [rowLimit] at most. A pinned list
- * shows only among the pinned ones, and a finished one only while finished lists stay with the rest.
+ * The overview: every pinned list in the order pinned, then Want to read; your other lists in the
+ * screen's order (Stalled goes to Made for you); then each server's lists opened lately first and
+ * the rest by name, [rowLimit] at most. A pinned list shows only among the pinned ones, and a
+ * finished one only while finished lists stay with the rest.
  */
 fun ListsCatalog.overview(rowLimit: Int = ServerRowLimit): ListsOverview {
     val visible = visibleOf(ListsFilter.All)
@@ -139,11 +149,14 @@ fun ListsCatalog.overview(rowLimit: Int = ServerRowLimit): ListsOverview {
         val rest = (candidates - opened.toSet()).sortedWith(byName)
         ListsServerRow(filter, count = shown.size, lists = (opened + rest).take(rowLimit))
     }
+    val yours = visibleOf(ListsFilter.Yours).filter(::inRow)
     return ListsOverview(
         pinned = pinned,
-        yours = visibleOf(ListsFilter.Yours).filter(::inRow),
+        yours = yours.filter { list -> list.kind != UserListKind.WantToRead && list.kind != UserListKind.Stalled },
         servers = rows,
         hiddenCount = listsOf(ListsFilter.All).count(::isLeftOut),
+        wantToRead = yours.firstOrNull { list -> list.kind == UserListKind.WantToRead },
+        stalled = stalled?.takeUnless { list -> preference(list).hidden },
     )
 }
 
@@ -290,7 +303,7 @@ fun ListsFoundBook.whereLine(): String = "In " + lists.joinToString(" · ") { li
 fun UserList.rowLine(progressByItemId: Map<String, ItemProgressSummary>, withKind: Boolean = true): String {
     val count = entries.size
     val read = entries.count { entry -> progressByItemId[entry.itemId]?.isFinished == true }
-    val books = bookCountLabel(count).lowercase()
+    val books = if (count == 0) "empty" else bookCountLabel(count).lowercase()
     val parts = when (kind) {
         UserListKind.ServerReadingList -> listOf(
             "Reading list".takeIf { withKind },

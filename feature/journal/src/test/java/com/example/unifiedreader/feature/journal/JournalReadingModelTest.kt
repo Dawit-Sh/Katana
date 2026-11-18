@@ -112,13 +112,11 @@ class JournalReadingModelTest {
     }
 
     @Test
-    fun `times read short in a square and in the summary`() {
-        assertEquals("1m", formatJournalCellMinutes(20_000L))
-        assertEquals("22m", formatJournalCellMinutes(22 * 60_000L))
-        assertEquals("1h 27", formatJournalCellMinutes(87 * 60_000L))
-        assertEquals("1h 05", formatJournalCellMinutes(65 * 60_000L))
-        assertEquals("2h", formatJournalCellMinutes(120 * 60_000L))
-        assertEquals("10h", formatJournalCellMinutes(614 * 60_000L))
+    fun `the month's best day is its longest, and times read short in the summary`() {
+        val best = journalBestDay(listOf(day(16, minutes = 5), day(18, minutes = 8), day(17, minutes = 7)))
+        assertEquals("18 Oct, 8 min", best?.bestDayLabel())
+        assertEquals("2 Oct, 1 h 42 min", day(2, minutes = 102).bestDayLabel())
+        assertNull(journalBestDay(listOf(day(3, minutes = 0))))
         assertEquals("3 h 24 min", formatJournalReadingTime(204 * 60_000L))
         assertEquals("61 h", formatJournalReadingTime(61 * 3_600_000L + 12 * 60_000L))
     }

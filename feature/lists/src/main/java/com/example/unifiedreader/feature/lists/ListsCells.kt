@@ -35,8 +35,14 @@ internal sealed interface ListsCell {
         override val key = "tile:$section:${list.id}"
     }
 
-    data class Strip(val row: ListsServerRow) : ListsCell {
-        override val key = "strip:${row.filter.key}"
+    /** All's one line on how books get into a list, while none of your lists has any. */
+    data object Hint : ListsCell {
+        override val key = "hint"
+    }
+
+    /** All's lists the app keeps for you: Stalled (null while hidden), and New smart list. */
+    data class MadeForYou(val stalled: UserList?) : ListsCell {
+        override val key = "made-for-you"
     }
 
     /**
@@ -87,6 +93,56 @@ internal sealed interface ListsCell {
     }
 }
 
+/**
+ * All's overview: Pinned with Want to read beside the pinned lists (or Your lists headed by Want to
+ * read while nothing is pinned), the rest of your lists in one row of tiles, each server's lists
+ * as rows, then Made for you and the hidden count.
+ */
+private fun MutableList<ListsCell>.addOverview(catalog: ListsCatalog, overview: ListsOverview, columns: Int, rowColumns: Int) {
+    val progress = catalog.progressByItemId
+    val wantToRead = overview.wantToRead
+    val yours = if (overview.pinned.isEmpty()) listOfNotNull(wantToRead) + overview.yours else overview.yours
+    if (overview.pinned.isNotEmpty()) {
+        add(ListsCell.Heading("pinned", "Pinned", count = null))
+        overview.pinned.forEach { list -> add(ListsCell.Tile("pinned", list, list.placeCaption(progress))) }
+        wantToRead?.let { list -> add(ListsCell.Tile("pinned", list, list.tileCaption(progress))) }
+    }
+    if (yours.isNotEmpty()) {
+        val count = catalog.visibleOf(ListsFilter.Yours).size
+        val more = yours.size > columns
+        add(ListsCell.Heading("yours", "Your lists", count, seeAll = ListsFilter.Yours.takeIf { more }, seeAllCount = count))
+        yours.take(columns).forEach { list -> add(ListsCell.Tile("yours", list, list.tileCaption(progress))) }
+    }
+    overview.servers.forEach { row ->
+        add(ListsCell.Heading(row.filter.key, row.filter.label(), row.count, seeAll = row.filter, seeAllCount = row.count))
+        addRows("server:${row.filter.key}", row.lists, rowColumns)
+    }
+    add(ListsCell.Heading("made-for-you", "Made for you", count = null))
+    add(ListsCell.MadeForYou(overview.stalled))
+    if (overview.hiddenCount > 0) add(ListsCell.Hidden(overview.hiddenCount))
+}
+
+/** How a run of rows reads: with each list's kind, with its place (All's search), and the search's match. */
+private data class ListsRowsLook(
+    val withKind: Boolean = true,
+    val withPlace: Boolean = false,
+    val highlight: String? = null,
+)
+
+/** [lists] as lines of rows, [rowColumns] to a line, each line knowing whether it starts or ends its panels. */
+private fun MutableList<ListsCell>.addRows(section: String, lists: List<UserList>, rowColumns: Int, look: ListsRowsLook = ListsRowsLook()) {
+    val lines = lists.chunked(rowColumns)
+    lines.forEachIndexed { index, line ->
+        val nextCount = lines.getOrNull(index + 1)?.size ?: 0
+        val top = index == 0
+        val bottom = index == lines.lastIndex
+        add(ListsCell.Rows(section, line, top, bottom, nextCount, look.withKind, look.withPlace, look.highlight))
+    }
+}
+
+/** How many of a server's lists All shows as rows; See all opens the rest. */
+private const val ServerRowsOnAll = 5
+
 /** A cell with the space above and below it, so the grid itself has no vertical spacing of its own. */
 internal data class PlacedListsCell(
     val cell: ListsCell,
@@ -113,13 +169,8 @@ internal fun buildListsCells(
     val cells = buildList {
         add(ListsCell.Places(catalog.places))
 
-        fun rows(section: String, lists: List<UserList>, withKind: Boolean = true, withPlace: Boolean = false, highlight: String? = null) {
-            val lines = lists.chunked(rowColumns)
-            lines.forEachIndexed { index, line ->
-                val nextCount = lines.getOrNull(index + 1)?.size ?: 0
-                add(ListsCell.Rows(section, line, top = index == 0, bottom = index == lines.lastIndex, nextCount, withKind, withPlace, highlight))
-            }
-        }
+        fun rows(section: String, lists: List<UserList>, withKind: Boolean = true, withPlace: Boolean = false, highlight: String? = null) =
+            addRows(section, lists, rowColumns, ListsRowsLook(withKind, withPlace, highlight))
 
         when {
             query.isNotEmpty() -> {
@@ -141,23 +192,9 @@ internal fun buildListsCells(
                 }
             }
             page == null -> {
+                if (catalog.own.none { list -> list.takesBooksByHand && list.entries.isNotEmpty() }) add(ListsCell.Hint)
                 underWay?.let { add(ListsCell.Card(it)) }
-                val overview = catalog.overview()
-                if (overview.pinned.isNotEmpty()) {
-                    add(ListsCell.Heading("pinned", "Pinned", overview.pinned.size))
-                    overview.pinned.forEach { list -> add(ListsCell.Tile("pinned", list, list.placeCaption(progress))) }
-                }
-                if (overview.yours.isNotEmpty()) {
-                    val more = overview.yours.size > columns
-                    val count = catalog.visibleOf(ListsFilter.Yours).size
-                    add(ListsCell.Heading("yours", "Your lists", count, seeAll = ListsFilter.Yours.takeIf { more }, seeAllCount = count))
-                    overview.yours.take(columns).forEach { list -> add(ListsCell.Tile("yours", list, list.tileCaption(progress))) }
-                }
-                overview.servers.forEach { row ->
-                    add(ListsCell.Heading(row.filter.key, row.filter.label(), row.count, seeAll = row.filter, seeAllCount = row.count))
-                    if (row.lists.isNotEmpty()) add(ListsCell.Strip(row))
-                }
-                if (overview.hiddenCount > 0) add(ListsCell.Hidden(overview.hiddenCount))
+                addOverview(catalog, catalog.overview(rowLimit = ServerRowsOnAll), columns, rowColumns)
             }
             else -> {
                 add(ListsCell.Tools(page))
@@ -208,6 +245,7 @@ private fun gapBefore(previous: ListsCell?, cell: ListsCell): Dp = when {
     cell is ListsCell.Books && !cell.top -> Dp.Hairline
     cell is ListsCell.Tile && previous is ListsCell.Tile -> Dp.Hairline
     previous is ListsCell.Places -> AppLayout.gridGap
+    previous is ListsCell.Hint -> AppLayout.sectionGap
     previous is ListsCell.Folds -> AppLayout.headingGap
     cell is ListsCell.Letter -> AppLayout.gridGap
     previous is ListsCell.Tile -> AppLayout.sectionGap - AppLayout.gridGap

@@ -155,9 +155,19 @@ fun UserList.tileCaption(progressByItemId: Map<String, ItemProgressSummary>): St
             val read = entries.count { entry -> progressByItemId[entry.itemId]?.isFinished == true }
             if (read > 0) "$read of $count read" else bookCountLabel(count)
         }
+        count == 0 -> "Empty"
         else -> bookCountLabel(count)
     }
 }
+
+/** Made for you's line for Stalled: "Started, then not opened for 21 days · none now", "· 3 now". */
+fun UserList.stalledLine(stalledAfterMillis: Long = StalledAfterMillis): String {
+    val days = stalledAfterMillis / DayMillis
+    val now = if (entries.isEmpty()) "none now" else "${entries.size} now"
+    return "Started, then not opened for $days days · $now"
+}
+
+private const val DayMillis: Long = 24L * 60 * 60 * 1000
 
 /**
  * The lists that hold [itemId], for its book page: Want to read, the user's lists and smart lists,

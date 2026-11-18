@@ -106,6 +106,15 @@ data class UserList(
             else -> OwnOrders
         }
 
+    /** Whether books are added to it by hand, so its page (and its empty tile) offers Add books. */
+    val takesBooksByHand: Boolean
+        get() = isEditable && (
+            kind == UserListKind.User ||
+                kind == UserListKind.WantToRead ||
+                kind == UserListKind.ServerShelf ||
+                kind == UserListKind.ServerReadingList
+            )
+
     /** Whether its books come from rules (a smart list, a magic shelf, Stalled), so nothing is added to it by hand. */
     val isBuiltFromRules: Boolean
         get() = kind == UserListKind.Smart || kind == UserListKind.ServerMagicShelf || kind == UserListKind.Stalled

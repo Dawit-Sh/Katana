@@ -580,6 +580,7 @@ fun UnifiedReaderScaffold(
                                     modifier = Modifier.fillMaxSize(),
                                     finishedLists = listsViewModel?.let { rememberJournalFinishedLists(it, uiState) }.orEmpty(),
                                     listCover = rememberJournalListCover(viewModel),
+                                    marks = rememberJournalMarks(),
                                 )
                             }
 

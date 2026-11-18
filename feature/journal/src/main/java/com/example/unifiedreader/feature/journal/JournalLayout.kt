@@ -8,6 +8,7 @@ internal enum class JournalSlot {
     Pages,
     TimeByMonth,
     WhatYouRead,
+    Highlights,
     Finished,
     NeedsRating,
     Lists,
@@ -40,6 +41,7 @@ internal fun journalLayout(
                 listOf(cell(7, JournalSlot.ReadingDays), cell(5, JournalSlot.WhenYouRead, JournalSlot.Pages)),
             ),
             "Books" to listOf(
+                listOf(cell(12, JournalSlot.Highlights)),
                 listOf(cell(7, JournalSlot.WhatYouRead), cell(5, JournalSlot.Finished, JournalSlot.NeedsRating)),
                 listOf(cell(12, JournalSlot.Lists)),
             ),
