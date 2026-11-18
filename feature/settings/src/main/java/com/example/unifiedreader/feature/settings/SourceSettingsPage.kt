@@ -93,6 +93,13 @@ internal fun SourceSettingsPage(
             onLibraryDirectionSelected = onLibraryDirectionSelected,
             onLibraryModeSelected = onLibraryReaderModeSelected,
         )
+        entry.actions.onSignOut?.let { signOut ->
+            SourceSignOutGroup(
+                sourceName = entry.sourceType.displayName(),
+                enabled = !entry.connection.isConnecting,
+                onSignOut = signOut,
+            )
+        }
     }
 }
 

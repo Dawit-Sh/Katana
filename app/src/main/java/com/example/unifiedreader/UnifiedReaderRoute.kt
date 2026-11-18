@@ -62,7 +62,10 @@ import com.example.unifiedreader.feature.translation.LocalTranslationService
 import kotlinx.coroutines.flow.MutableStateFlow
 
 @Composable
-fun UnifiedReaderRoute() {
+fun UnifiedReaderRoute(
+    // Settings' look for new books, Storage, backup, Sign out, and the Downloads sheet's "On this tablet".
+    settingsTools: AppSettingsToolsViewModel = hiltViewModel(),
+) {
     val viewModel: AppViewModel = hiltViewModel()
     val updates: AppUpdatesViewModel = hiltViewModel()
     val lists: AppListsViewModel = hiltViewModel()
@@ -81,7 +84,10 @@ fun UnifiedReaderRoute() {
         }
     }
 
-    CompositionLocalProvider(LocalTranslationService provides translation.service) {
+    CompositionLocalProvider(
+        LocalTranslationService provides translation.service,
+        LocalAppSettingsTools provides settingsTools,
+    ) {
         UnifiedReaderAppContent(
             viewModel = viewModel,
             onImportLocalFileClick = {

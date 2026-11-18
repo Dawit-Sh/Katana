@@ -41,7 +41,8 @@ fun AppUpdateVersionRow(
         lastCheckedLabel = lastCheckedLabel,
     )
     AppSettingsRow(
-        title = "Version",
+        // The app and its version, as About names it: "Katana" over "1.0.0 · checked today".
+        title = "Katana",
         icon = AppIcons.Info,
         supporting = copy.supporting,
         supportingColor = when (copy.tone) {

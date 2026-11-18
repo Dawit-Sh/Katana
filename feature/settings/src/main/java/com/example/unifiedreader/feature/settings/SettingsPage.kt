@@ -20,6 +20,18 @@ sealed interface SettingsPage {
         override val title: String get() = sourceType.displayName()
     }
 
+    /** What "Use these for new books" in the reader's Aa panel saved, with Reset. */
+    data object NewBookLook : SettingsPage {
+        override val key: String = "new_book_look"
+        override val title: String = "Default look for new books"
+    }
+
+    /** The library's settings in one place: Filter chips, Tags and Source order open from here. */
+    data object Library : SettingsPage {
+        override val key: String = "library"
+        override val title: String = "Filters, tags and source order"
+    }
+
     data object FilterChips : SettingsPage {
         override val key: String = "filter_chips"
         override val title: String = "Filter chips"
@@ -64,6 +76,8 @@ sealed interface SettingsPage {
         fun fromKey(key: String?): SettingsPage? = when {
             key.isNullOrEmpty() -> null
             key == Theme.key -> Theme
+            key == NewBookLook.key -> NewBookLook
+            key == Library.key -> Library
             key == FilterChips.key -> FilterChips
             key == Tags.key -> Tags
             key == DrawerOrder.key -> DrawerOrder
@@ -79,9 +93,16 @@ sealed interface SettingsPage {
     }
 }
 
-/** The page Back returns to before the hub: a license's notice goes back to the list. */
+/**
+ * The page Back returns to before the hub: a license's notice goes back to the list, and Filter
+ * chips, Tags and Source order go back to the library's page.
+ */
 val SettingsPage.parent: SettingsPage?
-    get() = if (this is SettingsPage.License) SettingsPage.Licenses else null
+    get() = when (this) {
+        is SettingsPage.License -> SettingsPage.Licenses
+        SettingsPage.FilterChips, SettingsPage.Tags, SettingsPage.DrawerOrder -> SettingsPage.Library
+        else -> null
+    }
 
 /** Saves the open page across configuration changes and process death. */
 val SettingsPageSaver: Saver<SettingsPage?, String> = Saver(

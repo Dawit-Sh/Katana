@@ -66,6 +66,8 @@ fun SettingsScreen(
     onScrolledChanged: (Boolean) -> Unit = {},
     // Settings › Tags, from the library; no Tags row without it.
     tagsPage: SettingsTagsPage? = null,
+    // The look for new books, Storage, and Highlights and backup; each left out when null.
+    tools: SettingsTools = SettingsTools(),
 ) {
     val usesSidePane = settingsUsesSidePane(currentAppWindowWidth())
     var hubScrolled by remember { mutableStateOf(false) }
@@ -88,6 +90,22 @@ fun SettingsScreen(
                 SettingsPage.Theme -> ThemeSettingsPage(
                     themeMode = themeMode,
                     onThemeModeSelected = onThemeModeSelected,
+                    contentTopInset = contentTopInset,
+                    horizontalPadding = horizontalPadding,
+                )
+                SettingsPage.NewBookLook -> tools.newBookLook?.let { settings ->
+                    NewBookLookSettingsPage(
+                        settings = settings,
+                        contentTopInset = contentTopInset,
+                        horizontalPadding = horizontalPadding,
+                    )
+                }
+                SettingsPage.Library -> LibrarySettingsPage(
+                    sourceOrder = sourceOrder,
+                    filterPanelsBySource = libraryFilterPanelsBySource,
+                    tagsSummary = tagsPage?.summary,
+                    selectedPage = page,
+                    onOpenPage = onPageChanged,
                     contentTopInset = contentTopInset,
                     horizontalPadding = horizontalPadding,
                 )
@@ -163,7 +181,6 @@ fun SettingsScreen(
                 sourceOrder = sourceOrder,
                 filterPanelsBySource = libraryFilterPanelsBySource,
                 syncSettings = syncSettings,
-                tagsSummary = tagsPage?.summary,
                 versionName = versionName,
                 updateState = updateState,
                 updateActions = updateActions,
@@ -172,6 +189,7 @@ fun SettingsScreen(
                 contentTopInset = contentTopInset,
                 horizontalPadding = horizontalPadding,
                 modifier = hubModifier,
+                tools = tools,
             )
         }
     }

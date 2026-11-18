@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.yabai.android.library)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -13,6 +14,7 @@ android {
 dependencies {
     implementation(project(":core:database"))
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit4)
     testImplementation(libs.kotlinx.coroutines.test)
