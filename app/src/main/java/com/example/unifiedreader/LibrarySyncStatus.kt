@@ -26,7 +26,7 @@ import java.util.Locale
 
 /**
  * What the library bar's cloud says about the server on screen: when its library last synced on
- * this tablet, how many of this tablet's changes (reading progress) still wait to reach it, and
+ * this device, how many of this device's changes (reading progress) still wait to reach it, and
  * whether it can be reached now.
  */
 @Immutable
@@ -129,7 +129,7 @@ internal fun LibrarySyncStatusButton(
 }
 
 internal object LibrarySyncCopy {
-    const val NeverSynced = "Not synced yet on this tablet"
+    const val NeverSynced = "Not synced yet on this device"
     const val UpToDate = "Everything is synced; nothing is waiting"
     const val Syncing = "Syncing now…"
     const val SyncNow = "Sync now"

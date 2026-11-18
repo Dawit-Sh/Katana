@@ -38,7 +38,7 @@ import com.example.unifiedreader.ui.components.AppProgressBar
 import com.example.unifiedreader.ui.components.AppSheetDivider
 import com.example.unifiedreader.ui.components.AppTonalButton
 
-/** The books "On this tablet" shows, with what Remove does; none when the app gives no actions. */
+/** The books "On this device" shows, with what Remove does; none when the app gives no actions. */
 internal class ShownKeptBooks(
     val snapshot: KeptBooksSnapshot,
     val actions: KeptBookActions?,
@@ -55,7 +55,7 @@ internal fun downloadsHeaderSummary(snapshot: DownloadEntriesSnapshot, kept: Sho
 }
 
 /**
- * "On this tablet": each book whose file is here, the latest read first, with Remove; then, when
+ * "On this device": each book whose file is here, the latest read first, with Remove; then, when
  * the queue is empty ([withNothingDownloading]), how downloading starts. Nothing without books.
  */
 internal fun LazyListScope.keptBooksSection(
@@ -97,7 +97,7 @@ internal fun LazyListScope.keptBooksSection(
     if (withNothingDownloading) nothingDownloading()
 }
 
-/** Under "On this tablet" when nothing else is in the sheet: how downloading starts. */
+/** Under "On this device" when nothing else is in the sheet: how downloading starts. */
 private fun LazyListScope.nothingDownloading() {
     sheetHeading(key = "section-downloading-none", title = DownloadsSheetSection.Downloading.title)
     item(key = "downloading-none-note") {
@@ -191,22 +191,22 @@ internal fun KeptBooksFooter(kept: ShownKeptBooks) {
 internal enum class KeptBooksRemoval { Finished, All }
 
 internal object KeptBooksCopy {
-    const val Heading = "On this tablet"
+    const val Heading = "On this device"
     const val Note = "Books you opened are kept so they read offline, the same as a download."
     const val NothingDownloading = "Nothing waiting. Long-press covers in the library to download several at once."
-    const val Total = "Books on this tablet"
+    const val Total = "Books on this device"
     const val RemoveFinished = "Remove finished"
     const val RemoveAll = "Remove all"
-    const val ConfirmBody = "Their files leave this tablet. Your place, highlights and notes stay, and the " +
+    const val ConfirmBody = "Their files leave this device. Your place, highlights and notes stay, and the " +
         "books stay in your library to open again from the server."
 
-    fun removeOne(title: String): String = "Remove $title from this tablet"
+    fun removeOne(title: String): String = "Remove $title from this device"
 
     fun confirmTitle(removal: KeptBooksRemoval, count: Int): String {
         val books = if (count == 1) "1 book" else "$count books"
         return when (removal) {
             KeptBooksRemoval.Finished -> "Remove $books you've finished?"
-            KeptBooksRemoval.All -> "Remove all $books from this tablet?"
+            KeptBooksRemoval.All -> "Remove all $books from this device?"
         }
     }
 }

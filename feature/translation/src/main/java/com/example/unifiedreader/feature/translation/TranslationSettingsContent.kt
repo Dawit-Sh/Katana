@@ -25,8 +25,8 @@ import com.example.unifiedreader.ui.components.AppTextButton
 import com.example.unifiedreader.ui.components.AppButtonSpinner
 
 /**
- * Settings › Translation: your language, who translates (DeepL with your key, or this tablet),
- * the languages on this tablet (remove one, add one).
+ * Settings › Translation: your language, who translates (DeepL with your key, or this device),
+ * the languages on this device (remove one, add one).
  * The settings page puts this in its column.
  */
 @Composable
@@ -115,7 +115,7 @@ fun ColumnScope.TranslationSettingsContent(service: TranslationService) {
     }
 }
 
-/** Translate with (DeepL or this tablet) and, with a key saved, DeepL's key and this month's use. */
+/** Translate with (DeepL or this device) and, with a key saved, DeepL's key and this month's use. */
 @Composable
 private fun ColumnScope.TranslateWithGroups(service: TranslationService, state: TranslationState) {
     var editingKey by remember { mutableStateOf(false) }

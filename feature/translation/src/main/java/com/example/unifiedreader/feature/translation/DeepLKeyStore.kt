@@ -17,7 +17,7 @@ import javax.crypto.spec.GCMParameterSpec
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-/** Your DeepL key, kept on this tablet only. */
+/** Your DeepL key, kept on this device only. */
 interface DeepLKeyStore {
     /** The key, or null: none saved, or the tablet's keystore lost what encrypted it. */
     val key: Flow<String?>

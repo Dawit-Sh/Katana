@@ -10,7 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * A server's book whose file is on this tablet: downloaded, or kept when it was opened so it
+ * A server's book whose file is on this device: downloaded, or kept when it was opened so it
  * reads offline. [openedAtEpochMillis] is when it was last read, null if it never was.
  */
 data class KeptBook(
@@ -41,7 +41,7 @@ data class KeptBooksSnapshot(
     }
 }
 
-/** What the "On this tablet" section can do: [onRemove] takes the books' ids. */
+/** What the "On this device" section can do: [onRemove] takes the books' ids. */
 data class KeptBookActions(
     val onRemove: (List<String>) -> Unit,
 )
@@ -134,12 +134,12 @@ private fun KeptBook.progressLabel(): String? = when {
     else -> "$readPercent% read"
 }
 
-/** The sheet's line under its title: "3 books on this tablet · 8.5 MB". */
+/** The sheet's line under its title: "3 books on this device · 8.5 MB". */
 fun keptBooksSummary(snapshot: KeptBooksSnapshot): String? {
     if (!snapshot.isLoaded || snapshot.books.isEmpty()) return null
     val count = snapshot.books.size
     val books = if (count == 1) "1 book" else "$count books"
-    return "$books on this tablet · ${formatStorageSize(snapshot.totalBytes)}"
+    return "$books on this device · ${formatStorageSize(snapshot.totalBytes)}"
 }
 
 /** The share of the tablet's space these books take, for the bar under the list. */

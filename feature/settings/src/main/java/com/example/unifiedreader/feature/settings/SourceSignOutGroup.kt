@@ -15,7 +15,7 @@ import com.example.unifiedreader.ui.components.AppTonalButton
 
 /**
  * The last group of a connected server's page: Sign out, which asks first, then forgets the
- * server's address and sign-in on this tablet. The server leaves the side menu; its page shows
+ * server's address and sign-in on this device. The server leaves the side menu; its page shows
  * the sign-in form again, so it can be added back.
  */
 @Composable
@@ -60,11 +60,11 @@ internal fun SourceSignOutGroup(
 internal object SignOutCopy {
     const val Title = "Sign out"
 
-    fun row(sourceName: String): String = "Removes $sourceName from this tablet. You can add it again here."
+    fun row(sourceName: String): String = "Removes $sourceName from this device. You can add it again here."
 
     fun dialogTitle(sourceName: String): String = "Sign out of $sourceName?"
 
     fun dialogBody(sourceName: String): String =
         "Katana forgets this server's address and sign-in, and $sourceName leaves the side menu. " +
-            "Your reading places, highlights and the books kept on this tablet stay."
+            "Your reading places, highlights and the books kept on this device stay."
 }

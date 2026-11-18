@@ -22,7 +22,7 @@ import com.example.unifiedreader.ui.components.AppMenuItem
 import com.example.unifiedreader.ui.components.AppSearchField
 
 /**
- * Every language, in two groups: the ones on this tablet, then the ones to download. A search
+ * Every language, in two groups: the ones on this device, then the ones to download. A search
  * field narrows both. [extraFirst] is an optional row above them ("The book's language").
  */
 @Composable

@@ -261,7 +261,7 @@ internal fun Context.openInAnotherApp(text: String) {
 }
 
 /**
- * Who translated, as a chip: DeepL or This tablet. Its menu is Settings' Translate with, so a
+ * Who translated, as a chip: DeepL or This device. Its menu is Settings' Translate with, so a
  * pick holds for later cards; before a DeepL key it offers Add DeepL… instead.
  */
 @Composable
@@ -299,7 +299,7 @@ private fun ProviderChip(
                     },
                 )
             } else {
-                // A choice row, unticked, so it lines up with This tablet under it.
+                // A choice row, unticked, so it lines up with This device under it.
                 AppMenuChoiceItem(
                     text = TranslationCopy.AddDeepL,
                     selected = false,

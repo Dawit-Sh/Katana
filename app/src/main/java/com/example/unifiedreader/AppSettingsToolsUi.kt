@@ -61,7 +61,7 @@ private fun onCopiesRemoved(viewModel: AppViewModel): (Set<String>) -> Unit = { 
     if (itemIds.isNotEmpty()) {
         viewModel.onLocalCopiesRemoved(itemIds)
         val books = if (itemIds.size == 1) "1 book" else "${itemIds.size} books"
-        viewModel.toasts.show(AppToastMessage(text = "Removed $books from this tablet", icon = AppToastIcon.Removed))
+        viewModel.toasts.show(AppToastMessage(text = "Removed $books from this device", icon = AppToastIcon.Removed))
     }
 }
 

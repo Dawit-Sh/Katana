@@ -199,7 +199,7 @@ internal object StorageCopy {
     fun removeFinishedTitle(count: Int): String =
         if (count == 1) "Remove 1 finished book?" else "Remove $count finished books?"
 
-    const val RemoveFinishedBody = "Their files leave this tablet. Your place, highlights and notes stay, " +
+    const val RemoveFinishedBody = "Their files leave this device. Your place, highlights and notes stay, " +
         "and the books stay in your library to open again from the server."
     const val ClearCoversBody = "Covers are fetched again from your servers as you scroll the library."
 }

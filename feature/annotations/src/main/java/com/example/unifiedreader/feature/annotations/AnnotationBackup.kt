@@ -17,7 +17,7 @@ import kotlinx.coroutines.withContext
 /**
  * Settings › Back up to a file and Restore from a file: every highlight (with its note), saved
  * word (with its review state) and page bookmark as one JSON file, and restoring one, which adds
- * what this tablet doesn't have and changes nothing it has.
+ * what this device doesn't have and changes nothing it has.
  */
 class AnnotationBackupStore(
     private val dao: ReaderAnnotationDao,
@@ -38,7 +38,7 @@ class AnnotationBackupStore(
     }
 
     /**
-     * Adds the backup's highlights, words and bookmarks this tablet doesn't have: one with the same
+     * Adds the backup's highlights, words and bookmarks this device doesn't have: one with the same
      * id, or the same words (or page) in the same book, is left as it is here. A highlight removed
      * here stays removed; a bookmark removed here comes back.
      * Throws [AnnotationBackupFormatException] when [text] isn't a Katana backup.
@@ -86,7 +86,7 @@ data class AnnotationRestoreResult(
                 counted(addedBookmarks, "bookmark"),
             )
             return when (added.size) {
-                0 -> "Nothing new: this tablet has it all"
+                0 -> "Nothing new: this device has it all"
                 1 -> "Added ${added.single()}"
                 else -> "Added ${added.dropLast(1).joinToString(", ")} and ${added.last()}"
             }
@@ -101,7 +101,7 @@ data class AnnotationRestoreResult(
 
 class AnnotationBackupFormatException : IllegalArgumentException("Not a Katana backup")
 
-/** The rows a restore writes: those of [backup] that this tablet has in no form. */
+/** The rows a restore writes: those of [backup] that this device has in no form. */
 internal data class AnnotationRestorePlan(
     val highlights: List<ReaderHighlightEntity>,
     val words: List<SavedWordEntity>,
@@ -131,7 +131,7 @@ internal fun planAnnotationRestore(
     return AnnotationRestorePlan(highlights = highlights, words = words)
 }
 
-/** The backup's bookmarks this tablet doesn't have: not the same id, not the same page of the same book. */
+/** The backup's bookmarks this device doesn't have: not the same id, not the same page of the same book. */
 internal fun planBookmarkRestore(
     backup: List<BackupBookmark>,
     existing: List<ReaderBookmarkEntity>,

@@ -68,7 +68,7 @@ object AppSettingsToolsModule {
     )
 }
 
-/** The Downloads sheet's "On this tablet": the books and what Remove does; no actions without the tools. */
+/** The Downloads sheet's "On this device": the books and what Remove does; no actions without the tools. */
 internal class KeptBooksForSheet(
     val snapshot: KeptBooksSnapshot,
     val actions: KeptBookActions?,
@@ -135,7 +135,7 @@ class AppSettingsToolsViewModel @Inject constructor(
 
     /**
      * Deletes the tablet's copies of [itemIds], then tells the library through [onRemoved] (it drops
-     * their "on this tablet" marks) and measures again.
+     * their "on this device" marks) and measures again.
      */
     fun removeKeptBooks(itemIds: List<String>, onRemoved: (Set<String>) -> Unit) {
         if (itemIds.isEmpty()) return
@@ -191,7 +191,7 @@ class AppSettingsToolsViewModel @Inject constructor(
         )
     }
 
-    /** Every server book read on this tablet or downloaded to it: those that may have a file here. */
+    /** Every server book read on this device or downloaded to it: those that may have a file here. */
     private suspend fun keptBookCandidates(): List<KeptBookCandidate> {
         readerSessionStore.isHydratedFlow.first { hydrated -> hydrated }
         val progress = readerSessionStore.progressByItemIdFlow.value

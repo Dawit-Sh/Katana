@@ -97,8 +97,8 @@ class KeptBooksTest {
     @Test
     fun `the summary counts the books and their size, once measured`() {
         val books = listOf(kept(2_100_000, opened = now, percent = 9), kept(6_400_000, opened = now, percent = 1))
-        assertEquals("2 books on this tablet · 8.5 MB", keptBooksSummary(KeptBooksSnapshot(books, isLoaded = true)))
-        assertEquals("1 book on this tablet · 2.1 MB", keptBooksSummary(KeptBooksSnapshot(books.take(1), isLoaded = true)))
+        assertEquals("2 books on this device · 8.5 MB", keptBooksSummary(KeptBooksSnapshot(books, isLoaded = true)))
+        assertEquals("1 book on this device · 2.1 MB", keptBooksSummary(KeptBooksSnapshot(books.take(1), isLoaded = true)))
         assertNull(keptBooksSummary(KeptBooksSnapshot(books, isLoaded = false)))
         assertNull(keptBooksSummary(KeptBooksSnapshot(emptyList(), isLoaded = true)))
     }

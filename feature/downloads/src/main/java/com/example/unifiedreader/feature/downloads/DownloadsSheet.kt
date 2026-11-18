@@ -56,7 +56,7 @@ import com.example.unifiedreader.ui.components.AppTextButton
 import com.example.unifiedreader.ui.components.AppTonalButton
 
 /**
- * The Downloads sheet: the books on this tablet (downloaded or kept from opening, with their size
+ * The Downloads sheet: the books on this device (downloaded or kept from opening, with their size
  * and Remove), what is downloading now (a raised block with the file it is on and a bar), what
  * waits, what couldn't download and why, and what finished, by day. A finished row opens the
  * book's page; Read on a single book opens it straight away. Under the list, the space the books
@@ -101,10 +101,10 @@ fun DownloadsSheet(
         )
         if (snapshot.entries.isEmpty() && kept.books.isEmpty()) {
             AppEmptyState(
-                title = "Nothing on this tablet",
+                title = "Nothing on this device",
                 // A book opened once is kept too, and shows here once it is: saying nothing about
                 // it read as "the book you opened is gone".
-                body = "Books you open stay on this tablet and read offline, and show here. Download keeps " +
+                body = "Books you open stay on this device and read offline, and show here. Download keeps " +
                     "books you haven't opened yet: use it on a book's page, or long-press covers to pick several.",
             )
             return@AppSideSheet

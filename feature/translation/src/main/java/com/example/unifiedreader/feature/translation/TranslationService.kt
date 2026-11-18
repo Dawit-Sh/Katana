@@ -30,7 +30,7 @@ data class TranslationState(
 ) {
     /**
      * Whether a card may translate: the tablet's languages, your choices and your DeepL key are
-     * all known. Before that, Translate with would read as This tablet and the tablet would
+     * all known. Before that, Translate with would read as This device and the tablet would
      * answer a word you meant for DeepL.
      */
     val ready: Boolean

@@ -65,7 +65,7 @@ data class RemoteSourceSettingsActions(
     val onRetryFailedCovers: () -> Unit,
     val onCancelCoverPreload: () -> Unit,
     val onClearCoverCache: () -> Unit,
-    /** Forgets the server's saved sign-in on this tablet; null leaves Sign out off the page. */
+    /** Forgets the server's saved sign-in on this device; null leaves Sign out off the page. */
     val onSignOut: (() -> Unit)? = null,
 )
 

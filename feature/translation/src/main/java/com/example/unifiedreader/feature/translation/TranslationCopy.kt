@@ -15,7 +15,7 @@ internal object TranslationCopy {
     const val Swap = "Swap languages"
     const val Close = "Close"
     const val FindLanguage = "Find a language"
-    const val OnThisTablet = "On this tablet"
+    const val OnThisTablet = "On this device"
     const val DownloadHeading = "Download · about 30 MB each"
     const val Downloading = "Downloading"
     const val OnThisDevice = "Translated on this device"
@@ -33,7 +33,7 @@ internal object TranslationCopy {
     const val PickTo = "Pick a language to translate into."
     const val CouldntTranslate = "Couldn't translate this"
     const val DownloadFailed = "The download didn't finish. Check the connection and try again."
-    const val TranslateFailed = "Something went wrong on this tablet. Try again, or open it in another app."
+    const val TranslateFailed = "Something went wrong on this device. Try again, or open it in another app."
     const val BuiltIn = "Built in"
     const val Remove = "Remove"
     const val AddLanguage = "Add a language"
@@ -44,7 +44,7 @@ internal object TranslationCopy {
     // DeepL
     const val TranslateWith = "Translate with"
     const val DeepL = "DeepL"
-    const val ThisTablet = "This tablet"
+    const val ThisTablet = "This device"
     const val AddDeepL = "Add DeepL…"
     const val DeepLSupporting = "Better wording. Sends the selected text and its sentence to DeepL"
     const val DeepLNoKeySupporting = "Better wording, online. Add your own key to use it"
@@ -53,15 +53,15 @@ internal object TranslationCopy {
     const val Change = "Change"
     const val ThisMonth = "This month"
     const val DeepLDialogTitle = "Translate with DeepL"
-    const val DeepLDialogBody = "DeepL words translations better than the tablet does, especially whole sentences. " +
+    const val DeepLDialogBody = "DeepL words translations better than this device does, especially whole sentences. " +
         "It needs your own key: DeepL's free API plan allows 500,000 characters a month."
-    const val DeepLKeyWhere = "deepl.com › Account › API Keys. Kept on this tablet only"
+    const val DeepLKeyWhere = "deepl.com › Account › API Keys. Kept on this device only"
     const val DeepLPrivacy = "What you select, and the sentence around it, goes to DeepL. Nothing else from your books does."
     const val CheckAndSave = "Check and save"
     const val Cancel = "Cancel"
     const val RemoveKey = "Remove key"
-    const val DeepLFailedTranslate = "DeepL couldn't translate this, and the languages aren't on this tablet yet. " +
-        "Try again, or switch to This tablet below."
+    const val DeepLFailedTranslate = "DeepL couldn't translate this, and the languages aren't on this device yet. " +
+        "Try again, or switch to This device below."
 
     fun plan(isFree: Boolean): String = if (isFree) "Free plan" else "Pro plan"
 
@@ -70,14 +70,14 @@ internal object TranslationCopy {
 
     /** Under a translation the tablet made because DeepL couldn't. */
     fun fellBack(failure: DeepLFailure, from: String, to: String): String = when (failure) {
-        DeepLFailure.Unreachable -> "DeepL couldn't be reached, so this tablet translated."
-        DeepLFailure.LimitReached -> "DeepL's characters for this month are used up, so this tablet translated."
-        DeepLFailure.KeyRefused -> "DeepL refused the key, so this tablet translated. Check it in Settings › Translation."
+        DeepLFailure.Unreachable -> "DeepL couldn't be reached, so this device translated."
+        DeepLFailure.LimitReached -> "DeepL's characters for this month are used up, so this device translated."
+        DeepLFailure.KeyRefused -> "DeepL refused the key, so this device translated. Check it in Settings › Translation."
         DeepLFailure.LanguageMissing -> {
             val missing = listOf(from, to).first { !DeepLLanguages.supports(it) }
-            "DeepL doesn't translate ${TranslationLanguages.displayName(missing)}, so this tablet did."
+            "DeepL doesn't translate ${TranslationLanguages.displayName(missing)}, so this device did."
         }
-        DeepLFailure.Other -> "DeepL couldn't translate this, so this tablet did."
+        DeepLFailure.Other -> "DeepL couldn't translate this, so this device did."
     }
 
     /** Why a key wasn't saved, under the field. */
@@ -88,7 +88,7 @@ internal object TranslationCopy {
         DeepLFailure.LanguageMissing, DeepLFailure.Other -> "DeepL said no. Check the key and try again."
     }
 
-    fun downloadTitle(names: List<String>): String = "Translate ${names.joinToString(" and ")} on this tablet?"
+    fun downloadTitle(names: List<String>): String = "Translate ${names.joinToString(" and ")} on this device?"
 
     fun downloadBody(count: Int): String =
         if (count == 1) {
@@ -101,14 +101,14 @@ internal object TranslationCopy {
 
     fun downloadLanguage(name: String): String = "Download $name"
 
-    /** The hub row's line: "Into Russian · 2 languages on this tablet". */
+    /** The hub row's line: "Into Russian · 2 languages on this device". */
     fun hubSummary(state: TranslationState): String {
         val into = "Into ${TranslationLanguages.displayName(state.yourLanguage)}"
         if (!state.loaded) return into
         val count = state.downloaded.size
-        return "$into · $count ${if (count == 1) "language" else "languages"} on this tablet"
+        return "$into · $count ${if (count == 1) "language" else "languages"} on this device"
     }
 }
 
-/** The Settings hub row's line: "Into Russian · 2 languages on this tablet". */
+/** The Settings hub row's line: "Into Russian · 2 languages on this device". */
 fun translationHubSummary(state: TranslationState): String = TranslationCopy.hubSummary(state)

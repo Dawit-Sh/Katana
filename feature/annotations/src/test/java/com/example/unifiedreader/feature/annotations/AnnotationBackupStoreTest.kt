@@ -173,7 +173,7 @@ class AnnotationBackupStoreTest {
         assertEquals("Added 1 highlight, 2 words and 3 bookmarks", AnnotationRestoreResult(1, 2, 0, 3).message)
         assertEquals("Added 2 highlights and 1 word", AnnotationRestoreResult(2, 1, 0).message)
         assertEquals("Added 1 highlight", AnnotationRestoreResult(1, 0, 3).message)
-        assertEquals("Nothing new: this tablet has it all", AnnotationRestoreResult(0, 0, 3).message)
+        assertEquals("Nothing new: this device has it all", AnnotationRestoreResult(0, 0, 3).message)
     }
 
     @Test
