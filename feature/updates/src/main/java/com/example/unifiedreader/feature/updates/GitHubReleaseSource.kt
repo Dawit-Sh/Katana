@@ -59,10 +59,12 @@ internal fun parseGitHubRelease(
     supportedAbis: List<String> = emptyList(),
 ): AppRelease? {
     val release = gitHubJson.decodeFromString<GitHubReleaseDto>(body)
-    if (release.draft || release.prerelease) return null
-    val version = AppVersion.parse(release.tagName) ?: return null
+    val version = AppVersion.parse(release.tagName)
     val apks = release.assets.filter { asset -> asset.name.endsWith(".apk", ignoreCase = true) }
-    val apkName = chooseReleaseApk(apks.map { asset -> asset.name }, supportedAbis) ?: return null
+    val apkName = chooseReleaseApk(apks.map { asset -> asset.name }, supportedAbis)
+    // Drafts and pre-releases are never offered.
+    val published = !release.draft && !release.prerelease
+    if (!published || version == null || apkName == null) return null
     val apk = apks.first { asset -> asset.name == apkName }
     return AppRelease(
         version = version,

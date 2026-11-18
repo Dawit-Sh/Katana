@@ -162,8 +162,10 @@ class AppReleaseParsingTest {
     }
 
     private companion object {
-        fun asset(name: String, size: Long) =
-            """{"name": "$name", "size": $size, "browser_download_url": "https://github.com/Dawit-Sh/Katana/releases/download/0.13.0/$name"}"""
+        fun asset(name: String, size: Long): String {
+            val url = "https://github.com/Dawit-Sh/Katana/releases/download/0.13.0/$name"
+            return """{"name": "$name", "size": $size, "browser_download_url": "$url"}"""
+        }
 
 
         val ReleaseJson = """
