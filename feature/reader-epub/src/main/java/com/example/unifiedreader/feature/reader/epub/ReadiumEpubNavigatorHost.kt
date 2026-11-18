@@ -71,7 +71,7 @@ internal fun ReadiumEpubNavigatorHost(
     annotations: EpubSelectionAnnotations? = null,
 ) {
     val containerId = remember(item.id) { View.generateViewId() }
-    val fragmentTag = remember(item.id) { "readium-epub-${item.id}" }
+    val fragmentTag = remember(item.id) { epubNavigatorTag(item.id) }
     val configuration = LocalConfiguration.current
     val latestOnLocationChanged = rememberUpdatedState(onLocationChanged)
     val latestOnSurfaceTap = rememberUpdatedState(onSurfaceTap)

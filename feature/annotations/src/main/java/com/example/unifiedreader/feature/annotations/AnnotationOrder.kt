@@ -20,5 +20,15 @@ fun List<SavedWord>.inReadingOrderWords(): List<SavedWord> =
         ),
     )
 
+/** Bookmarks as the book has them: by place, those without one last, then oldest first. */
+fun List<ReaderBookmark>.inReadingOrderBookmarks(): List<ReaderBookmark> =
+    sortedWith(
+        compareBy<ReaderBookmark>(
+            { it.place.progression == null },
+            { it.place.progression },
+            { it.createdAtEpochMillis },
+        ),
+    )
+
 /** The text on one line, its runs of white space as single spaces. */
 internal fun String.oneLine(): String = replace(Regex("\\s+"), " ").trim()

@@ -33,6 +33,8 @@ fun SourceNavigationFrame(
     settingsBadge: String? = null,
     /** "Add a server", while a server is not connected. */
     showAddSource: Boolean = false,
+    /** The drawer's reading card (the rail has no room for one). */
+    readingCard: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val railShown = sourceNavigationUsesRail()
@@ -48,6 +50,7 @@ fun SourceNavigationFrame(
         settingsBadge = settingsBadge,
         showAddSource = showAddSource,
         gesturesEnabled = !railShown,
+        readingCard = readingCard,
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
             if (railShown) {

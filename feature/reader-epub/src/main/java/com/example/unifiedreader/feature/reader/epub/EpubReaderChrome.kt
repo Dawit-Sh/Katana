@@ -13,7 +13,8 @@ import com.example.unifiedreader.feature.reader.core.ReaderTopBar
 import com.example.unifiedreader.ui.components.AppIcons
 
 /**
- * The EPUB reader's bars and panels: the title over the chapter and author, Aa at the top end;
+ * The EPUB reader's bars and panels: the title over the chapter and author, then the page's
+ * bookmark (filled while the page has one), the marks panel and Aa at the top end;
  * the contents button, the percentage, the slider with its chapter ticks and the page in the
  * dock. [panels] are the contents and settings panels, placed between the bars.
  */
@@ -38,6 +39,9 @@ internal fun EpubReaderChrome(
     isAnnotationsOpen: Boolean = false,
     // The highlights and saved words panel; null when the book can't keep highlights.
     onAnnotationsClick: (() -> Unit)? = null,
+    isPageBookmarked: Boolean = false,
+    // Bookmarks the page on screen, or removes its bookmark; null when the book can't keep them.
+    onBookmarkClick: (() -> Unit)? = null,
     panels: @Composable BoxScope.(ReaderPanelSlot) -> Unit,
 ) {
     val chapterTitle = remember(tocEntries, currentHref, currentProgress) {
@@ -53,6 +57,14 @@ internal fun EpubReaderChrome(
                 subtitle = epubReaderSubtitle(chapterTitle = chapterTitle, author = author, bookTitle = title),
                 onBack = onBack,
             ) {
+                onBookmarkClick?.let { onClick ->
+                    ReaderBarButton(
+                        icon = if (isPageBookmarked) AppIcons.BookmarkFilled else AppIcons.Bookmark,
+                        contentDescription = if (isPageBookmarked) EpubAnnotationCopy.RemoveBookmark else EpubAnnotationCopy.AddBookmark,
+                        active = isPageBookmarked,
+                        onClick = onClick,
+                    )
+                }
                 onAnnotationsClick?.let { onClick ->
                     ReaderBarButton(
                         icon = AppIcons.CollectionsBookmark,

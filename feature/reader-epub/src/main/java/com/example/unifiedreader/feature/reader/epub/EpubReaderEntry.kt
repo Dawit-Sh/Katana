@@ -32,6 +32,7 @@ import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SyncState
 import com.example.unifiedreader.core.model.primaryAuthor
 import com.example.unifiedreader.feature.annotations.AnnotatedBook
+import com.example.unifiedreader.feature.annotations.AnnotationJumps
 import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
 import com.example.unifiedreader.feature.reader.core.ImmersiveReaderOverlay
 import com.example.unifiedreader.feature.reader.core.rememberReaderActiveSessionTracker
@@ -74,6 +75,7 @@ fun EpubReaderScreen(
     onCompletionRequested: () -> Unit = {},
     translation: TranslationService? = null,
     annotationStore: ReaderAnnotationStore? = null,
+    annotationJumps: AnnotationJumps? = null,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -195,6 +197,8 @@ fun EpubReaderScreen(
     val bookWordsFlow = remember(annotationStore, item.id) { annotationStore?.words(item.id) ?: flowOf(emptyList()) }
     val bookHighlights by bookHighlightsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
     val bookWords by bookWordsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+    val bookBookmarks by remember(annotationStore, item.id) { annotationStore?.bookmarks(item.id) ?: flowOf(emptyList()) }
+        .collectAsStateWithLifecycle(initialValue = emptyList())
     var footnoteContent by remember(item.id) { mutableStateOf<EpubFootnoteContent?>(null) }
     val translationSession = translation?.let { service -> rememberTranslationSession(service) }
     val translationState = translation?.state?.collectAsStateWithLifecycle()?.value
@@ -436,6 +440,12 @@ fun EpubReaderScreen(
                     },
                 )
             }
+            val pageBookmarks = rememberPageBookmarks(bookBookmarks, currentLocator, framePage, currentPage)
+            // A bookmark or highlight opened from the Bookmarks page: go there once the book shows.
+            EpubPendingJumpEffect(annotationJumps, item.id, ready = initialRestoreLocked) { locator ->
+                readerTouched = true
+                navigationRequest = EpubLocatorNavigationRequest(seekRequestId++, locator)
+            }
             LaunchedEffect(bookProgress.pageCount) {
                 if (bookProgress.pageCount > 0) {
                     pageCount = bookProgress.pageCount
@@ -605,6 +615,7 @@ fun EpubReaderScreen(
                             }
                         },
                     )
+                    EpubBookmarkRibbon(visible = pageBookmarks.isNotEmpty())
                 },
                 overlay = {
                     Box(modifier = Modifier.fillMaxSize()) {
@@ -638,6 +649,14 @@ fun EpubReaderScreen(
                                 isAnnotationsOpen = false
                             },
                             isAnnotationsOpen = isAnnotationsOpen,
+                            isPageBookmarked = pageBookmarks.isNotEmpty(),
+                            onBookmarkClick = annotationController?.let { controller ->
+                                {
+                                    controller.bookmarks.toggle(pageBookmarks, currentLocator, currentPage, pageCount) {
+                                        activity.epubFirstVisibleText(item.id)
+                                    }
+                                }
+                            },
                             onAnnotationsClick = annotationController?.let {
                                 {
                                     overlayState.show()
@@ -743,6 +762,7 @@ fun EpubReaderScreen(
                                     slot = slot,
                                     highlights = bookHighlights,
                                     words = bookWords,
+                                    bookmarks = bookBookmarks,
                                     controller = controller,
                                     onDismissRequest = { isAnnotationsOpen = false },
                                     onJump = { locator ->

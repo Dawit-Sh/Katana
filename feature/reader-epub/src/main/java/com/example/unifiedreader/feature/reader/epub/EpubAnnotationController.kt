@@ -10,7 +10,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
 import com.example.unifiedreader.feature.annotations.AnnotatedBook
-import com.example.unifiedreader.feature.annotations.AnnotationMarkdown
+import com.example.unifiedreader.feature.annotations.AnnotationExports
 import com.example.unifiedreader.feature.annotations.AnnotationPlace
 import com.example.unifiedreader.feature.annotations.HighlightColor
 import com.example.unifiedreader.feature.annotations.HighlightStyle
@@ -21,9 +21,7 @@ import com.example.unifiedreader.ui.components.AppToastIcon
 import com.example.unifiedreader.ui.components.AppToastMessage
 import com.example.unifiedreader.ui.components.AppToastState
 import com.example.unifiedreader.ui.components.LocalAppToastState
-import java.time.LocalDate
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.readium.r2.navigator.Selection
 import org.readium.r2.shared.publication.Locator
@@ -31,12 +29,10 @@ import org.readium.r2.shared.publication.Locator
 /** The highlight card open over the page: which highlight, and where it is on screen (window pixels). */
 internal data class EpubHighlightCardState(val highlightId: String, val anchor: Rect?)
 
-/** A Markdown export ready to be saved where the reader picks. */
-internal data class EpubMarkdownExport(val fileName: String, val text: String)
-
 /**
- * The reader's side of highlights and saved words: makes them from a selection, opens the card on
- * one, and changes or removes them. Everything is saved at once; nothing waits for the book to close.
+ * The reader's side of highlights, bookmarks and saved words: makes them from a selection or the
+ * page on screen, opens the card on a highlight (and its share card), and changes or removes them.
+ * Everything is saved at once; nothing waits for the book to close.
  */
 @Stable
 internal class EpubAnnotationController(
@@ -49,12 +45,18 @@ internal class EpubAnnotationController(
     var card by mutableStateOf<EpubHighlightCardState?>(null)
         private set
 
-    /** Markdown of this book's marks, or of every book's. */
-    val exports = EpubAnnotationExports(store = store, book = book, toasts = toasts)
-
     /** The highlight whose note is being written, if any. */
     var editingNoteOf by mutableStateOf<String?>(null)
         private set
+
+    /** The highlight being shared as an image, if any. */
+    val sharing = EpubQuoteSharing()
+
+    /** The page bookmarks: the top bar's button and the panel's rows. */
+    val bookmarks = EpubBookmarkActions(store = store, book = book, scope = scope, toasts = toasts, chapterTitleOf = chapterTitleOf)
+
+    /** This book's marks as Markdown; every book's is on the Bookmarks page. */
+    val export = EpubMarkExport(exports = AnnotationExports(store), book = book, toasts = toasts)
 
     fun highlight(selection: Selection, anchor: Rect?, withNote: Boolean) {
         val text = selection.locator.text.highlight?.trim().orEmpty()
@@ -126,7 +128,6 @@ internal class EpubAnnotationController(
         }
     }
 
-
     private companion object {
         /** Kept off a saved word's ends: a selection often takes the comma or the quote mark after it. */
         val WordEdgePunctuation = charArrayOf(
@@ -136,53 +137,12 @@ internal class EpubAnnotationController(
     }
 }
 
-private fun Locator.toAnnotationPlace(chapterTitleOf: (Locator) -> String?): AnnotationPlace = AnnotationPlace(
+internal fun Locator.toAnnotationPlace(chapterTitleOf: (Locator) -> String?): AnnotationPlace = AnnotationPlace(
     href = href.toString(),
     locatorJson = toJSON().toString(),
     chapterTitle = chapterTitleOf(this),
     progression = locations.totalProgression,
 )
-
-/** The Markdown exports the highlights panel saves: this book's, or every book's as one notebook. */
-@Stable
-internal class EpubAnnotationExports(
-    private val store: ReaderAnnotationStore,
-    private val book: AnnotatedBook,
-    private val toasts: () -> AppToastState?,
-) {
-    /** This book's highlights and words as Markdown, with a file name for it. */
-    suspend fun bookExport(): EpubMarkdownExport {
-        val day = LocalDate.now()
-        val text = AnnotationMarkdown.book(
-            book = book,
-            highlights = store.highlights(book.itemId).first(),
-            words = store.words(book.itemId).first(),
-            exportedOn = day,
-        )
-        return EpubMarkdownExport(fileName = AnnotationMarkdown.fileName(book, day), text = text)
-    }
-
-    /** Every book's highlights and words as one Markdown notebook. */
-    suspend fun libraryExport(): EpubMarkdownExport {
-        val day = LocalDate.now()
-        val text = AnnotationMarkdown.library(
-            highlights = store.allHighlights.first(),
-            words = store.allWords.first(),
-            exportedOn = day,
-        )
-        return EpubMarkdownExport(fileName = AnnotationMarkdown.fileName(null, day), text = text)
-    }
-
-    fun exported(succeeded: Boolean) {
-        val message = if (succeeded) {
-            AppToastMessage(text = EpubAnnotationCopy.Exported, icon = AppToastIcon.Done)
-        } else {
-            AppToastMessage(text = EpubAnnotationCopy.ExportFailed, icon = AppToastIcon.Error)
-        }
-        toasts()?.show(message)
-    }
-
-}
 
 @Composable
 internal fun rememberEpubAnnotationController(

@@ -3,6 +3,7 @@ package com.example.unifiedreader.feature.reader.epub
 import android.net.Uri
 import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.ReadableItem
+import com.example.unifiedreader.feature.annotations.AnnotationJumps
 import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
 import com.example.unifiedreader.feature.reader.core.ReaderChrome
 import com.example.unifiedreader.feature.reader.core.ReaderScreenFactory
@@ -32,11 +33,16 @@ fun epubReaderFactory(
             onCompletionRequested = navigationActions.onRequestCompletion,
             translation = extras.translation,
             annotationStore = extras.annotations,
+            annotationJumps = extras.jumps,
         )
 }
 
-/** What the EPUB reader can add when the app has it: translation of a selection, and highlights and saved words. */
+/**
+ * What the EPUB reader can add when the app has it: translation of a selection; highlights,
+ * bookmarks and saved words; and places to open a book at, handed over by the Bookmarks page.
+ */
 data class EpubReaderExtras(
     val translation: TranslationService? = null,
     val annotations: ReaderAnnotationStore? = null,
+    val jumps: AnnotationJumps? = null,
 )

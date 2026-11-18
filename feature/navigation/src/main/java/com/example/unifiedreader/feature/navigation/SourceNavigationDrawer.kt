@@ -1,11 +1,15 @@
 package com.example.unifiedreader.feature.navigation
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
@@ -31,6 +35,7 @@ import com.example.unifiedreader.ui.components.AppDrawerBadge
 import com.example.unifiedreader.ui.components.AppDrawerItem
 import com.example.unifiedreader.ui.components.AppGroupLabel
 import com.example.unifiedreader.ui.components.AppIcons
+import com.example.unifiedreader.ui.components.AppLayout
 import com.example.unifiedreader.ui.components.appGlass
 import com.example.unifiedreader.ui.theme.UnifiedReaderThemeTokens
 
@@ -44,6 +49,9 @@ sealed interface SourceNavigationDestination {
 
     /** The user's lists and reading orders, from every source. */
     data object Lists : SourceNavigationDestination
+
+    /** Every book's highlights, bookmarks and saved words. */
+    data object Bookmarks : SourceNavigationDestination
 
     /** "Add a server": the choices the first launch offers. */
     data object AddSource : SourceNavigationDestination
@@ -61,6 +69,8 @@ fun SourceNavigationDrawer(
     showAddSource: Boolean = false,
     /** False while the rail shows: then nothing opens the drawer, not even a swipe. */
     gesturesEnabled: Boolean = true,
+    /** The reading card, in the room between the sources and the destinations below. */
+    readingCard: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val presentation = UnifiedReaderThemeTokens.presentation
@@ -78,7 +88,8 @@ fun SourceNavigationDrawer(
                         WindowInsets.systemBars.only(WindowInsetsSides.Vertical + WindowInsetsSides.Start),
                     )
                     .padding(start = 12.dp, top = 12.dp, bottom = 12.dp)
-                    .widthIn(max = 320.dp)
+                    // A little wider with the reading card, so its fifteen weeks keep a usable size.
+                    .widthIn(max = if (readingCard != null) DrawerWithCardMaxWidth else DrawerMaxWidth)
                     .appGlass(shape = drawerShape),
                 drawerShape = drawerShape,
                 drawerContainerColor = Color.Transparent,
@@ -89,12 +100,7 @@ fun SourceNavigationDrawer(
                         .fillMaxHeight()
                         .padding(horizontal = 12.dp, vertical = 16.dp),
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
+                    DrawerTopSection(readingCard = readingCard, modifier = Modifier.weight(1f)) {
                         KatanaDrawerHeader()
                         AppGroupLabel(
                             text = "Sources",
@@ -130,6 +136,18 @@ fun SourceNavigationDrawer(
                         icon = {
                             Icon(
                                 imageVector = AppIcons.Checklist,
+                                contentDescription = null,
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    AppDrawerItem(
+                        label = { Text(text = "Bookmarks") },
+                        selected = selectedDestination == SourceNavigationDestination.Bookmarks,
+                        onClick = { onDestinationSelected(SourceNavigationDestination.Bookmarks) },
+                        icon = {
+                            Icon(
+                                imageVector = AppIcons.Bookmark,
                                 contentDescription = null,
                             )
                         },
@@ -173,6 +191,37 @@ fun SourceNavigationDrawer(
         content = content,
     )
 }
+
+/**
+ * The drawer's top part, scrolling when the window is short: the name and the sources and, with a
+ * [readingCard], the card midway in the room left under them.
+ */
+@Composable
+private fun DrawerTopSection(
+    readingCard: (@Composable () -> Unit)?,
+    modifier: Modifier = Modifier,
+    sources: @Composable () -> Unit,
+) {
+    BoxWithConstraints(modifier = modifier) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .heightIn(min = maxHeight),
+            verticalArrangement = if (readingCard != null) Arrangement.SpaceBetween else Arrangement.Top,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) { sources() }
+            if (readingCard != null) {
+                Box(modifier = Modifier.padding(top = AppLayout.headingGap)) { readingCard() }
+                // The foot of SpaceBetween, so the card sits midway rather than at the bottom.
+                Spacer(Modifier)
+            }
+        }
+    }
+}
+
+private val DrawerMaxWidth = 320.dp
+private val DrawerWithCardMaxWidth = 360.dp
 
 @Composable
 private fun SourceNavigationItem(

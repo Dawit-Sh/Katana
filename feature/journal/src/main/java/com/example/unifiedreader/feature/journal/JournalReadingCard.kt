@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -35,7 +34,6 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
@@ -75,8 +73,9 @@ fun JournalReadingCard(
             .semantics(mergeDescendants = true) { contentDescription = ReadingCardCopy.description(shown) },
     ) {
         Column(
-            modifier = Modifier.padding(AppLayout.menuInset),
-            verticalArrangement = Arrangement.spacedBy(AppLayout.menuInset),
+            // Tight enough for the Fire's side menu, under its sources, without scrolling.
+            modifier = Modifier.padding(horizontal = AppLayout.menuInset, vertical = AppLayout.headingGap + TileExtraInset),
+            verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
         ) {
             CardHeader(shown)
             StatTiles(shown)
@@ -156,11 +155,11 @@ private fun StatTile(
     Column(
         modifier = modifier
             .background(tileColor(), RoundedCornerShape(UnifiedReaderThemeTokens.presentation.innerCornerRadius))
-            .padding(horizontal = AppLayout.headingGap + TileExtraInset, vertical = AppLayout.headingGap),
+            .padding(horizontal = AppLayout.headingGap + TileExtraInset, vertical = TileVerticalInset),
         verticalArrangement = Arrangement.spacedBy(TileLineGap),
     ) {
         Row(verticalAlignment = Alignment.Bottom) {
-            Text(text = value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(text = value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             unit?.let {
                 Text(
                     text = " $it",
@@ -192,7 +191,7 @@ private fun HeatMap(model: ReadingCardModel) {
         val columns = model.weeks.size
         val cell = min(MaxCell, (maxWidth - DayLabelWidth - AppLayout.headingGap - CellGap * (columns - 1)) / columns)
         val step = cell + CellGap
-        Column(verticalArrangement = Arrangement.spacedBy(TileLineGap)) {
+        Column(verticalArrangement = Arrangement.spacedBy(MonthGap)) {
             MonthLabels(labels = model.monthLabels, step = step)
             Row(horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap)) {
                 Column(modifier = Modifier.width(DayLabelWidth), verticalArrangement = Arrangement.spacedBy(CellGap)) {
@@ -336,10 +335,12 @@ private const val STREAK_ARGB = 0xFFE8A33D
 private val StreakTint = Color(STREAK_ARGB)
 private val SmallIcon = 16.dp
 private val TinyIcon = 13.dp
-private val MaxCell: Dp = 18.dp
+private val MaxCell: Dp = 14.dp
 private val CellGap: Dp = 3.dp
 private val DayLabelWidth: Dp = 26.dp
-private val MonthRowHeight: Dp = 14.dp
+private val MonthRowHeight: Dp = 12.dp
+private val MonthGap: Dp = 2.dp
+private val TileVerticalInset: Dp = 6.dp
 internal val TileLineGap: Dp = 4.dp
 private val TileExtraInset: Dp = 4.dp
 private val TileUnitNudge: Dp = 2.dp

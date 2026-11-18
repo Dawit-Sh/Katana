@@ -87,7 +87,7 @@ private fun DayBar(day: ReadingCardDay, most: Int, modifier: Modifier = Modifier
 }
 
 private const val BarAlpha = 0.6f
-private val BarsHeight: Dp = 86.dp
+private val BarsHeight: Dp = 60.dp
 private val BarWidth: Dp = 22.dp
 private val MinBar: Dp = 4.dp
-private val MaxBar: Dp = 48.dp
+private val MaxBar: Dp = 26.dp

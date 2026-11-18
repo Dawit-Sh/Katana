@@ -87,6 +87,69 @@ class AnnotationMarkdownTest {
     }
 
     @Test
+    fun `bookmarks come first, by page, with their first words and chapter, and are counted`() {
+        val markdown = AnnotationMarkdown.book(
+            book = hole,
+            highlights = listOf(highlight("a", "fragments", chapter = null, at = 0.1)),
+            words = emptyList(),
+            exportedOn = day,
+            bookmarks = listOf(
+                bookmark("late", page = 40 to 78, text = "The black animal.", chapter = "Chapter 2", at = 0.5),
+                bookmark("early", page = 8 to 78, text = "home looked like.\nAll I could remember", chapter = null, at = 0.09),
+                bookmark("unpaged", page = null, text = null, chapter = null, at = 0.912),
+            ),
+        )
+
+        assertEquals(
+            """
+            # The Hole
+            *Hiroko Oyamada*
+
+            Exported from Katana on 18 November 2026: 1 highlight, 3 bookmarks, 0 saved words.
+
+            ## Bookmarks
+
+            - Page 8 of 78: "home looked like. All I could remember"
+            - Page 40 of 78: "The black animal." (Chapter 2)
+            - 91%
+
+            ## Highlights
+
+            > fragments
+
+            """.trimIndent(),
+            markdown,
+        )
+    }
+
+    @Test
+    fun `the notebook takes in books that only have bookmarks`() {
+        val markdown = AnnotationMarkdown.library(
+            highlights = emptyList(),
+            words = emptyList(),
+            exportedOn = day,
+            bookmarks = listOf(bookmark("b", page = 3 to 10, text = null, chapter = null, at = 0.3)),
+        )
+
+        assertEquals(
+            """
+            # Katana notebook
+
+            Exported from Katana on 18 November 2026: 0 highlights, 1 bookmark, 0 saved words.
+
+            ## The Hole
+            *Hiroko Oyamada*
+
+            ### Bookmarks
+
+            - Page 3 of 10
+
+            """.trimIndent(),
+            markdown,
+        )
+    }
+
+    @Test
     fun `file names keep the title readable and drop characters a file system refuses`() {
         assertEquals("The Hole 2026-11-18.md", AnnotationMarkdown.fileName(hole, day))
         assertEquals(
@@ -106,6 +169,17 @@ class AnnotationMarkdownTest {
         note = note,
         createdAtEpochMillis = 1,
         updatedAtEpochMillis = 1,
+    )
+
+    /** A bookmark on [page] (its number to the book's page count). */
+    private fun bookmark(id: String, page: Pair<Int, Int>?, text: String?, chapter: String?, at: Double?) = ReaderBookmark(
+        id = id,
+        book = hole,
+        place = AnnotationPlace(href = "c.xhtml", locatorJson = "{}", chapterTitle = chapter, progression = at),
+        page = page?.first,
+        pageCount = page?.second,
+        text = text,
+        createdAtEpochMillis = 1,
     )
 
     private fun word(word: String, sentence: String?, chapter: String?, at: Double?, book: AnnotatedBook = hole) = SavedWord(
