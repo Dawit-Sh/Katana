@@ -23,3 +23,10 @@ externalNativeBuild/
 
 # Android Studio captures
 captures/
+
+# Old screenshots and other local output (removed from the repository 2026-11-19)
+output/
+
+# Claude Code: worktrees and personal settings (.claude/CLAUDE.md is shared)
+.claude/worktrees/
+.claude/settings.local.json
