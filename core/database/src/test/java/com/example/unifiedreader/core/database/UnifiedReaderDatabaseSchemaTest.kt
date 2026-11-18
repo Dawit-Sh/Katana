@@ -77,6 +77,35 @@ class UnifiedReaderDatabaseSchemaTest {
     }
 
     @Test
+    fun `migration 38 to 39 gives the exported 39 schema, an empty bookmark table and unreviewed words`() {
+        val name = "schema-38-39-${System.nanoTime()}"
+        helper.createDatabase(name, 38).use { database ->
+            database.execSQL(
+                """
+                INSERT INTO saved_words (id, itemId, bookTitle, bookAuthor, word, sentence, chapterTitle,
+                    locatorJson, progression, note, createdAtEpochMillis)
+                VALUES ('w1', 'grimmory:item:7', 'The Hole', 'Hiroko Oyamada', 'solar', 'solar panels on the roof',
+                    NULL, NULL, 0.1, NULL, 5)
+                """.trimIndent(),
+            )
+        }
+
+        helper.runMigrationsAndValidate(name, 39, true, MIGRATION_38_39).use { database ->
+            database.query("SELECT word, reviewLevel, reviewDueAtEpochMillis, reviewedAtEpochMillis FROM saved_words").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("solar", cursor.getString(0))
+                assertEquals(0, cursor.getInt(1))
+                assertTrue(cursor.isNull(2))
+                assertTrue(cursor.isNull(3))
+            }
+            database.query("SELECT COUNT(*) FROM reader_bookmarks").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals(0, cursor.getInt(0))
+            }
+        }
+    }
+
+    @Test
     fun `room opens a version 36 database at the current version with every migration`() {
         val name = "schema-36-current-${System.nanoTime()}"
         helper.createDatabase(name, 36).close()
