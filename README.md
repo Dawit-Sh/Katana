@@ -72,11 +72,21 @@ repository folder:
 ./gradlew :app:assembleRelease
 ```
 
-On Windows use `gradlew.bat`. The APK lands in `app/build/outputs/apk/release/app-release.apk`.
+On Windows use `gradlew.bat`. One release build makes three APKs, in `app/build/outputs/katana-apks/`:
 
-- **Fire 7 build.** The release build contains native code for `armeabi-v7a` only, because the Fire 7 (2019)
-  runs 32-bit Android. For a modern 64-bit phone, change `abiFilters` in `app/build.gradle.kts` to
-  `arm64-v8a`.
+| APK | For |
+| --- | --- |
+| `katana-<version>-fire7-armeabi-v7a.apk` | the Fire 7 (2019) and other 32-bit Android devices |
+| `katana-<version>-arm64-v8a.apk` | modern 64-bit phones and tablets (Pixel, Samsung Galaxy and most others) |
+| `katana-<version>-universal.apk` | any device (armeabi-v7a, arm64-v8a and x86_64); bigger, for anyone unsure |
+
+- **ABIs.** Translation's native code is 12 to 17 MB per ABI, so the first two carry one ABI each. All three
+  have the same version code, signature and Baseline Profile, so a device can move from one to another with a
+  normal update. The 64-bit native libraries are 16 KB aligned, as Android 15 and later devices with 16 KB
+  memory pages need. A build that asks only for debug tasks (`assembleDebug`) still makes one
+  `app-debug.apk` with every ABI.
+- **Updates.** The in-app updater picks the APK made for the device's ABI from a release, so a release
+  should attach all three under these names.
 - **Signing.** With the `ANDROID_SIGNING_*` environment variables set, the release build is signed with
   that key. Without them it is signed with your computer's debug key, so a new build installs over an older
   one only when both came from the same computer.
