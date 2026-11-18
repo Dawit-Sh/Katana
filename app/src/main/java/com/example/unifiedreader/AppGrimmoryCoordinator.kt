@@ -10,6 +10,7 @@ class AppGrimmoryCoordinator @Inject constructor(
     private val grimmoryCatalogSyncer: GrimmoryCatalogSyncer,
     private val grimmoryCredentialStore: GrimmoryCredentialStore,
     private val remoteSourceConnectivityPolicy: RemoteSourceConnectivityPolicy,
+    private val highlightSync: HighlightSyncTriggers = HighlightSyncTriggers.None,
 ) {
     fun refreshedConnectionState(
         connection: RemoteSourceConnectionUiState,
@@ -171,6 +172,7 @@ class AppGrimmoryCoordinator @Inject constructor(
             },
         )
         remoteSourceConnectivityPolicy.markReachable(SourceType.GRIMMORY)
+        highlightSync.afterLibrarySync()
         if (result.hasCatalogChanges) {
             clearCoverState()
         }

@@ -40,6 +40,38 @@ data class ReaderHighlightEntity(
 )
 
 /**
+ * Where a highlight stands with its book's server ([ReaderHighlightEntity.syncState]).
+ * [HIGHLIGHT_WAITING]: made, changed or removed on this device and not yet on the server (a book
+ * with no server keeps it for good). [HIGHLIGHT_IN_STEP]: the same as the server's copy.
+ * [HIGHLIGHT_ON_DEVICE]: its place can't be told to the server, so it stays on this device.
+ */
+const val HIGHLIGHT_WAITING = "DIRTY"
+const val HIGHLIGHT_IN_STEP = "CLEAN"
+const val HIGHLIGHT_ON_DEVICE = "LOCAL"
+
+/** A highlight waiting to go to its server: which book, and the change (the highlight and when). */
+data class WaitingHighlightKey(
+    val itemId: String,
+    val id: String,
+    val updatedAtEpochMillis: Long,
+)
+
+/**
+ * What a highlight sync writes over a stored highlight: [row], if the stored one still has
+ * [expectedUpdatedAt] (unchanged since the sync read it); null for a highlight new to this device.
+ */
+data class HighlightRowWrite(
+    val row: ReaderHighlightEntity,
+    val expectedUpdatedAt: Long?,
+)
+
+/** A highlight a sync removes for good, if it still has [expectedUpdatedAt]. */
+data class HighlightRowPurge(
+    val id: String,
+    val expectedUpdatedAt: Long,
+)
+
+/**
  * A word the reader saved from a book ("Add to dictionary") to look up later: the word, the
  * sentence it came from, and where (chapter, [locatorJson], [progression]). Only on this device.
  * Reviewing it as a flashcard keeps [reviewLevel] (how often it was known in a row), when it is

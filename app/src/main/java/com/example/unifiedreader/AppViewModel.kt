@@ -79,6 +79,7 @@ class AppViewModel @Inject constructor(
     private val libraryGridPager: LibraryGridPager,
     private val pagedWindowBadgeResolver: AppPagedWindowBadgeResolver,
     private val libraryAutoRefreshCoordinator: AppLibraryAutoRefreshCoordinator,
+    private val highlightSync: HighlightSyncTriggers = HighlightSyncTriggers.None,
 ) : ViewModel() {
     var uiState by mutableStateOf(initialUiStateFactory.create())
         private set
@@ -532,6 +533,7 @@ class AppViewModel @Inject constructor(
             pendingRemoteSyncSummary = uiState.pendingRemoteSyncSummary,
             extraSourceTypes = remoteSourceConnectivityPolicy.offlineRemoteSources(),
         )
+        highlightSync.retry()
     }
 
     /** Settings › Reading progress sync: Keep on this device, for the books no longer in the library. */
@@ -1051,6 +1053,7 @@ class AppViewModel @Inject constructor(
             },
             retry = ::retryPendingRemoteSync,
         )
+        highlightSync.start()
         progressSyncStartupRetryCoordinator.retryAfterHydration(
             scope = viewModelScope,
             onSyncFailures = ::reportProgressSyncFailures,

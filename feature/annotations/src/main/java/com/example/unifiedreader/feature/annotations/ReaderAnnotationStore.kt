@@ -3,12 +3,15 @@ package com.example.unifiedreader.feature.annotations
 import com.example.unifiedreader.core.database.dao.ReaderAnnotationDao
 import com.example.unifiedreader.core.database.dao.ReaderBookmarkDao
 import com.example.unifiedreader.core.database.dao.SavedWordStudyDao
+import com.example.unifiedreader.core.database.entity.HIGHLIGHT_WAITING
 import com.example.unifiedreader.core.database.entity.ReaderHighlightEntity
 import com.example.unifiedreader.core.database.entity.SavedWordEntity
 import java.util.UUID
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -56,7 +59,35 @@ interface ReaderAnnotationStore : ReaderBookmarkStore, SavedWordStudyStore {
     ): SavedWord
 
     suspend fun deleteWord(id: String)
+
+    /**
+     * A book's highlights its reader has to place for the server sync: new ones whose place the
+     * server's way (an EPUB CFI) isn't worked out yet, and ones from the server not yet found in this
+     * device's copy of the book. Empty for a store that doesn't sync.
+     */
+    fun highlightsToPlace(itemId: String): Flow<List<HighlightToPlace>> = flowOf(emptyList())
+
+    /** The highlight's place the server's way, worked out by the reader; it can go to the server now. */
+    suspend fun setServerPlace(highlightId: String, cfi: String) = Unit
+
+    /** A new highlight whose place can't be put the server's way: it stays on this device. */
+    suspend fun keepOnDevice(highlightId: String) = Unit
+
+    /** Where a highlight from the server is in this device's copy of the book. */
+    suspend fun place(highlightId: String, place: AnnotationPlace) = Unit
 }
+
+/**
+ * A highlight its reader has to place: [locatorJson] is empty for one from the server, which has
+ * [serverPlace] (its EPUB CFI) instead; a new one from this device has its locator and no server place yet.
+ */
+data class HighlightToPlace(
+    val id: String,
+    val locatorJson: String,
+    val serverPlace: String?,
+    val text: String,
+    val chapterTitle: String?,
+)
 
 class RoomReaderAnnotationStore(
     private val dao: ReaderAnnotationDao,
@@ -165,11 +196,29 @@ class RoomReaderAnnotationStore(
 
     override suspend fun deleteWord(id: String) = io { dao.deleteWord(id) }
 
+    override fun highlightsToPlace(itemId: String): Flow<List<HighlightToPlace>> =
+        dao.observeHighlightsToPlace(itemId)
+            .map { rows ->
+                rows.map { row ->
+                    HighlightToPlace(row.id, row.locatorJson, row.remoteCfi, row.text, row.chapterTitle)
+                }
+            }
+            .distinctUntilChanged()
+            .flowOn(ioDispatcher)
+
+    override suspend fun setServerPlace(highlightId: String, cfi: String) = io { dao.setHighlightCfi(highlightId, cfi) }
+
+    override suspend fun keepOnDevice(highlightId: String) = io { dao.keepHighlightOnDevice(highlightId) }
+
+    override suspend fun place(highlightId: String, place: AnnotationPlace) = io {
+        dao.placeHighlight(highlightId, place.href, place.locatorJson, place.progression, place.chapterTitle)
+    }
+
     private suspend fun <T> io(block: () -> T): T = withContext(ioDispatcher) { block() }
 
     private companion object {
-        /** A change no server has yet; the Grimmory sync (later) sends these. */
-        const val SYNC_DIRTY = "DIRTY"
+        /** A change no server has yet; the Grimmory sync sends these. */
+        const val SYNC_DIRTY = HIGHLIGHT_WAITING
     }
 }
 

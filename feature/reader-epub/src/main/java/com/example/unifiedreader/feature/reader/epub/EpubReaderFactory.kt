@@ -35,15 +35,19 @@ fun epubReaderFactory(
             translation = extras.translation,
             annotationStore = extras.annotations,
             annotationJumps = extras.jumps,
+            syncsHighlights = extras.syncsHighlights(item),
         )
 }
 
 /**
  * What the EPUB reader can add when the app has it: translation of a selection; highlights,
- * bookmarks and saved words; and places to open a book at, handed over by the Bookmarks page.
+ * bookmarks and saved words; places to open a book at, handed over by the Bookmarks page; and
+ * which books share their highlights with their server ([syncsHighlights]), whose highlights the
+ * reader then places the server's way too.
  */
 data class EpubReaderExtras(
     val translation: TranslationService? = null,
     val annotations: ReaderAnnotationStore? = null,
     val jumps: AnnotationJumps? = null,
+    val syncsHighlights: (ReadableItem) -> Boolean = { false },
 )

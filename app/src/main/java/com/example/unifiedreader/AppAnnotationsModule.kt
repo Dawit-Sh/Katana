@@ -2,7 +2,9 @@ package com.example.unifiedreader
 
 import com.example.unifiedreader.core.database.UnifiedReaderDatabase
 import com.example.unifiedreader.feature.annotations.AnnotationJumps
+import com.example.unifiedreader.feature.annotations.HighlightSyncStore
 import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
+import com.example.unifiedreader.feature.annotations.RoomHighlightSyncStore
 import com.example.unifiedreader.feature.annotations.RoomReaderAnnotationStore
 import dagger.Module
 import dagger.Provides
@@ -10,7 +12,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-/** The reader's highlights, bookmarks and saved words; kept out of [AppModule], which should not grow. */
+/** The reader's highlights (and their sync), bookmarks and saved words; kept out of [AppModule], which should not grow. */
 @Module
 @InstallIn(SingletonComponent::class)
 object AppAnnotationsModule {
@@ -23,6 +25,19 @@ object AppAnnotationsModule {
         bookmarkDao = database.readerBookmarkDao(),
         studyDao = database.savedWordStudyDao(),
     )
+
+    /** The highlights as their sync with a server reads and writes them. */
+    @Provides
+    @Singleton
+    fun provideHighlightSyncStore(
+        database: UnifiedReaderDatabase,
+    ): HighlightSyncStore = RoomHighlightSyncStore(dao = database.readerAnnotationDao())
+
+    /** When highlights sync with Grimmory; the app shell starts it and asks it. */
+    @Provides
+    fun provideHighlightSyncTriggers(
+        coordinator: AppHighlightSyncCoordinator,
+    ): HighlightSyncTriggers = coordinator
 
     /** The place the Bookmarks page asks a book to open at, which the reader takes. */
     @Provides
