@@ -1,7 +1,6 @@
 package com.example.unifiedreader.feature.navigation
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -35,7 +34,6 @@ import com.example.unifiedreader.ui.components.AppDrawerBadge
 import com.example.unifiedreader.ui.components.AppDrawerItem
 import com.example.unifiedreader.ui.components.AppGroupLabel
 import com.example.unifiedreader.ui.components.AppIcons
-import com.example.unifiedreader.ui.components.AppLayout
 import com.example.unifiedreader.ui.components.appGlass
 import com.example.unifiedreader.ui.theme.UnifiedReaderThemeTokens
 
@@ -212,7 +210,7 @@ private fun DrawerTopSection(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) { sources() }
             if (readingCard != null) {
-                Box(modifier = Modifier.padding(top = AppLayout.headingGap)) { readingCard() }
+                readingCard()
                 // The foot of SpaceBetween, so the card sits midway rather than at the bottom.
                 Spacer(Modifier)
             }

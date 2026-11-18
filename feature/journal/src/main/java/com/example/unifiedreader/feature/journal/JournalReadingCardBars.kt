@@ -28,7 +28,7 @@ import com.example.unifiedreader.ui.theme.UnifiedReaderThemeTokens
 @Composable
 internal fun LastSevenDays(model: ReadingCardModel) {
     val most = model.lastSeven.maxOf { it.minutes }.coerceAtLeast(1)
-    Column(verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap)) {
+    Column(verticalArrangement = Arrangement.spacedBy(TileLineGap)) {
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
                 text = ReadingCardCopy.lastSeven(model.weekMinutes),
@@ -43,7 +43,8 @@ internal fun LastSevenDays(model: ReadingCardModel) {
             )
         }
         Row(
-            modifier = Modifier.fillMaxWidth().height(BarsHeight),
+            // As tall as its tallest day: the time, the bar and the day's name.
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
             verticalAlignment = Alignment.Bottom,
         ) {
@@ -87,7 +88,6 @@ private fun DayBar(day: ReadingCardDay, most: Int, modifier: Modifier = Modifier
 }
 
 private const val BarAlpha = 0.6f
-private val BarsHeight: Dp = 60.dp
 private val BarWidth: Dp = 22.dp
 private val MinBar: Dp = 4.dp
-private val MaxBar: Dp = 26.dp
+private val MaxBar: Dp = 20.dp

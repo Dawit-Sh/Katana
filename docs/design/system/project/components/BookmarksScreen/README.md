@@ -24,10 +24,10 @@ Every book's marks in one place: its highlights (with their notes), its page boo
 
 ## The menu's reading card
 
-The drawer (360 wide with the card, 320 without) holds a reading card in the room between the sources and Lists, centred there; it scrolls with the sources on a short window. It is an `AppPanel` (16 at the sides, 12 top and bottom, 8 between its parts, tight enough for the Fire's 1024-tall menu under its name and sources without scrolling), from the journal's own reading sessions, and a tap opens the Journal.
+The drawer (360 wide with the card, 320 without) holds a reading card in the room between the sources and Lists, centred there; it scrolls with the sources on a short window. It is an `AppPanel` (16 at the sides, 8 top and bottom and between its parts, tight enough for the Fire's 1024-tall menu under its name and sources without scrolling), from the journal's own reading sessions, and a tap opens the Journal.
 
 - "Reading" (Bold) over "Last 15 weeks, 10 Aug to today", and "Journal ›" in `primary` at its end.
 - Three tiles on `surface-container-highest`: the **streak** in days (`local_fire_department`, amber; it still counts while today has no reading yet), **days read** (`event_available`) and books **finished** (`task_alt`) in the 15 weeks.
-- **The heat map**: 15 columns of Monday to Sunday, the last one this week, tiles up to 14 square with 3 between, their size shrinking to fit; Mon, Wed, Fri and Sun beside them; the months over the columns that hold their 1st. A tile's shade is the minutes read that day (none; up to 20, 40, 70; more) as `primary` at 30, 50, 75 and 100% over the empty tile; today has an `on-surface` ring; the days after today are outlined only.
+- **The heat map**: 15 columns of Monday to Sunday, the last one this week, tiles up to 13 square with 3 between, their size shrinking to fit; Mon, Wed, Fri and Sun beside them; the months over the columns that hold their 1st. A tile's shade is the minutes read that day (none; up to 20, 40, 70; more) as `primary` at 30, 50, 75 and 100% over the empty tile; today has an `on-surface` ring; the days after today are outlined only.
 - "Best day: Sun 15 Nov, 1h 42m" with the Less … More key, then an `AppDivider`.
-- **Last 7 days** with their total ("· 4h 29m") and "38 min a day"; seven bars up to 26 tall, each with its time over it and its day under it, today's in `primary` and named Today.
+- **Last 7 days** with their total ("· 4h 29m") and "38 min a day"; seven bars up to 20 tall, each with its time over it and its day under it, today's in `primary` and named Today.

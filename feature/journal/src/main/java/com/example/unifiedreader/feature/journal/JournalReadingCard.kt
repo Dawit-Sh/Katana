@@ -74,7 +74,7 @@ fun JournalReadingCard(
     ) {
         Column(
             // Tight enough for the Fire's side menu, under its sources, without scrolling.
-            modifier = Modifier.padding(horizontal = AppLayout.menuInset, vertical = AppLayout.headingGap + TileExtraInset),
+            modifier = Modifier.padding(horizontal = AppLayout.menuInset, vertical = AppLayout.headingGap),
             verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
         ) {
             CardHeader(shown)
@@ -335,10 +335,10 @@ private const val STREAK_ARGB = 0xFFE8A33D
 private val StreakTint = Color(STREAK_ARGB)
 private val SmallIcon = 16.dp
 private val TinyIcon = 13.dp
-private val MaxCell: Dp = 14.dp
+private val MaxCell: Dp = 13.dp
 private val CellGap: Dp = 3.dp
 private val DayLabelWidth: Dp = 26.dp
-private val MonthRowHeight: Dp = 12.dp
+private val MonthRowHeight: Dp = 16.dp
 private val MonthGap: Dp = 2.dp
 private val TileVerticalInset: Dp = 6.dp
 internal val TileLineGap: Dp = 4.dp
