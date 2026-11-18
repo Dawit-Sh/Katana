@@ -11,6 +11,7 @@ import com.example.unifiedreader.feature.library.LocalLibraryBookDescriptionLoad
 import com.example.unifiedreader.feature.reader.epub.discardRestoredEpubNavigators
 import com.example.unifiedreader.feature.reader.epub.installEpubNavigatorRestoreFactory
 import com.example.unifiedreader.ui.components.AppLaunchSplashHold
+import com.example.unifiedreader.ui.components.AppStartupLog
 import com.example.unifiedreader.ui.components.LocalAppLaunchSplashHold
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -21,6 +22,7 @@ class MainActivity : FragmentActivity() {
     lateinit var bookDescriptions: BookDescriptionRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        AppStartupLog.mark("activity.onCreate")
         val splashScreen = installSplashScreen()
         installEpubNavigatorRestoreFactory()
         super.onCreate(savedInstanceState)
@@ -30,6 +32,9 @@ class MainActivity : FragmentActivity() {
         val launchHold = if (savedInstanceState == null) {
             AppLaunchSplashHold(onReleased = ::logLaunchSplashReleased).also { hold ->
                 splashScreen.setKeepOnScreenCondition(hold::shouldKeep)
+            }.also {
+                // The first real cover on screen: Android logs the cold start as fully drawn.
+                AppStartupLog.onLibraryReady { runCatching { reportFullyDrawn() } }
             }
         } else {
             null
@@ -43,9 +48,11 @@ class MainActivity : FragmentActivity() {
                 UnifiedReaderRoute()
             }
         }
+        AppStartupLog.mark("activity.setContent")
     }
 }
 
 private fun logLaunchSplashReleased(heldMillis: Long, timedOut: Boolean) {
+    AppStartupLog.mark("splash.released")
     Log.d("LaunchSplash", "kept ${heldMillis} ms past the first frame" + if (timedOut) ", stopped waiting" else "")
 }

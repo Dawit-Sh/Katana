@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.example.unifiedreader.ui.components.AppStartupLog
 import androidx.compose.ui.geometry.isSpecified
 import java.util.concurrent.ConcurrentHashMap
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -218,6 +219,7 @@ internal fun BucketedCoverImage(
         placeholder = retainedPainter,
         error = retainedPainter,
         onSuccess = { state ->
+            AppStartupLog.coverShown()
             retainedPainter = state.painter
             val size = state.painter.intrinsicSize
             if (onAspectRatio != null && size.isSpecified && size.width > 0f && size.height > 0f) {
