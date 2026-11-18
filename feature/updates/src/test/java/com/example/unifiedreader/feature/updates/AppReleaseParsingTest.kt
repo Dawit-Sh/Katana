@@ -58,6 +58,54 @@ class AppReleaseParsingTest {
     }
 
     @Test
+    fun `each device gets the release apk made for its main ABI`() {
+        val apks = listOf(
+            "katana-1.1.0-fire7-armeabi-v7a.apk",
+            "katana-1.1.0-arm64-v8a.apk",
+            "katana-1.1.0-universal.apk",
+        )
+
+        // The Fire 7 (2019) and 32-bit Android phones.
+        assertEquals("katana-1.1.0-fire7-armeabi-v7a.apk", chooseReleaseApk(apks, listOf("armeabi-v7a", "armeabi")))
+        // Pixel 7 and later run 64-bit only; most other modern phones run both.
+        assertEquals("katana-1.1.0-arm64-v8a.apk", chooseReleaseApk(apks, listOf("arm64-v8a")))
+        assertEquals("katana-1.1.0-arm64-v8a.apk", chooseReleaseApk(apks, listOf("arm64-v8a", "armeabi-v7a", "armeabi")))
+        // Chromebooks and emulators.
+        assertEquals("katana-1.1.0-universal.apk", chooseReleaseApk(apks, listOf("x86_64", "arm64-v8a")))
+        assertEquals("katana-1.1.0-universal.apk", chooseReleaseApk(apks, emptyList()))
+    }
+
+    @Test
+    fun `an older single apk is still offered, and an apk that cannot install is not`() {
+        assertEquals("yabai-0.13.0.apk", chooseReleaseApk(listOf("yabai-0.13.0.apk"), listOf("arm64-v8a")))
+        assertEquals(
+            "katana-1.1.0-arm64-v8a.apk",
+            chooseReleaseApk(listOf("katana-1.1.0-arm64-v8a.apk"), listOf("x86_64", "arm64-v8a")),
+        )
+        assertNull(chooseReleaseApk(listOf("katana-1.1.0-arm64-v8a.apk"), listOf("armeabi-v7a", "armeabi")))
+        assertNull(chooseReleaseApk(emptyList(), listOf("arm64-v8a")))
+    }
+
+    @Test
+    fun `a release with the three apks hands this device its own`() {
+        val threeApks = ReleaseJson.substringBefore("\"assets\"") +
+            """"assets": [
+                ${asset("katana-0.13.0-fire7-armeabi-v7a.apk", 37_000_000)},
+                ${asset("katana-0.13.0-arm64-v8a.apk", 41_000_000)},
+                ${asset("katana-0.13.0-universal.apk", 70_000_000)}
+              ]
+            }"""
+
+        val pixel = parseGitHubRelease(threeApks, listOf("arm64-v8a"))!!
+        assertEquals("katana-0.13.0-arm64-v8a.apk", pixel.apk.name)
+        assertEquals(41_000_000L, pixel.apk.sizeBytes)
+        assertEquals(
+            "katana-0.13.0-fire7-armeabi-v7a.apk",
+            parseGitHubRelease(threeApks, listOf("armeabi-v7a", "armeabi"))!!.apk.name,
+        )
+    }
+
+    @Test
     fun `an asset without a digest has no checksum`() {
         val release = parseGitHubRelease(ReleaseJson.replace(Regex("\"digest\": \"[^\"]*\","), ""))!!
 
@@ -114,6 +162,10 @@ class AppReleaseParsingTest {
     }
 
     private companion object {
+        fun asset(name: String, size: Long) =
+            """{"name": "$name", "size": $size, "browser_download_url": "https://github.com/Dawit-Sh/Katana/releases/download/0.13.0/$name"}"""
+
+
         val ReleaseJson = """
             {
               "tag_name": "0.13.0",

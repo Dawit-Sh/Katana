@@ -1,6 +1,7 @@
 package com.example.unifiedreader.feature.updates
 
 import android.content.Context
+import android.os.Build
 import io.ktor.client.HttpClient
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -16,7 +17,7 @@ object AppUpdates {
     ): AppUpdateController {
         val appContext = context.applicationContext
         return AppUpdateController(
-            releaseSource = GitHubReleaseSource(httpClient),
+            releaseSource = GitHubReleaseSource(httpClient, supportedAbis = Build.SUPPORTED_ABIS.toList()),
             downloader = KtorAppUpdateDownloader(httpClient),
             packageInspector = PackageManagerAppPackageInspector(appContext),
             installer = PackageInstallerAppUpdateInstaller(appContext),
