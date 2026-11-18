@@ -1,7 +1,7 @@
 # Theme Customization Guide
 
 A theme is a palette. Every theme shares the same typography, shape scale, spacing, and
-components; only colors change. This was decided on 2026-10-17 (see `UI_REDESIGN_PLAN.md`):
+components; only colors change. This was decided on 2026-10-17 (see [`UI_REDESIGN_PLAN.md`](../history/UI_REDESIGN_PLAN.md)):
 the earlier per-theme shapes, fonts, and "personality" treatments (scanlines, halftone,
 frames, dashed borders) were removed because they made the app read as mismatched.
 

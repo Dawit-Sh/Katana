@@ -29,25 +29,25 @@ The codebase is still a scaffold, but it is no longer all held inside `MainActiv
 
 Current structure:
 
-- [MainActivity.kt](/Users/andrewbostan/Documents/yabai/app/src/main/java/com/example/unifiedreader/MainActivity.kt)
+- [MainActivity.kt](../../app/src/main/java/com/example/unifiedreader/MainActivity.kt)
   - thin app host
   - renders app shell and delegates state/actions
-- [AppViewModel.kt](/Users/andrewbostan/Documents/yabai/app/src/main/java/com/example/unifiedreader/AppViewModel.kt)
+- [AppViewModel.kt](../../app/src/main/java/com/example/unifiedreader/AppViewModel.kt)
   - owns current app UI state
   - handles source switching, item selection, reader entry, and back behavior
-- [SampleLibraryRepository.kt](/Users/andrewbostan/Documents/yabai/app/src/main/java/com/example/unifiedreader/SampleLibraryRepository.kt)
+- [SampleLibraryRepository.kt](../../app/src/main/java/com/example/unifiedreader/SampleLibraryRepository.kt)
   - fake local repository for sample content
-- [ImportedComicArchiveRepository.kt](/Users/andrewbostan/Documents/yabai/app/src/main/java/com/example/unifiedreader/ImportedComicArchiveRepository.kt)
+- [ImportedComicArchiveRepository.kt](../../app/src/main/java/com/example/unifiedreader/ImportedComicArchiveRepository.kt)
   - Room-backed local imported CBZ/CBR metadata
-- [RoomComicReaderStateStore.kt](/Users/andrewbostan/Documents/yabai/app/src/main/java/com/example/unifiedreader/RoomComicReaderStateStore.kt)
+- [RoomComicReaderStateStore.kt](../../app/src/main/java/com/example/unifiedreader/RoomComicReaderStateStore.kt)
   - Room-backed page progress and per-item reader preferences
-- [LibraryScreen.kt](/Users/andrewbostan/Documents/yabai/feature/library/src/main/java/com/example/unifiedreader/feature/library/LibraryScreen.kt)
+- [LibraryScreen.kt](../../feature/library/src/main/java/com/example/unifiedreader/feature/library/LibraryScreen.kt)
   - library UI with detailed/grid modes and import action
-- [ComicsReaderEntry.kt](/Users/andrewbostan/Documents/yabai/feature/reader-comics/src/main/java/com/example/unifiedreader/feature/reader/comics/ComicsReaderEntry.kt)
+- [ComicsReaderEntry.kt](../../feature/reader-comics/src/main/java/com/example/unifiedreader/feature/reader/comics/ComicsReaderEntry.kt)
   - real local comics reader
-- [PdfReaderEntry.kt](/Users/andrewbostan/Documents/yabai/feature/reader-pdf/src/main/java/com/example/unifiedreader/feature/reader/pdf/PdfReaderEntry.kt)
+- [PdfReaderEntry.kt](../../feature/reader-pdf/src/main/java/com/example/unifiedreader/feature/reader/pdf/PdfReaderEntry.kt)
   - placeholder PDF reader
-- [EpubReaderEntry.kt](/Users/andrewbostan/Documents/yabai/feature/reader-epub/src/main/java/com/example/unifiedreader/feature/reader/epub/EpubReaderEntry.kt)
+- [EpubReaderEntry.kt](../../feature/reader-epub/src/main/java/com/example/unifiedreader/feature/reader/epub/EpubReaderEntry.kt)
   - placeholder EPUB reader
 
 ## Important Decisions Already Made
@@ -83,8 +83,8 @@ Avoid broad cleanup or architecture refactors unless they are required by the fe
 
 For repository-specific architecture guardrails and Codex prompting rules, also follow:
 
-- [ARCHITECTURE_RULES.md](/Users/andrewbostan/Documents/yabai/ARCHITECTURE_RULES.md)
-- [CODEX_PROMPT_TEMPLATE.md](/Users/andrewbostan/Documents/yabai/CODEX_PROMPT_TEMPLATE.md)
+- [ARCHITECTURE_RULES.md](../architecture/ARCHITECTURE_RULES.md)
+- `CODEX_PROMPT_TEMPLATE.md` (removed from the repository on 2026-11-19; git history keeps it)
 
 ## Known Good Build/Test Workflow
 

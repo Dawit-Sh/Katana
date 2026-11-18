@@ -1,6 +1,6 @@
 # Third redesign pass
 
-Section 9 of [`UI_REDESIGN_PLAN.md`](../../../UI_REDESIGN_PLAN.md) is the plan; this folder keeps the
+Section 9 of [`UI_REDESIGN_PLAN.md`](../../history/UI_REDESIGN_PLAN.md) is the plan; this folder keeps the
 boards it was decided on. The second pass's rules still hold (see
 [`../second-pass/README.md`](../second-pass/README.md)): Manrope for UI text, pill controls, 6 dp
 covers, everything through `core:ui-components` with tokens in `core:ui-theme`, mock sizes in dp,

@@ -23,7 +23,7 @@ artifact, then the code.
 
 ## Enforcement
 
-`CLAUDE.md` ("UI work") gives every session the rules. The rule tests in `core:ui-components` hold them in CI:
+[`.claude/CLAUDE.md`](../../../.claude/CLAUDE.md) ("UI work") gives every session the rules. The rule tests in `core:ui-components` hold them in CI:
 `FeatureMaterialImportRuleTest` (kit instead of raw Material), `AppLayoutRuleTest` (gutter, one sheet width, one
 content top) and `DesignSystemRuleTest` (`AppScreenTitle` only for content titles; literal dp in paddings and corner
 radii per file may only go down from `core/ui-components/src/test/design-baselines/`, rewritten with

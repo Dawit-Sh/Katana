@@ -27,9 +27,9 @@ All three integrations can support this feature, but they are not equally mature
 
 - Sync currently imports libraries and all books with progress.
 - Relevant local code:
-  - [data/grimmory/src/main/kotlin/com/example/unifiedreader/data/grimmory/GrimmoryApi.kt](/Users/andrewbostan/Documents/yabai/data/grimmory/src/main/kotlin/com/example/unifiedreader/data/grimmory/GrimmoryApi.kt)
-  - [data/grimmory/src/main/kotlin/com/example/unifiedreader/data/grimmory/GrimmoryDtos.kt](/Users/andrewbostan/Documents/yabai/data/grimmory/src/main/kotlin/com/example/unifiedreader/data/grimmory/GrimmoryDtos.kt)
-  - [app/src/main/java/com/example/unifiedreader/GrimmoryCatalogSyncService.kt](/Users/andrewbostan/Documents/yabai/app/src/main/java/com/example/unifiedreader/GrimmoryCatalogSyncService.kt)
+  - [data/grimmory/src/main/kotlin/com/example/unifiedreader/data/grimmory/GrimmoryApi.kt](../../data/grimmory/src/main/kotlin/com/example/unifiedreader/data/grimmory/GrimmoryApi.kt)
+  - [data/grimmory/src/main/kotlin/com/example/unifiedreader/data/grimmory/GrimmoryDtos.kt](../../data/grimmory/src/main/kotlin/com/example/unifiedreader/data/grimmory/GrimmoryDtos.kt)
+  - [app/src/main/java/com/example/unifiedreader/GrimmoryCatalogSyncService.kt](../../app/src/main/java/com/example/unifiedreader/GrimmoryCatalogSyncService.kt)
 - Available synced fields already include:
   - `lastReadTime`
   - `pdfProgress`
@@ -40,18 +40,18 @@ All three integrations can support this feature, but they are not equally mature
 
 - Sync currently imports libraries, series, media items, and per-item progress.
 - Relevant local code:
-  - [data/stump/src/main/kotlin/com/example/unifiedreader/data/stump/StumpApi.kt](/Users/andrewbostan/Documents/yabai/data/stump/src/main/kotlin/com/example/unifiedreader/data/stump/StumpApi.kt)
-  - [data/stump/src/main/kotlin/com/example/unifiedreader/data/stump/StumpDtos.kt](/Users/andrewbostan/Documents/yabai/data/stump/src/main/kotlin/com/example/unifiedreader/data/stump/StumpDtos.kt)
-  - [app/src/main/java/com/example/unifiedreader/StumpCatalogSyncService.kt](/Users/andrewbostan/Documents/yabai/app/src/main/java/com/example/unifiedreader/StumpCatalogSyncService.kt)
+  - [data/stump/src/main/kotlin/com/example/unifiedreader/data/stump/StumpApi.kt](../../data/stump/src/main/kotlin/com/example/unifiedreader/data/stump/StumpApi.kt)
+  - [data/stump/src/main/kotlin/com/example/unifiedreader/data/stump/StumpDtos.kt](../../data/stump/src/main/kotlin/com/example/unifiedreader/data/stump/StumpDtos.kt)
+  - [app/src/main/java/com/example/unifiedreader/StumpCatalogSyncService.kt](../../app/src/main/java/com/example/unifiedreader/StumpCatalogSyncService.kt)
 - The app does not currently fetch Stump home-scene shelves.
 
 ### Kavita
 
 - Sync currently imports libraries, all series, series detail, and chapter progress.
 - Relevant local code:
-  - [data/kavita/src/main/kotlin/com/example/unifiedreader/data/kavita/KavitaApi.kt](/Users/andrewbostan/Documents/yabai/data/kavita/src/main/kotlin/com/example/unifiedreader/data/kavita/KavitaApi.kt)
-  - [data/kavita/src/main/kotlin/com/example/unifiedreader/data/kavita/KavitaDtos.kt](/Users/andrewbostan/Documents/yabai/data/kavita/src/main/kotlin/com/example/unifiedreader/data/kavita/KavitaDtos.kt)
-  - [app/src/main/java/com/example/unifiedreader/KavitaCatalogSyncService.kt](/Users/andrewbostan/Documents/yabai/app/src/main/java/com/example/unifiedreader/KavitaCatalogSyncService.kt)
+  - [data/kavita/src/main/kotlin/com/example/unifiedreader/data/kavita/KavitaApi.kt](../../data/kavita/src/main/kotlin/com/example/unifiedreader/data/kavita/KavitaApi.kt)
+  - [data/kavita/src/main/kotlin/com/example/unifiedreader/data/kavita/KavitaDtos.kt](../../data/kavita/src/main/kotlin/com/example/unifiedreader/data/kavita/KavitaDtos.kt)
+  - [app/src/main/java/com/example/unifiedreader/KavitaCatalogSyncService.kt](../../app/src/main/java/com/example/unifiedreader/KavitaCatalogSyncService.kt)
 - The app does not currently fetch `On Deck`.
 
 ## Recommended Product Shape

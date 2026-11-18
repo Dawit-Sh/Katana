@@ -516,7 +516,7 @@ step below lands and is judged on the emulator, then the tablet, before the next
 ## 8. Second pass: cover-led and alive `[ ]`
 
 Approved 2026-10-22 (see Decisions). **Build spec:
-[`docs/design/second-pass/README.md`](docs/design/second-pass/README.md)**: the mock image for every
+[`docs/design/second-pass/README.md`](../design/second-pass/README.md)**: the mock image for every
 change (`docs/design/second-pass/mocks/`), exact sizes and behaviour, what each step depends on, what
 can run in parallel, and what was rejected. Where this section and the spec disagree, fix both.
 
@@ -1936,7 +1936,7 @@ settings hub's "Settings" title (the library dropped "Kavita"/"Grimmory" in 9.11
 misalignment as examples, and a design source of truth for later changes.
 
 **Source of truth:** the design system at https://claude.ai/artifact/RaAkZ8f5bEnCVbW86Co1iF, mirrored in
-[`docs/design/system/`](docs/design/system/README.md): tokens for eight themes, the type roles, the layout
+[`docs/design/system/`](../design/system/README.md): tokens for eight themes, the type roles, the layout
 and titles rules, 17 kit components and 3 screen mocks (settings on Expanded and Compact, the library home
 on Medium, the journal on Expanded) with a spacing overlay. From now on a screen change starts there.
 

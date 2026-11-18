@@ -1,31 +1,33 @@
-# yabai (Android reader)
+# Katana (Android reader, built on yabai)
 
-Kotlin + Jetpack Compose reader for EPUB/PDF/CBZ/CBR from Kavita, Grimmory, Stump, or local files.
+Katana is a personal fork of yabai (https://github.com/bostannnn/yabai). Most of this file is upstream's and
+still holds; the build, signing and device notes further down describe upstream's macOS setup.
+No releases or APKs are published from this repository while upstream has no license.
+
+Kotlin + Jetpack Compose reader for EPUB/PDF/CBZ/CBR (plus MOBI, AZW, AZW3, FB2, DjVu) from Kavita, Grimmory,
+Stump, or local files.
 Package `com.example.unifiedreader`. Hilt DI, Room DB, Ktor networking, Readium (EPUB),
-`PdfRenderer` (PDF). 24 Gradle modules; ownership map in `ARCHITECTURE_RULES.md`.
+`PdfRenderer` (PDF). Ownership map in `docs/architecture/ARCHITECTURE_RULES.md`.
 Screens are built from the component kit in `core:ui-components` (`AppPanel`, `AppDialog`,
 `AppButton`, `AppIcons`, ...), never from raw Material `Card`/`Surface`/`Button` or the Material
 Icons artifacts; a unit test enforces this. UI font: bundled Manrope; icons: Material Symbols Rounded.
 
 ## Read before changing code
 
-- `ARCHITECTURE_RULES.md` is binding: keep `app` thin, no side effects in Hilt providers,
+- `docs/architecture/ARCHITECTURE_RULES.md` is binding: keep `app` thin, no side effects in Hilt providers,
   source-specific logic in per-source classes, don't grow the listed hotspot files, and
   performance changes need measured proof. It also holds the DB-paging pattern and the
-  library presentation-coherence rules.
-- `LIBRARY_DB_PAGING_PLAN.md` is the live handoff for the library paging/performance work.
+  library presentation-coherence rules. `docs/architecture/THEME_CUSTOMIZATION_GUIDE.md` explains themes.
 - `docs/design/system/` is the design source of truth; see "UI work" below.
-- `UI_REDESIGN_PLAN.md` tracks the visual redesign: what's done, what's left, and the design decisions.
-- `APP_REVIEW.md` is the live tracker for the 2026-10-18 app review: the prioritized fix list, what is
-  fixed (with commits), what is next, and the product decisions. Its status section says where work stopped.
-- `LISTS_PLAN.md` is the live handoff for the lists feature (your own lists and reading orders): what version 1
-  holds, what waits for version 2, and the ownership of each piece.
-- `UI_POLISH_PLAN.md` is the live handoff for the 2026-11-01 polish pass (Lists, Journal, Filters, Pages sort,
-  Mark unread): the steps in order, where each problem lives in the code, and the open questions.
-- `CODE_PRACTICES_PLAN.md` is the live handoff for the 2026-11-05 code-practices review: duplication to consolidate,
-  coroutine and build hygiene, moving behaviour out of `app`, and the decisions still open. Its status section says
-  where work stopped.
-- `CURRENT_STATUS.md`, `ROADMAP.md` and the other plan docs are historical (April-July 2026).
+- `docs/history/` holds upstream yabai's plans and handoffs, up to the fork (2026-11-18). They explain why the
+  code is the way it is:
+  - `LIBRARY_DB_PAGING_PLAN.md`: the library paging/performance work.
+  - `UI_REDESIGN_PLAN.md`: the visual redesign, what was done and the design decisions.
+  - `APP_REVIEW.md`: the 2026-10-18 app review, its fix list and product decisions.
+  - `LISTS_PLAN.md`: the lists feature (your own lists and reading orders).
+  - `UI_POLISH_PLAN.md`: the 2026-11-01 polish pass (Lists, Journal, Filters, Pages sort, Mark unread).
+  - `CODE_PRACTICES_PLAN.md`: the 2026-11-05 code-practices review and the decisions left open.
+  - `CURRENT_STATUS.md`, `ROADMAP.md` and the other plans are older still (April-July 2026).
 
 ## UI work (design system)
 
@@ -86,7 +88,7 @@ export ANDROID_HOME=~/Library/Android/sdk_new
   that resumes on Main (anything behind a `Dispatchers.IO` hop): the looper can't run and the
   suite hangs with no timeout. Poll while idling the looper instead (`waitForUiState { ... }`).
   If `testDebugUnitTest` stops progressing, `jstack` the Gradle Test Executor JVM.
-- Room schema is v37 (`core/database/.../UnifiedReaderDatabase.kt`), no destructive fallback: every version bump
+- Room schema is v39 (`core/database/.../UnifiedReaderDatabase.kt`), no destructive fallback: every version bump
   needs a migration. `exportSchema = true` writes each version to `core/database/schemas/`: commit the new file
   with the bump (`UnifiedReaderDatabaseSchemaTest` checks every version from 36 has one) and add a
   `MigrationTestHelper` case for the new migration there. Run the tests twice after a bump: the first build
@@ -110,21 +112,16 @@ Keystore `~/yabai.jks`, alias `key0`. The release cert SHA-256 must be
 
 ## GitHub Actions
 
-- `ci.yml` runs `testDebugUnitTest` on every push and on PRs to `main` (30 min job timeout).
-- `release-apk.yml` builds a signed release APK. Pushing a version tag (`0.6.0` or `v0.6.0`)
-  also publishes a GitHub Release with `yabai-<tag>.apk` attached; the tag must equal `versionName`
-  in `app/build.gradle.kts` (the job fails otherwise), so bump `versionName` and `versionCode` first.
-  Manual runs (`gh workflow run release-apk.yml --ref main`) only keep the APK as the run's
-  `unified-reader-release-apk` artifact. Signing comes from the `ANDROID_SIGNING_*` repo secrets.
-- The release notes come from `.github/scripts/release-notes.sh`: one bullet per commit since the
-  previous tag, without merges, the "Release x.y.z" commit and docs-only commits. The app's updater
-  shows those bullets as "What's new", so write commit subjects for people; reword the release on
-  GitHub afterwards if needed (the app reads it at check time).
+- `ci.yml` runs the unit tests, detekt and lint on every push and on PRs to `fire7` (30 min job timeout).
+  It only builds and tests; nothing is published.
+- Upstream's `release-apk.yml` (signed APK and a GitHub Release on every version tag) and its
+  `.github/scripts/release-notes.sh` were removed on 2026-11-19: Katana publishes no releases or APKs while
+  yabai has no license (and DjVuLibre is GPL, see `THIRD_PARTY_NOTICES.md`). Git history keeps both.
 
 ## In-app updater (`feature:updates`)
 
-- Checks `bostannnn/yabai`'s latest GitHub release (once a day after the library appears, or from
-  Settings › About › Version), downloads `yabai-<tag>.apk`, checks GitHub's SHA-256, the package
+- Checks `Dawit-Sh/Katana`'s latest GitHub release (there are none, see above; once a day after the library
+  appears, or from Settings › About › Version), downloads the release's `.apk`, checks GitHub's SHA-256, the package
   name, the signing certificate and a higher `versionCode`, then installs through Android's
   `PackageInstaller`. So a release must keep the release key and raise `versionCode`.
 - Debug builds never check by themselves, and their button stops at "This copy can't update

@@ -1,7 +1,7 @@
 # Second redesign pass: build spec
 
 Approved by the user on 2026-10-22. This folder says exactly what to build for section 8 of
-[`UI_REDESIGN_PLAN.md`](../../../UI_REDESIGN_PLAN.md): the order, the mock for every change, and the
+[`UI_REDESIGN_PLAN.md`](../../history/UI_REDESIGN_PLAN.md): the order, the mock for every change, and the
 sizes and behaviour the mocks only show. Build from here; record progress in the plan.
 
 ## How to use this folder
