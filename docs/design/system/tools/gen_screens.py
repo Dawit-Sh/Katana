@@ -1588,4 +1588,95 @@ Select text in an EPUB and the card opens by itself; the toolbar over the text k
 </div>""", width=752, page=True, script=TOGGLE_SCRIPT)
 
 
+
+SEARCH_PAGE = "".join(
+    f'<p style="margin:0 0 14px;text-indent:24px">{t}</p>' for t in [
+        "Every morning at the same hour he walked along the river and crossed the bridge to the "
+        '<span style="background:rgb(232 163 61 / .55);box-shadow:inset 0 -2px 0 rgb(232 163 61);border-radius:2px">bento</span> shop.',
+        "The woman behind the counter knew his order by now. When the "
+        '<span style="background:rgb(232 163 61 / .22);border-radius:2px">bento</span> was ready she set it on the counter.',
+    ])
+
+
+def search_row(before, word, after, page, selected=False):
+    bg = "background:var(--primary-container);color:var(--on-primary-container);" if selected else ""
+    return (f'<div style="display:flex;gap:8px;padding:10px;border-radius:var(--radius-control);{bg}">'
+            f'<span style="flex:1;font:14px/20px var(--font-sans)">{before}<b style="background:rgb(232 163 61 / .35)">{word}</b>{after}</span>'
+            f'<span style="font:12px/16px var(--font-sans);color:var(--on-surface-variant)">p. {page}</span></div>')
+
+
+def search_heading(title, count):
+    return (f'<div style="display:flex;padding:8px 10px 0;font:600 14px/20px var(--font-sans);color:var(--on-surface-variant)">'
+            f'<span style="flex:1">{title}</span><span style="font-weight:500">{count}</span></div>')
+
+
+reader_bar = (f'<div class="yb-bar is-glass" style="position:absolute;top:12px;left:12px;right:12px">{ic("arrow_back")}'
+              f'<span class="yb-bar-title" style="flex:1;text-align:center">The Devotion of Suspect X</span>'
+              f'<button class="yb-icon-btn" style="background:var(--primary-container)">{ic("search")}</button>'
+              f'<button class="yb-icon-btn">{ic("collections_bookmark")}</button><button class="yb-icon-btn">{ic("format_size")}</button></div>')
+
+search_panel = f"""
+<div class="yb-device" style="width:600px;height:760px;background:#0d0e10;color:#d7d4cc">
+  <div style="position:absolute;left:30px;right:30px;top:96px;font:400 17px/28px var(--font-book)">{SEARCH_PAGE}</div>
+  {reader_bar}
+  <div style="position:absolute;top:90px;right:12px;bottom:12px;width:380px;box-sizing:border-box;border-radius:var(--radius-sheet);background:var(--surface-container-high);color:var(--on-surface);display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;gap:8px;padding:16px 8px 0 16px"><div class="yb-search" style="flex:1">{ic("search")}<span>bento</span></div>{ic("close")}</div>
+    <div style="padding:8px 20px;font:500 14px/20px var(--font-sans);color:var(--on-surface-variant)">12 results in 3 chapters</div>
+    <div style="flex:1;padding:0 8px;overflow:hidden">
+      {search_heading("Chapter 1", 5)}
+      {search_row("…crossed the bridge to the ", "bento", " shop. He always ordered…", 3, selected=True)}
+      {search_row("…when the ", "bento", " was ready she set it on the counter…", 3)}
+      {search_heading("Chapter 2", 4)}
+      {search_row("…left the ", "bento", " on the table, untouched…", 31)}
+    </div>
+    <div class="yb-divider is-full"></div>
+    <div style="display:flex;align-items:center;padding:8px 8px 8px 20px;font:500 14px/20px var(--font-sans);color:var(--on-surface-variant)"><span style="flex:1">1 of 12</span>{ic("navigate_before")}{ic("navigate_next")}</div>
+  </div>
+  <div class="yb-spec">{g(208, "pages-width 380")}</div>
+</div>"""
+
+light_card = f"""
+<div class="yb-device" style="width:600px;height:760px;background:#f6f1e7;color:#2b2a27">
+  <div style="position:absolute;left:30px;right:30px;top:96px;font:400 17px/28px var(--font-book)">{SEARCH_PAGE.replace("rgb(232 163 61 / .55)", "transparent").replace("rgb(232 163 61 / .22)", "transparent").replace("inset 0 -2px 0 rgb(232 163 61)", "none")}</div>
+  <div style="position:absolute;inset:0;background:rgb(255 138 41 / .18)"></div>
+  {reader_bar.replace("background:var(--primary-container)", "").replace('<button class="yb-icon-btn">' + ic("format_size") + '</button>', '<button class="yb-icon-btn" style="background:var(--primary-container)">' + ic("format_size") + '</button>')}
+  <div style="position:absolute;left:12px;top:220px;width:6px;height:300px;border-radius:3px;background:var(--surface-container-high)"><div style="position:absolute;left:0;right:0;bottom:0;height:40%;border-radius:3px;background:var(--primary)"></div></div>
+  <div style="position:absolute;left:34px;top:350px;display:flex;align-items:center;gap:8px;padding:8px;border-radius:var(--radius-control);background:var(--surface-container-high);color:var(--on-surface);font:600 14px/20px var(--font-sans)">{ic("light_mode", 18)}40%</div>
+  <div style="position:absolute;top:90px;right:12px;width:360px;box-sizing:border-box;border-radius:var(--radius-container);background:var(--surface-container-high);color:var(--on-surface);display:flex;flex-direction:column;padding-bottom:8px">
+    <div style="display:flex;align-items:center;padding:16px 8px 8px 20px;font:600 20px/28px var(--font-sans)"><span style="flex:1">Light</span>{ic("close")}</div>
+    <div style="padding:6px 20px;display:flex;font:500 16px/24px var(--font-sans)"><span style="flex:1">Brightness</span><span style="font-size:14px;color:var(--on-surface-variant)">40%</span></div>
+    <div style="margin:4px 20px 12px;height:18px;border-radius:9px;background:var(--surface-container-highest)"><div style="width:40%;height:18px;border-radius:9px;background:var(--primary)"></div></div>
+    <div class="yb-seg" style="margin:0 20px"><span>Follow the device</span><span class="is-selected">Own for reading</span></div>
+    <div style="padding:8px 20px;font:12px/16px var(--font-sans);color:var(--on-surface-variant)">Or slide a finger up or down the left edge of the page.</div>
+    <div style="padding:6px 20px;display:flex;font:500 16px/24px var(--font-sans)"><span style="flex:1">Warmth</span><span style="font-size:14px;color:var(--on-surface-variant)">55% from 21:00</span></div>
+    <div style="margin:4px 20px 8px;height:18px;border-radius:9px;background:var(--surface-container-highest)"><div style="width:55%;height:18px;border-radius:9px;background:var(--primary)"></div></div>
+    {row("Only from 21:00", "Off again at 6:00", trailing="switch-on")}
+    {row("Keep the screen on", "While a book is open, until 10 minutes without a touch", trailing="switch-on")}
+  </div>
+  <div class="yb-spec">{g(228, "card 360, TopEnd")}{g(48, "edge 36")}</div>
+</div>"""
+
+comp("ReaderSearchLight", "Screens", 1700, """
+# Search, light and keys in the reader
+
+The EPUB reader's comfort features (Katana, 2026-11-18): search in the book, brightness and warmth, keeping the screen on, and the volume keys.
+
+- **Search** is a top-bar button (`search`, before the highlights and Aa); the top bar's title keeps clear of however many buttons the end holds. It opens an end-edge `ReaderPanel` at `pages-width` 380 (a bottom sheet on phones): the `AppSearchField` "Search this book" with Close beside it, then the count in `label-large` `on-surface-variant` ("12 results in 3 chapters", "Searching…", "No results", "The first 500 results, in 40 chapters", "This book can't be searched"), then the matches under their chapters (the chapter as the contents name it, its count at the end), each a snippet of a few whole words either side with the match in bold on amber at 35%, and its page "p. 3". The current match is filled `primary-container`. The foot, under a hairline: "3 of 12" with Previous and Next (`navigate_before`, `navigate_next`).
+- **Typing searches** after a 450 ms pause (two letters at least, or one Chinese or Japanese character); the keyboard's search key doesn't wait. Readium's search service (`publication.search`) finds the matches a chapter at a time, up to 500.
+- **On the page** every match is tinted amber `rgb(232 163 61)`, a colour no highlight has: the others at 22%, the current one at 55% with a 2 px line under it. Drawn as Readium decorations in their own group `search`, on the box Readium places over each line (a child inside it didn't show on the Fire's WebView 98).
+- **A tap on a match** goes there and closes the panel; the dock then shows a strip over its row: the words searched for and "3 of 12" (a tap opens the list again), Previous, Next and End search (`close`). Stepping before a match is chosen starts from where you are reading, and goes round past the ends. End search clears the tints.
+- **Light** is a row in the reading settings' Page section, `light_mode` "Light" with what is set ("Device", "40%, warm from 21:00") and a chevron. It opens a small card at the top end under the bar (`AppFloatingPanelPlacement.TopEnd`, 360 wide) that doesn't dim the page, so what it changes shows as it changes; a tap outside closes it. In it: Brightness (an `AppSliderRow`, "Device" while followed) over the choice Follow the device / Own for reading, the hint "Or slide a finger up or down the left edge of the page.", Warmth (a slider, "Off" at 0), Only from 21:00 ("Off again at 6:00") and Keep the screen on, as switch rows.
+- **Brightness** is the reader's window only (`screenBrightness`), never the tablet's setting, and goes back to the tablet's when the book closes. Its lowest level is 2%, as 0 turns some backlights off. Sliding a finger up or down within 36 of the left edge sets it (60% of the page's height goes from darkest to brightest) and makes it the reader's own; a tap, a sideways swipe or a long press there stays the page's. While sliding, a 6 wide bar by the edge (`primary` up to the level) and a pill with `light_mode` 18 and "40%" show, fading 700 ms after the finger lifts.
+- **Warmth** is a see-through candlelight amber `rgb(255 138 41)` over the page, up to 30% at full, under the bars and panels (multiplying the page by a warm white would keep black black, but over the Fire's WebView the blend doesn't reach the page). Only from 21:00 shows it from 21:00 to 6:00.
+- **Keep the screen on** (on by default) holds the screen on while a book is open, until 10 minutes pass without a touch, a page turn or a key. **Volume keys turn pages** (on by default): down for the next page, up for the one before, mirrored in a right-to-left book; held keys don't repeat and the keys no longer change the volume in a book.
+- **Settings › Reading** (the hub) has both as switch rows after Translation: `tablet_android` "Keep the screen on" and `volume_up` "Volume keys turn pages" ("Down for the next page, up to go back. Mirrored in right-to-left books").
+""", f"""
+<div class="yb" style="padding:16px">
+  {TOGGLE}
+  <div id="screens">
+    <div class="yb-caption" style="margin-bottom:8px">Search: the panel, the current match tinted on the page (Fire 7, 600 wide)</div>{search_panel}
+    <div class="yb-caption" style="margin:24px 0 8px">The Light card, a brightness swipe at the left edge, warmth on Paper</div>{light_card}
+  </div>
+</div>""", width=632, page=True, script=TOGGLE_SCRIPT)
+
 print("screens written")

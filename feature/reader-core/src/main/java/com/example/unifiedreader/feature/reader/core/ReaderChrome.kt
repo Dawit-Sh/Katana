@@ -38,6 +38,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -47,6 +48,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -80,6 +82,9 @@ fun ReaderTopBar(
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val tokens = readerOverlayTokens()
+    val density = LocalDensity.current
+    // The end's buttons, measured: three or more need more room than the two the title leaves by default.
+    var actionsWidth by remember { mutableStateOf(0.dp) }
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -97,8 +102,8 @@ fun ReaderTopBar(
             modifier = Modifier
                 .align(Alignment.Center)
                 .fillMaxWidth()
-                // Clear of a button on either side, so the title stays centred on the bar.
-                .padding(horizontal = ReaderChromeDefaults.buttonSize * 2),
+                // Clear of the buttons on either side, so the title stays centred on the bar.
+                .padding(horizontal = maxOf(ReaderChromeDefaults.buttonSize * 2, actionsWidth)),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(1.dp),
         ) {
@@ -124,7 +129,9 @@ fun ReaderTopBar(
             }
         }
         Row(
-            modifier = Modifier.align(Alignment.CenterEnd),
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .onSizeChanged { size -> actionsWidth = with(density) { size.width.toDp() } },
             verticalAlignment = Alignment.CenterVertically,
             content = actions,
         )

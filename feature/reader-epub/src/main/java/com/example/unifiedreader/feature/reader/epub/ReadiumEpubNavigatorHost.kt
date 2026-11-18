@@ -34,6 +34,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.readium.r2.navigator.Decoration
 import org.readium.r2.navigator.HyperlinkNavigator
 import org.readium.r2.navigator.epub.EpubDefaults
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
@@ -47,7 +48,6 @@ import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.publication.ReadingProgression
 import org.readium.r2.shared.publication.epub.EpubLayout
 import org.readium.r2.shared.publication.presentation.presentation
-import org.readium.r2.shared.publication.services.locateProgression
 import org.readium.r2.shared.util.AbsoluteUrl
 import org.readium.r2.shared.util.Url
 
@@ -69,6 +69,9 @@ internal fun ReadiumEpubNavigatorHost(
     onNavigationRequestConsumed: () -> Unit,
     modifier: Modifier = Modifier,
     annotations: EpubSelectionAnnotations? = null,
+    // The search matches' tint (EpubSearchDecorations.kt), and whether the volume keys turn pages.
+    searchMatches: List<Decoration> = emptyList(),
+    volumeKeysTurnPages: Boolean = false,
 ) {
     val containerId = remember(item.id) { View.generateViewId() }
     val fragmentTag = remember(item.id) { epubNavigatorTag(item.id) }
@@ -80,6 +83,7 @@ internal fun ReadiumEpubNavigatorHost(
     val footnoteNavigationScope = rememberCoroutineScope()
     val latestAnnotations = rememberUpdatedState(annotations)
     val highlightLayer = remember(publication) { EpubHighlightLayer(footnoteNavigationScope) }
+    val searchLayer = remember(publication) { EpubSearchLayer(footnoteNavigationScope) }
     val latestTranslation = rememberUpdatedState(translation)
     val isLandscape = remember(
         configuration.orientation,
@@ -405,11 +409,13 @@ internal fun ReadiumEpubNavigatorHost(
         highlightLayer.attach(fragment) { highlightId, anchor ->
             latestAnnotations.value?.onHighlightActivated?.invoke(highlightId, anchor)
         }
+        searchLayer.attach(fragment)
 
         onDispose {
             pageTaps.handler = null
             curlHost.navigator = null
             highlightLayer.detach(fragment)
+            searchLayer.detach(fragment)
             bookEndCheckJob?.cancel()
             footnoteNavigationJobs.toList().forEach { job -> job.cancel() }
             footnoteNavigationJobs.clear()
@@ -434,6 +440,13 @@ internal fun ReadiumEpubNavigatorHost(
     // The book's highlights, drawn on whichever navigator shows it now (EpubHighlightLayer.kt).
     val highlights = annotations?.highlights.orEmpty()
     LaunchedEffect(highlightLayer, highlights) { highlightLayer.show(highlights) }
+    LaunchedEffect(searchLayer, searchMatches) { searchLayer.show(searchMatches) }
+
+    // The volume keys turn pages as the page's sides do, mirrored in a right-to-left book.
+    DisposableEffect(activity, volumeKeysTurnPages, pageTaps) {
+        val release = if (volumeKeysTurnPages) activity.turnPagesWithVolumeKeys(pageTaps::onTap) else null
+        onDispose { release?.invoke() }
+    }
 
     // When the card or sheet closes, the words stop being selected too.
     val translationOpen = translation?.isOpen == true
@@ -455,32 +468,12 @@ internal fun ReadiumEpubNavigatorHost(
     LaunchedEffect(navigationRequest, fragmentTag, publication) {
         val request = navigationRequest ?: return@LaunchedEffect
         val navigator = fragmentManager.findFragmentByTag(fragmentTag) as? EpubNavigatorFragment
-        if (navigator == null) {
-            onNavigationRequestConsumed()
-            return@LaunchedEffect
-        }
-        when (request) {
-            is EpubProgressSeekRequest -> {
-                val locator = withContext(Dispatchers.IO) {
-                    publication.locateProgression(request.progress.toDouble())
-                }
-                locator?.let { navigator.go(it, animated = false) }
-            }
-
-            is EpubTocNavigationRequest -> {
-                navigator.go(request.link, animated = false)
-            }
-
-            is EpubLocatorNavigationRequest -> {
-                navigator.go(request.locator, animated = false)
-            }
-
-            is EpubNoteNavigationRequest -> {
-                navigator.go(request.link, animated = false)
-                val tint = preferences.theme.colors.number.toArgb()
-                footnoteNavigationScope.launch { navigator.markEpubNote(request.link, tint) }
-            }
-        }
+        navigator?.goToEpubRequest(
+            request = request,
+            publication = publication,
+            noteTint = preferences.theme.colors.number.toArgb(),
+            scope = footnoteNavigationScope,
+        )
         onNavigationRequestConsumed()
     }
 }

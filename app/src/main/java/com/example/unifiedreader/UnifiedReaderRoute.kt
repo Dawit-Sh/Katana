@@ -59,6 +59,7 @@ import com.example.unifiedreader.ui.theme.ApplyLaunchSplashTheme
 import com.example.unifiedreader.ui.theme.UnifiedReaderTheme
 import com.example.unifiedreader.ui.theme.applyAndroidThemeMode
 import com.example.unifiedreader.feature.translation.LocalTranslationService
+import com.example.unifiedreader.feature.settings.LocalReaderComfortPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 
 @Composable
@@ -67,6 +68,8 @@ fun UnifiedReaderRoute(
     settingsTools: AppSettingsToolsViewModel = hiltViewModel(),
     // Every book's marks, for the Bookmarks screen.
     bookmarks: AppBookmarksViewModel = hiltViewModel(),
+    // The readers' shared settings, for Settings › Reading.
+    readerDisplay: AppReaderDisplayViewModel = hiltViewModel(),
 ) {
     val viewModel: AppViewModel = hiltViewModel()
     val updates: AppUpdatesViewModel = hiltViewModel()
@@ -89,6 +92,7 @@ fun UnifiedReaderRoute(
     CompositionLocalProvider(
         LocalTranslationService provides translation.service,
         LocalAppSettingsTools provides settingsTools,
+        LocalReaderComfortPreferences provides readerDisplay.preferences.comfort,
     ) {
         UnifiedReaderAppContent(
             viewModel = viewModel,

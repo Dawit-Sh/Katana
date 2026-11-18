@@ -136,8 +136,8 @@ internal fun SettingsHub(
 }
 
 /**
- * Settings › Reading: the look new books open with, then Translation when the app has it. Left
- * out when it has neither.
+ * Settings › Reading: the look new books open with, Translation when the app has it, then the
+ * readers' Keep the screen on and Volume keys switches. Left out when it has none of them.
  */
 @Composable
 private fun ReadingSettingsGroup(
@@ -146,7 +146,8 @@ private fun ReadingSettingsGroup(
     onOpenPage: (SettingsPage) -> Unit,
 ) {
     val translation = LocalTranslationService.current
-    if (newBookLook == null && translation == null) return
+    val comfort = LocalReaderComfortPreferences.current
+    if (newBookLook == null && translation == null && comfort == null) return
     AppSettingsGroup(label = "Reading") {
         if (newBookLook != null) {
             AppSettingsRow(
@@ -169,6 +170,7 @@ private fun ReadingSettingsGroup(
                 onClick = { onOpenPage(SettingsPage.Translation) },
             )
         }
+        ReaderComfortSettingsRows(leadingDivider = newBookLook != null || translation != null)
     }
 }
 

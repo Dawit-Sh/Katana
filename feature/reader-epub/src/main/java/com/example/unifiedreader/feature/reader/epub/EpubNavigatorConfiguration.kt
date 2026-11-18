@@ -29,8 +29,9 @@ internal fun epubNavigatorFragmentConfiguration(
             overrides = readiumCssRsProperties.overrides + (SelectionBackgroundProperty to EpubSelectionHighlight.css),
         )
         useReadiumCssFontSize = false
-        // Highlights: Readium's fill and underline, plus our strikethrough and squiggle (EpubHighlightStyles.kt).
-        decorationTemplates = decorationTemplates.withEpubHighlightStyles()
+        // Highlights: Readium's fill and underline, plus our strikethrough and squiggle (EpubHighlightStyles.kt),
+        // and the search matches' tint (EpubSearchDecorations.kt).
+        decorationTemplates = decorationTemplates.withEpubHighlightStyles().withEpubSearchStyle()
         servedAssets += "fonts/.*"
         addBundledReaderFontDeclarations()
         onSameFileLink?.let { onLink ->

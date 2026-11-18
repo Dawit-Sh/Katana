@@ -47,6 +47,8 @@ internal fun EpubPreferencesSheet(
     onPageNumbersVisibleChanged: (Boolean) -> Unit,
     slot: ReaderPanelSlot,
     onUseForNewBooks: (() -> Unit)? = null,
+    // The row that opens the Light card, in the Page section.
+    lightRow: (@Composable () -> Unit)? = null,
 ) {
     var selectedTab by rememberSaveable { mutableStateOf(EpubPreferencesTab.Text) }
     var isFontPickerOpen by rememberSaveable { mutableStateOf(false) }
@@ -96,6 +98,7 @@ internal fun EpubPreferencesSheet(
             onPageTurnStyleChanged = onPageTurnStyleChanged,
             onPageNumbersVisibleChanged = onPageNumbersVisibleChanged,
             onUseForNewBooks = onUseForNewBooks,
+            lightRow = lightRow,
         )
     }
     // Registered after the panel's own handler, so it runs first: back leaves the font page

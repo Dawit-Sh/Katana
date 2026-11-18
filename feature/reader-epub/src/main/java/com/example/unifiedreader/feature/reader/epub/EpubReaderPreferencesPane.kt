@@ -95,6 +95,7 @@ internal fun ColumnScope.EpubPreferencesPaneContent(
     onPageTurnStyleChanged: (PageTurnStyle) -> Unit,
     onPageNumbersVisibleChanged: (Boolean) -> Unit,
     onUseForNewBooks: (() -> Unit)? = null,
+    lightRow: (@Composable () -> Unit)? = null,
 ) {
     val compact = currentAppWindowWidth() == AppWindowWidth.Compact
     val layoutDirection = LocalLayoutDirection.current
@@ -200,6 +201,7 @@ internal fun ColumnScope.EpubPreferencesPaneContent(
                                 onVisibleChanged = onPageNumbersVisibleChanged,
                                 label = "Page number and chapter",
                             )
+                            lightRow?.invoke()
                         }
                         if (!compact || tab == EpubPreferencesTab.Layout) {
                             if (!compact) EpubSettingsSectionLabel("Layout")

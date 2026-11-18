@@ -59,9 +59,7 @@ import kotlinx.coroutines.withContext
 import com.example.unifiedreader.feature.translation.ReaderTranslationOverlay
 import com.example.unifiedreader.feature.translation.TranslationService
 import com.example.unifiedreader.feature.translation.rememberTranslationSession
-import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
-import org.readium.r2.shared.publication.Publication
 
 @Composable
 fun EpubReaderScreen(
@@ -98,6 +96,8 @@ fun EpubReaderScreen(
         ReportReaderOpening(ReaderOpenStatus.Failed(ReaderOpenFailure.Unknown))
         return
     }
+    val comfort = rememberEpubReaderComfort(displayPreferences.comfort)
+    EpubReaderComfortEffects(comfort, activity)
 
     val hydrated by sessionStore.isHydratedFlow.collectAsStateWithLifecycle()
     val progressByItemId by sessionStore.progressByItemIdFlow.collectAsStateWithLifecycle()
@@ -190,9 +190,7 @@ fun EpubReaderScreen(
     }
     var seekRequestId by remember { mutableIntStateOf(0) }
     var navigationRequest by remember { mutableStateOf<EpubNavigationRequest?>(null) }
-    var isTocSheetOpen by rememberSaveable(item.id) { mutableStateOf(false) }
-    var isPreferencesPaneOpen by rememberSaveable(item.id) { mutableStateOf(false) }
-    var isAnnotationsOpen by rememberSaveable(item.id) { mutableStateOf(false) }
+    var openPanel by rememberSaveable(item.id) { mutableStateOf<EpubReaderPanel?>(null) }
     val bookHighlightsFlow = remember(annotationStore, item.id) { annotationStore?.highlights(item.id) ?: flowOf(emptyList()) }
     val bookWordsFlow = remember(annotationStore, item.id) { annotationStore?.words(item.id) ?: flowOf(emptyList()) }
     val bookHighlights by bookHighlightsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
@@ -264,10 +262,12 @@ fun EpubReaderScreen(
         layoutMode = defaultEpubLayoutMode(isLandscape)
     }
     LaunchedEffect(overlayState.isVisible) {
-        if (!overlayState.isVisible) {
-            isTocSheetOpen = false
-            isPreferencesPaneOpen = false
-        }
+        if (!overlayState.isVisible) openPanel = null
+    }
+    // A bar button opens its panel in place of any other, and closes it when it is open.
+    val togglePanel = { panel: EpubReaderPanel ->
+        overlayState.show()
+        openPanel = panel.takeUnless { openPanel == it }
     }
     LaunchedEffect(initialRestoreLocked, restoreProgressSnapshot, restoreSessionSnapshot, serializedInitialLocator) {
         if (initialRestoreLocked) return@LaunchedEffect
@@ -446,6 +446,13 @@ fun EpubReaderScreen(
                 readerTouched = true
                 navigationRequest = EpubLocatorNavigationRequest(seekRequestId++, locator)
             }
+            val bookSearch = rememberEpubBookSearch(state.publication)
+            val goToSearchMatch = { match: Locator? ->
+                match?.let { locator ->
+                    readerTouched = true
+                    navigationRequest = EpubLocatorNavigationRequest(seekRequestId++, locator)
+                }
+            }
             LaunchedEffect(bookProgress.pageCount) {
                 if (bookProgress.pageCount > 0) {
                     pageCount = bookProgress.pageCount
@@ -505,6 +512,7 @@ fun EpubReaderScreen(
                     null
                 },
                 sheet = {
+                    EpubBrightnessIndicator(comfort)
                     EpubFootnoteCard(
                         footnote = footnoteContent,
                         pageColor = theme,
@@ -533,6 +541,7 @@ fun EpubReaderScreen(
                         initialLocator = resolvedInitialLocator,
                         preferences = readerPreferences,
                         onLocationChanged = { reportedLocator, resourcePage, isAtBookEnd ->
+                            comfort.touched()
                             val locator = reportedLocator.withReadingOrderIndex(
                                 state.publication.readingOrderIndexOf(reportedLocator),
                             )
@@ -603,7 +612,7 @@ fun EpubReaderScreen(
                         onNavigationRequestConsumed = {
                             navigationRequest = null
                         },
-                        modifier = Modifier.fillMaxSize().onEveryTouchDown { readerTouched = true },
+                        modifier = Modifier.fillMaxSize().onEveryTouchDown { readerTouched = true }.epubBrightnessEdgeSwipe(comfort),
                         annotations = annotationController?.let { controller ->
                             remember(controller, bookHighlights) {
                                 EpubSelectionAnnotations(
@@ -614,8 +623,11 @@ fun EpubReaderScreen(
                                 )
                             }
                         },
+                        searchMatches = bookSearch.decorations,
+                        volumeKeysTurnPages = comfort.comfort.volumeKeysTurnPages,
                     )
                     EpubBookmarkRibbon(visible = pageBookmarks.isNotEmpty())
+                    EpubWarmthTint(comfort)
                 },
                 overlay = {
                     Box(modifier = Modifier.fillMaxSize()) {
@@ -628,27 +640,14 @@ fun EpubReaderScreen(
                             currentPage = currentPage,
                             pageCount = pageCount,
                             chapterMarks = bookProgress.chapterMarks,
-                            isTocOpen = isTocSheetOpen,
-                            isPreferencesOpen = isPreferencesPaneOpen,
+                            isTocOpen = openPanel == EpubReaderPanel.Contents,
+                            isPreferencesOpen = openPanel == EpubReaderPanel.Settings,
                             onBack = closeReader,
-                            onTocClick = {
-                                overlayState.show()
-                                isPreferencesPaneOpen = false
-                                isAnnotationsOpen = false
-                                isTocSheetOpen = !isTocSheetOpen
-                            },
-                            onPreferencesClick = {
-                                overlayState.show()
-                                isTocSheetOpen = false
-                                isAnnotationsOpen = false
-                                isPreferencesPaneOpen = !isPreferencesPaneOpen
-                            },
-                            onDismissPanels = {
-                                isTocSheetOpen = false
-                                isPreferencesPaneOpen = false
-                                isAnnotationsOpen = false
-                            },
-                            isAnnotationsOpen = isAnnotationsOpen,
+                            onTocClick = { togglePanel(EpubReaderPanel.Contents) },
+                            onPreferencesClick = { togglePanel(EpubReaderPanel.Settings) },
+                            onDismissPanels = { openPanel = null },
+                            isAnnotationsOpen = openPanel == EpubReaderPanel.Annotations,
+                            onAnnotationsClick = annotationController?.let { { togglePanel(EpubReaderPanel.Annotations) } },
                             isPageBookmarked = pageBookmarks.isNotEmpty(),
                             onBookmarkClick = annotationController?.let { controller ->
                                 {
@@ -657,13 +656,19 @@ fun EpubReaderScreen(
                                     }
                                 }
                             },
-                            onAnnotationsClick = annotationController?.let {
+                            isSearchOpen = openPanel == EpubReaderPanel.Search,
+                            onSearchClick = { togglePanel(EpubReaderPanel.Search) },
+                            dockStrip = if (bookSearch.isActive && openPanel != EpubReaderPanel.Search) {
                                 {
-                                    overlayState.show()
-                                    isTocSheetOpen = false
-                                    isPreferencesPaneOpen = false
-                                    isAnnotationsOpen = !isAnnotationsOpen
+                                    EpubSearchDockStrip(
+                                        search = bookSearch,
+                                        onOpenResults = { togglePanel(EpubReaderPanel.Search) },
+                                        onStep = { forward -> goToSearchMatch(bookSearch.step(forward, currentProgress)) },
+                                        onEnd = bookSearch::clear,
+                                    )
                                 }
+                            } else {
+                                null
                             },
                             onProgressSelected = { selectedProgress ->
                                 currentProgress = selectedProgress.toDouble()
@@ -680,13 +685,11 @@ fun EpubReaderScreen(
                                 bookTitle = item.title,
                                 currentHref = currentHref,
                                 currentProgress = currentProgress,
-                                isOpen = isTocSheetOpen,
+                                isOpen = openPanel == EpubReaderPanel.Contents,
                                 slot = slot,
-                                onDismissRequest = {
-                                    isTocSheetOpen = false
-                                },
+                                onDismissRequest = { openPanel = null },
                                 onEntrySelected = { entry ->
-                                    isTocSheetOpen = false
+                                    openPanel = null
                                     readerTouched = true
                                     navigationRequest = EpubTocNavigationRequest(
                                         id = seekRequestId++,
@@ -695,7 +698,7 @@ fun EpubReaderScreen(
                                 },
                             )
                             EpubPreferencesSheet(
-                                isOpen = isPreferencesPaneOpen,
+                                isOpen = openPanel == EpubReaderPanel.Settings,
                                 typographyMode = typographyMode,
                                 fontFamily = fontFamily,
                                 fontSize = fontSize,
@@ -709,9 +712,7 @@ fun EpubReaderScreen(
                                 useOrientationLayoutDefault = useOrientationLayoutDefault,
                                 pageTurnStyle = pageTurnStyle,
                                 pageNumbersVisible = pageNumbersVisible,
-                                onDismissRequest = {
-                                    isPreferencesPaneOpen = false
-                                },
+                                onDismissRequest = { openPanel = null },
                                 onTypographyModeChanged = {
                                     typographyMode = it
                                 },
@@ -755,16 +756,36 @@ fun EpubReaderScreen(
                                 onPageNumbersVisibleChanged = displayPreferences.pageNumbers::setVisible,
                                 slot = slot,
                                 onUseForNewBooks = { displayPreferences.bookLook.save(readerPreferences.newBookLook()) },
+                                lightRow = { EpubLightRow(comfort, onClick = { openPanel = EpubReaderPanel.Light }) },
+                            )
+                            EpubSearchPanel(
+                                isOpen = openPanel == EpubReaderPanel.Search,
+                                slot = slot,
+                                search = bookSearch,
+                                publication = state.publication,
+                                tocEntries = bookProgress.tocEntries,
+                                onDismissRequest = { openPanel = null },
+                                onResultSelected = { index ->
+                                    openPanel = null
+                                    goToSearchMatch(bookSearch.select(index))
+                                },
+                                onStep = { forward -> goToSearchMatch(bookSearch.step(forward, currentProgress)) },
+                            )
+                            EpubLightCard(
+                                isOpen = openPanel == EpubReaderPanel.Light,
+                                slot = slot,
+                                comfort = comfort,
+                                onDismissRequest = { openPanel = null },
                             )
                             annotationController?.let { controller ->
                                 EpubAnnotationsPanel(
-                                    isOpen = isAnnotationsOpen,
+                                    isOpen = openPanel == EpubReaderPanel.Annotations,
                                     slot = slot,
                                     highlights = bookHighlights,
                                     words = bookWords,
                                     bookmarks = bookBookmarks,
                                     controller = controller,
-                                    onDismissRequest = { isAnnotationsOpen = false },
+                                    onDismissRequest = { openPanel = null },
                                     onJump = { locator ->
                                         readerTouched = true
                                         navigationRequest = EpubLocatorNavigationRequest(seekRequestId++, locator)
@@ -786,19 +807,6 @@ fun EpubReaderScreen(
             )
         }
     }
-}
-
-private fun Publication.readingOrderPositionFor(
-    locator: Locator,
-): Int? = readingOrderIndexOf(locator)?.plus(1)
-
-internal fun Publication.readingOrderIndexOf(
-    locator: Locator,
-): Int? {
-    val href = locator.href.removeFragment().toString()
-    return readingOrder
-        .indexOfFirst { link -> link.url().removeFragment().toString() == href }
-        .takeUnless { it < 0 }
 }
 
 internal const val EpubReaderSurfaceTag = "epub-reader-surface"
@@ -837,20 +845,6 @@ private fun buildCurrentReaderLocator(
     page = page,
     percent = percent.coerceIn(0.0, 1.0),
 )
-
-internal sealed interface EpubNavigationRequest {
-    val id: Int
-}
-
-internal data class EpubProgressSeekRequest(
-    override val id: Int,
-    val progress: Float,
-) : EpubNavigationRequest
-
-internal data class EpubTocNavigationRequest(
-    override val id: Int,
-    val link: Link,
-) : EpubNavigationRequest
 
 private fun defaultEpubLayoutMode(
     isLandscape: Boolean,
