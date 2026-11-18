@@ -39,10 +39,12 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            releaseSigningConfig?.let { signingConfig = it }
-            // Translation's native code is ~16 MB per ABI; ship only 64-bit ARM, which every
-            // tablet and phone this app targets runs. Debug builds keep all ABIs for emulators.
-            ndk { abiFilters += "arm64-v8a" }
+            // Local Fire 7 (2019) build: without the release keys, sign with this PC's debug key
+            // so the APK installs; the release stays a fast (non-debuggable) build.
+            signingConfig = releaseSigningConfig ?: signingConfigs.getByName("debug")
+            // Translation's native code is ~16 MB per ABI. Upstream ships only arm64-v8a; the
+            // Fire 7 (2019) runs 32-bit Android only, so this local build ships armeabi-v7a.
+            ndk { abiFilters += "armeabi-v7a" }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",

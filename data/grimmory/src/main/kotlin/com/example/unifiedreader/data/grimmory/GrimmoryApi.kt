@@ -7,6 +7,7 @@ import com.example.unifiedreader.core.network.writeBodyTo
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.ClientRequestException
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.delete
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
@@ -321,6 +322,10 @@ class KtorGrimmoryApi(
     ): List<GrimmoryBookCatalogEntry> = authenticatedRequest {
         val response = httpClient.get("$normalizedBaseUrl/api/v1/books") {
             bearerAuth(accessToken)
+            // A large library (2,600+ books) takes the server longer than the LAN default.
+            timeout {
+                socketTimeoutMillis = ALL_BOOKS_SOCKET_TIMEOUT_MILLIS
+            }
             url {
                 // Descriptions come with the list (about 3 MB for 2,000 books), so search and
                 // Browse can read them and the book page has one without asking the server.
@@ -650,6 +655,7 @@ class KtorGrimmoryApi(
     }.buildString()
 }
 
+private const val ALL_BOOKS_SOCKET_TIMEOUT_MILLIS = 180_000L
 private const val GRIMMORY_READING_SESSION_MAX_PAGES = 1_000
 private const val GRIMMORY_READING_SESSION_FALLBACK_MAX_PAGES = 10
 

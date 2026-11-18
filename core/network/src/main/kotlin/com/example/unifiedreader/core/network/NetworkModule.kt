@@ -24,5 +24,7 @@ fun buildHttpClient(
         }
     }
 
-private const val DEFAULT_CONNECT_TIMEOUT_MILLIS = 2_000L
-private const val DEFAULT_SOCKET_TIMEOUT_MILLIS = 5_000L
+// Local Fire 7 (2019) build: its Wi-Fi can take seconds to wake and the server answers big
+// lists slowly, so the upstream 2 s / 5 s limits failed there.
+private const val DEFAULT_CONNECT_TIMEOUT_MILLIS = 10_000L
+private const val DEFAULT_SOCKET_TIMEOUT_MILLIS = 60_000L
