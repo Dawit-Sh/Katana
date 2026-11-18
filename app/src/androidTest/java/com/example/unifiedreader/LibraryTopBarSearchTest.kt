@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.unifiedreader.core.model.SourceConnectivityState
 import com.example.unifiedreader.core.model.SourceType
+import com.example.unifiedreader.feature.downloads.DownloadsButtonState
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -91,11 +92,11 @@ private fun LibraryTopBarUnderTest(
             selectedSource = SourceType.LOCAL,
             sourceConnectivity = SourceConnectivityState.Unknown,
             searchQuery = searchQuery,
-            seriesTitle = seriesTitle,
+            contextTitle = seriesTitle,
             onSourceConnectivityClick = {},
             onDrawerClick = {},
             onSearchQueryChanged = onSearchQueryChanged,
-            downloadBadgeCount = 0,
+            downloadsButtonState = DownloadsButtonState(),
             onDownloadsClick = {},
             onImportLocalFileClick = {},
             onLeaveSeries = {},
