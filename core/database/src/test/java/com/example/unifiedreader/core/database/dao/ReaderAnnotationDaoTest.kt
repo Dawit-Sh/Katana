@@ -3,12 +3,14 @@ package com.example.unifiedreader.core.database.dao
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.unifiedreader.core.database.UnifiedReaderDatabase
+import com.example.unifiedreader.core.database.entity.ReaderBookmarkEntity
 import com.example.unifiedreader.core.database.entity.ReaderHighlightEntity
 import com.example.unifiedreader.core.database.entity.SavedWordEntity
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -19,6 +21,8 @@ import org.robolectric.RobolectricTestRunner
 class ReaderAnnotationDaoTest {
     private lateinit var database: UnifiedReaderDatabase
     private lateinit var dao: ReaderAnnotationDao
+    private lateinit var bookmarks: ReaderBookmarkDao
+    private lateinit var study: SavedWordStudyDao
 
     @Before
     fun setUp() {
@@ -29,6 +33,8 @@ class ReaderAnnotationDaoTest {
             .allowMainThreadQueries()
             .build()
         dao = database.readerAnnotationDao()
+        bookmarks = database.readerBookmarkDao()
+        study = database.savedWordStudyDao()
     }
 
     @After
@@ -102,6 +108,63 @@ class ReaderAnnotationDaoTest {
         syncState = "DIRTY",
         remoteId = null,
         remoteCfi = null,
+    )
+
+    @Test
+    fun `a book's bookmarks come in reading order and a removed one leaves the lists but stays stored`() = runBlocking {
+        bookmarks.upsertBookmark(bookmark(id = "late", progression = 0.8, createdAt = 1))
+        bookmarks.upsertBookmark(bookmark(id = "early", progression = 0.1, createdAt = 3))
+        bookmarks.upsertBookmark(bookmark(id = "other", itemId = "grimmory:item:2", progression = 0.5, createdAt = 4))
+
+        assertEquals(listOf("early", "late"), bookmarks.observeBookmarks("grimmory:item:1").first().map { it.id })
+        assertEquals(listOf("other", "early", "late"), bookmarks.observeAllBookmarks().first().map { it.id })
+
+        bookmarks.markBookmarkDeleted("late", syncState = "DIRTY", atEpochMillis = 9)
+
+        assertEquals(listOf("early"), bookmarks.observeBookmarks("grimmory:item:1").first().map { it.id })
+        assertEquals(listOf("other", "early"), bookmarks.observeAllBookmarks().first().map { it.id })
+    }
+
+    @Test
+    fun `a word keeps its note and its flashcard review`() = runBlocking {
+        dao.upsertWord(word(id = "w", word = "solar", progression = 0.1, createdAt = 1))
+        val fresh = study.getWord("w")!!
+        assertEquals(0, fresh.reviewLevel)
+        assertNull(fresh.reviewDueAtEpochMillis)
+
+        study.setWordNote("w", "of the sun")
+        study.setWordReview("w", level = 2, dueAtEpochMillis = 500, atEpochMillis = 100)
+
+        val reviewed = study.getWord("w")!!
+        assertEquals("of the sun", reviewed.note)
+        assertEquals(2, reviewed.reviewLevel)
+        assertEquals(500L, reviewed.reviewDueAtEpochMillis)
+        assertEquals(100L, reviewed.reviewedAtEpochMillis)
+        assertNull(study.getWord("missing"))
+    }
+
+    private fun bookmark(
+        id: String,
+        itemId: String = "grimmory:item:1",
+        progression: Double?,
+        createdAt: Long,
+    ) = ReaderBookmarkEntity(
+        id = id,
+        itemId = itemId,
+        bookTitle = "The Hole",
+        bookAuthor = "Hiroko Oyamada",
+        href = "c1.xhtml",
+        locatorJson = "{}",
+        chapterTitle = "Chapter 1",
+        progression = progression,
+        page = 8,
+        pageCount = 78,
+        text = "home looked like.",
+        createdAtEpochMillis = createdAt,
+        updatedAtEpochMillis = createdAt,
+        deleted = false,
+        syncState = "DIRTY",
+        remoteId = null,
     )
 
     private fun word(
