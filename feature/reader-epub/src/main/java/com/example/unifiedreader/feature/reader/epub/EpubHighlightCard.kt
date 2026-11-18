@@ -6,13 +6,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -58,7 +58,6 @@ internal fun EpubHighlightCardOverlay(
     controller: EpubAnnotationController,
     highlights: List<ReaderHighlight>,
 ) {
-    val context = LocalContext.current
     var origin by remember { mutableStateOf(Offset.Zero) }
     Box(modifier = Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInWindow() })
     val state = controller.card ?: return
@@ -71,30 +70,8 @@ internal fun EpubHighlightCardOverlay(
             modifier = Modifier.padding(AppLayout.menuInset),
             verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
         ) {
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
-            ) {
-                HighlightStyle.entries.forEach { style ->
-                    AppChip(
-                        selected = highlight.style == style,
-                        onClick = { controller.setStyle(highlight.id, style) },
-                        label = { Text(EpubAnnotationCopy.style(style)) },
-                    )
-                }
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
-            ) {
-                HighlightColor.entries.forEach { color ->
-                    HighlightColorSwatch(
-                        color = color,
-                        selected = highlight.color == color,
-                        onClick = { controller.setColor(highlight.id, color) },
-                    )
-                }
-            }
+            HighlightStyleChips(highlight = highlight, onStyle = { style -> controller.restyle(highlight.id, style = style) })
+            HighlightColorRow(highlight = highlight, onColor = { color -> controller.restyle(highlight.id, color = color) })
             highlight.note?.let { note ->
                 Text(
                     text = note,
@@ -103,28 +80,62 @@ internal fun EpubHighlightCardOverlay(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                AppIconButton(onClick = { controller.editNote(highlight.id) }) {
-                    Icon(
-                        imageVector = AppIcons.Edit,
-                        contentDescription = if (highlight.note == null) EpubAnnotationCopy.AddNote else EpubAnnotationCopy.EditNote,
-                    )
-                }
-                AppIconButton(
-                    onClick = {
-                        context.copyToClipboard(highlight.text)
-                        controller.closeCard()
-                    },
-                ) {
-                    Icon(imageVector = AppIcons.ContentCopy, contentDescription = EpubAnnotationCopy.Copy)
-                }
-                AppIconButton(onClick = { controller.delete(highlight) }) {
-                    Icon(imageVector = AppIcons.Delete, contentDescription = EpubAnnotationCopy.Delete)
-                }
-            }
+            HighlightCardActions(highlight = highlight, controller = controller)
+        }
+    }
+}
+
+/** The four styles; they wrap to a second row on a narrow card, so all stay in view. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun HighlightStyleChips(highlight: ReaderHighlight, onStyle: (HighlightStyle) -> Unit) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
+        verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
+    ) {
+        HighlightStyle.entries.forEach { style ->
+            AppChip(
+                selected = highlight.style == style,
+                onClick = { onStyle(style) },
+                label = { Text(EpubAnnotationCopy.style(style)) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun HighlightColorRow(highlight: ReaderHighlight, onColor: (HighlightColor) -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
+    ) {
+        HighlightColor.entries.forEach { color ->
+            HighlightColorSwatch(color = color, selected = highlight.color == color, onClick = { onColor(color) })
+        }
+    }
+}
+
+/** Note, Copy and Delete, at the card's end. */
+@Composable
+private fun HighlightCardActions(highlight: ReaderHighlight, controller: EpubAnnotationController) {
+    val context = LocalContext.current
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        AppIconButton(onClick = { controller.editNote(highlight.id) }) {
+            Icon(
+                imageVector = AppIcons.Edit,
+                contentDescription = if (highlight.note == null) EpubAnnotationCopy.AddNote else EpubAnnotationCopy.EditNote,
+            )
+        }
+        AppIconButton(
+            onClick = {
+                context.copyToClipboard(highlight.text)
+                controller.closeCard()
+            },
+        ) {
+            Icon(imageVector = AppIcons.ContentCopy, contentDescription = EpubAnnotationCopy.Copy)
+        }
+        AppIconButton(onClick = { controller.delete(highlight) }) {
+            Icon(imageVector = AppIcons.Delete, contentDescription = EpubAnnotationCopy.Delete)
         }
     }
 }

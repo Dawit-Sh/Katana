@@ -49,6 +49,9 @@ internal class EpubAnnotationController(
     var card by mutableStateOf<EpubHighlightCardState?>(null)
         private set
 
+    /** Markdown of this book's marks, or of every book's. */
+    val exports = EpubAnnotationExports(store = store, book = book, toasts = toasts)
+
     /** The highlight whose note is being written, if any. */
     var editingNoteOf by mutableStateOf<String?>(null)
         private set
@@ -59,7 +62,7 @@ internal class EpubAnnotationController(
         scope.launch {
             val made = store.addHighlight(
                 book = book,
-                place = selection.locator.toAnnotationPlace(),
+                place = selection.locator.toAnnotationPlace(chapterTitleOf),
                 text = text,
                 look = store.lastLook(),
             )
@@ -73,10 +76,10 @@ internal class EpubAnnotationController(
             before = selection.locator.text.before.orEmpty(),
             after = selection.locator.text.after.orEmpty(),
         )
-        val word = read.text.trim().trim(*WordEdgePunctuation)
+        val word = read.text.trim().trim { it in WordEdgePunctuation }
         if (word.isEmpty()) return
         scope.launch {
-            store.saveWord(book = book, word = word, sentence = read.sentence, place = selection.locator.toAnnotationPlace())
+            store.saveWord(book = book, word = word, sentence = read.sentence, place = selection.locator.toAnnotationPlace(chapterTitleOf))
             toasts()?.show(AppToastMessage(text = EpubAnnotationCopy.wordSaved(word), icon = AppToastIcon.Added))
         }
     }
@@ -89,12 +92,9 @@ internal class EpubAnnotationController(
         card = null
     }
 
-    fun setStyle(highlightId: String, style: HighlightStyle) {
-        scope.launch { store.updateHighlight(highlightId, style = style) }
-    }
-
-    fun setColor(highlightId: String, color: HighlightColor) {
-        scope.launch { store.updateHighlight(highlightId, color = color) }
+    /** A new style or colour for a highlight; null keeps that part. */
+    fun restyle(highlightId: String, style: HighlightStyle? = null, color: HighlightColor? = null) {
+        scope.launch { store.updateHighlight(highlightId, style = style, color = color) }
     }
 
     fun editNote(highlightId: String) {
@@ -126,6 +126,30 @@ internal class EpubAnnotationController(
         }
     }
 
+
+    private companion object {
+        /** Kept off a saved word's ends: a selection often takes the comma or the quote mark after it. */
+        val WordEdgePunctuation = charArrayOf(
+            '.', ',', ';', ':', '!', '?', '"', '\'', '(', ')', '[', ']',
+            '“', '”', '‘', '’', '…', '—', '–',
+        )
+    }
+}
+
+private fun Locator.toAnnotationPlace(chapterTitleOf: (Locator) -> String?): AnnotationPlace = AnnotationPlace(
+    href = href.toString(),
+    locatorJson = toJSON().toString(),
+    chapterTitle = chapterTitleOf(this),
+    progression = locations.totalProgression,
+)
+
+/** The Markdown exports the highlights panel saves: this book's, or every book's as one notebook. */
+@Stable
+internal class EpubAnnotationExports(
+    private val store: ReaderAnnotationStore,
+    private val book: AnnotatedBook,
+    private val toasts: () -> AppToastState?,
+) {
     /** This book's highlights and words as Markdown, with a file name for it. */
     suspend fun bookExport(): EpubMarkdownExport {
         val day = LocalDate.now()
@@ -158,20 +182,6 @@ internal class EpubAnnotationController(
         toasts()?.show(message)
     }
 
-    private fun Locator.toAnnotationPlace(): AnnotationPlace = AnnotationPlace(
-        href = href.toString(),
-        locatorJson = toJSON().toString(),
-        chapterTitle = chapterTitleOf(this),
-        progression = locations.totalProgression,
-    )
-
-    private companion object {
-        /** Kept off a saved word's ends: a selection often takes the comma or the quote mark after it. */
-        val WordEdgePunctuation = charArrayOf(
-            '.', ',', ';', ':', '!', '?', '"', '\'', '(', ')', '[', ']',
-            '“', '”', '‘', '’', '…', '—', '–',
-        )
-    }
 }
 
 @Composable

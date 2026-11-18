@@ -347,23 +347,13 @@ internal fun ReadiumEpubNavigatorHost(
                             activity.copyToClipboard(selection.text)
                         }
                     },
-                    canAnnotate = { latestAnnotations.value != null },
-                    onHighlight = {
-                        footnoteNavigationScope.withSelectionForAnnotation(curlHost.navigator) { selection, anchor ->
-                            latestAnnotations.value?.onHighlight?.invoke(selection, anchor, false)
-                        }
-                    },
-                    onNote = {
-                        footnoteNavigationScope.withSelectionForAnnotation(curlHost.navigator) { selection, anchor ->
-                            latestAnnotations.value?.onHighlight?.invoke(selection, anchor, true)
-                        }
-                    },
-                    onSaveWord = {
-                        footnoteNavigationScope.withSelectionForAnnotation(curlHost.navigator) { selection, _ ->
-                            latestAnnotations.value?.onSaveWord?.invoke(selection)
-                        }
-                    },
-                ),
+                ).apply {
+                    annotationActions = epubSelectionAnnotationActions(
+                        scope = footnoteNavigationScope,
+                        navigator = { curlHost.navigator },
+                        annotations = { latestAnnotations.value },
+                    )
+                },
                 onSameFileLink = { link ->
                     footnoteNavigationScope.launch { openAnchorLink(link, endnoteLink = null) }
                 },
@@ -375,9 +365,6 @@ internal fun ReadiumEpubNavigatorHost(
         ) as EpubNavigatorFragment
         navigatorFragment = fragment
         curlHost.navigator = fragment
-        highlightLayer.attach(fragment) { highlightId, anchor ->
-            latestAnnotations.value?.onHighlightActivated?.invoke(highlightId, anchor)
-        }
         fun turnByTap(target: PageCurlTarget, slide: () -> Unit) {
             if (!latestCurlEnabled.value) {
                 slide()
@@ -414,6 +401,10 @@ internal fun ReadiumEpubNavigatorHost(
         fragmentManager.beginTransaction()
             .replace(containerId, fragment, fragmentTag)
             .commitNowAllowingStateLoss()
+        // Only an attached navigator takes decorations (they live in its view model).
+        highlightLayer.attach(fragment) { highlightId, anchor ->
+            latestAnnotations.value?.onHighlightActivated?.invoke(highlightId, anchor)
+        }
 
         onDispose {
             pageTaps.handler = null

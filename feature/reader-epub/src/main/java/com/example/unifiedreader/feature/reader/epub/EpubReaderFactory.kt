@@ -17,8 +17,7 @@ fun epubReaderFactory(
     journalReadingSessionRecorder: JournalReadingSessionRecorder? = null,
     documentUriProvider: suspend (ReadableItem) -> Uri? = { null },
     displayPreferences: ReaderDisplayPreferences = ReaderDisplayPreferences(),
-    translation: TranslationService? = null,
-    annotations: ReaderAnnotationStore? = null,
+    extras: EpubReaderExtras = EpubReaderExtras(),
 ): ReaderScreenFactory = formatReaderFactory(
     FormatType.EPUB,
     chrome = ReaderChrome.Immersive,
@@ -31,7 +30,13 @@ fun epubReaderFactory(
             displayPreferences = displayPreferences,
             onBack = onBack,
             onCompletionRequested = navigationActions.onRequestCompletion,
-            translation = translation,
-            annotationStore = annotations,
+            translation = extras.translation,
+            annotationStore = extras.annotations,
         )
 }
+
+/** What the EPUB reader can add when the app has it: translation of a selection, and highlights and saved words. */
+data class EpubReaderExtras(
+    val translation: TranslationService? = null,
+    val annotations: ReaderAnnotationStore? = null,
+)

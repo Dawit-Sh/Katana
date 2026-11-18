@@ -1,5 +1,6 @@
 package com.example.unifiedreader.feature.reader.epub
 
+import android.graphics.Color
 import android.os.Parcel
 import android.os.Parcelable
 import androidx.annotation.ColorInt
@@ -47,13 +48,13 @@ internal data class EpubSquigglyStyle(@ColorInt override val tint: Int) : Decora
  * (BOXES), over the text, so it moves with the text when the size changes.
  */
 internal fun HtmlDecorationTemplates.withEpubHighlightStyles(): HtmlDecorationTemplates = copy().apply {
+    // Drawn on the box Readium places over each line, as its own underline is: a child inside it didn't show on the Fire.
     set(
         EpubStrikethroughStyle::class,
         HtmlDecorationTemplate(
             layout = HtmlDecorationTemplate.Layout.BOXES,
             width = HtmlDecorationTemplate.Width.WRAP,
-            element = { decoration -> lineElement(StrikeClass, decoration) },
-            stylesheet = StrikeStylesheet,
+            element = ::strikeElement,
         ),
     )
     set(
@@ -61,8 +62,7 @@ internal fun HtmlDecorationTemplates.withEpubHighlightStyles(): HtmlDecorationTe
         HtmlDecorationTemplate(
             layout = HtmlDecorationTemplate.Layout.BOXES,
             width = HtmlDecorationTemplate.Width.WRAP,
-            element = { decoration -> lineElement(SquiggleClass, decoration) },
-            stylesheet = SquiggleStylesheet,
+            element = ::squiggleElement,
         ),
     )
 }
@@ -84,48 +84,26 @@ internal fun ReaderHighlight.toEpubDecoration(): Decoration? {
     return Decoration(id = id, locator = locator, style = decorationStyle)
 }
 
-private fun lineElement(className: String, decoration: Decoration): String {
-    val tint = (decoration.style as? Decoration.Style.Tinted)?.tint ?: 0
-    return "<div><div class=\"$className\" style=\"background-color: ${tint.toCssRgb()}\"></div></div>"
+/** A band of [Decoration.Style.Tinted.tint] through the middle of the line's box. */
+private fun strikeElement(decoration: Decoration): String {
+    val rgb = decoration.tintRgb()
+    return "<div style=\"background: linear-gradient(to bottom, transparent calc(50% - 1px), $rgb calc(50% - 1px), " +
+        "$rgb calc(50% + 1px), transparent calc(50% + 1px));\"></div>"
 }
 
-private fun Int.toCssRgb(): String = "rgb(${(this shr 16) and 0xFF}, ${(this shr 8) and 0xFF}, ${this and 0xFF})"
-
-private const val StrikeClass = "ysy-strike"
-private const val SquiggleClass = "ysy-squiggle"
-
-private const val StrikeStylesheet = """
-.$StrikeClass {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 50%;
-    height: 2px;
-    margin-top: -1px;
-    border-radius: 1px;
+/** A wavy line of the tint along the bottom of the line's box, an SVG wave repeated across it. */
+private fun squiggleElement(decoration: Decoration): String {
+    val wave = Base64.getEncoder().encodeToString(
+        (
+            "<svg xmlns='http://www.w3.org/2000/svg' width='8' height='4' viewBox='0 0 8 4'>" +
+                "<path d='M0 3 Q2 0 4 3 T8 3' fill='none' stroke='${decoration.tintRgb()}' stroke-width='1.4'/></svg>"
+            ).toByteArray(),
+    )
+    return "<div style=\"background-image: url('data:image/svg+xml;base64,$wave'); background-repeat: repeat-x; " +
+        "background-position: left bottom; background-size: 8px 4px;\"></div>"
 }
-"""
 
-/** One wave of the squiggle, repeated along the line; the colour shows through it as a mask. */
-private val SquiggleWave: String = Base64.getEncoder().encodeToString(
-    (
-        "<svg xmlns='http://www.w3.org/2000/svg' width='8' height='4' viewBox='0 0 8 4'>" +
-            "<path d='M0 3 Q2 0 4 3 T8 3' fill='none' stroke='black' stroke-width='1.4'/></svg>"
-        ).toByteArray(),
-)
-
-private val SquiggleStylesheet = """
-.$SquiggleClass {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -3px;
-    height: 4px;
-    -webkit-mask-image: url("data:image/svg+xml;base64,$SquiggleWave");
-    -webkit-mask-repeat: repeat-x;
-    -webkit-mask-size: 8px 4px;
-    mask-image: url("data:image/svg+xml;base64,$SquiggleWave");
-    mask-repeat: repeat-x;
-    mask-size: 8px 4px;
+private fun Decoration.tintRgb(): String {
+    val tint = (style as? Decoration.Style.Tinted)?.tint ?: 0
+    return "rgb(${Color.red(tint)}, ${Color.green(tint)}, ${Color.blue(tint)})"
 }
-"""

@@ -70,23 +70,6 @@ internal fun EpubAnnotationsPanel(
     onDismissRequest: () -> Unit,
     onJump: (Locator) -> Unit,
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var pending by remember { mutableStateOf<EpubMarkdownExport?>(null) }
-    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(MarkdownMime)) { uri ->
-        val export = pending
-        pending = null
-        if (uri == null || export == null) return@rememberLauncherForActivityResult
-        scope.launch { controller.exported(context.writeText(uri, export.text)) }
-    }
-    fun startExport(make: suspend () -> EpubMarkdownExport) {
-        scope.launch {
-            val export = make()
-            pending = export
-            saveLauncher.launch(export.fileName)
-        }
-    }
-
     ReaderPanel(
         visible = isOpen,
         placement = AppFloatingPanelPlacement.End,
@@ -99,53 +82,87 @@ internal fun EpubAnnotationsPanel(
             subtitle = EpubAnnotationCopy.count(highlights.size, words.size),
             onClose = onDismissRequest,
         )
-        LazyColumn(
+        AnnotationsList(
+            highlights = highlights,
+            words = words,
+            onHighlightClick = { highlight ->
+                highlight.locatorOrNull()?.let(onJump)
+                onDismissRequest()
+            },
+            onDeleteWord = { word -> controller.deleteWord(word.id) },
             modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = AppLayout.menuInset, vertical = AppLayout.headingGap),
-            verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
-        ) {
-            if (highlights.isEmpty() && words.isEmpty()) {
-                item {
-                    Text(
-                        text = EpubAnnotationCopy.Empty,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            if (highlights.isNotEmpty()) {
-                item { PanelSectionTitle(EpubAnnotationCopy.HighlightsSection) }
-                items(highlights, key = { "h-${it.id}" }) { highlight ->
-                    HighlightRow(
-                        highlight = highlight,
-                        onClick = {
-                            highlight.locatorOrNull()?.let(onJump)
-                            onDismissRequest()
-                        },
-                    )
-                }
-            }
-            if (words.isNotEmpty()) {
-                item { PanelSectionTitle(EpubAnnotationCopy.WordsSection) }
-                items(words, key = { "w-${it.id}" }) { word ->
-                    WordRow(
-                        word = word,
-                        onLookUp = { context.lookUp(word.word) },
-                        onDelete = { controller.deleteWord(word.id) },
-                    )
-                }
+        )
+        ExportFooter(exports = controller.exports)
+    }
+}
+
+/** The book's highlights in reading order, then its saved words. */
+@Composable
+private fun AnnotationsList(
+    highlights: List<ReaderHighlight>,
+    words: List<SavedWord>,
+    onHighlightClick: (ReaderHighlight) -> Unit,
+    onDeleteWord: (SavedWord) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(horizontal = AppLayout.menuInset, vertical = AppLayout.headingGap),
+        verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
+    ) {
+        if (highlights.isEmpty() && words.isEmpty()) {
+            item {
+                Text(
+                    text = EpubAnnotationCopy.Empty,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
-        Column(modifier = Modifier.fillMaxWidth().padding(AppLayout.menuInset)) {
-            Text(
-                text = EpubAnnotationCopy.Export,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap)) {
-                AppTextButton(onClick = { startExport(controller::bookExport) }) { Text(EpubAnnotationCopy.ExportBook) }
-                AppTextButton(onClick = { startExport(controller::libraryExport) }) { Text(EpubAnnotationCopy.ExportAll) }
+        if (highlights.isNotEmpty()) {
+            item { PanelSectionTitle(EpubAnnotationCopy.HighlightsSection) }
+            items(highlights, key = { "h-${it.id}" }) { highlight ->
+                HighlightRow(highlight = highlight, onClick = { onHighlightClick(highlight) })
             }
+        }
+        if (words.isNotEmpty()) {
+            item { PanelSectionTitle(EpubAnnotationCopy.WordsSection) }
+            items(words, key = { "w-${it.id}" }) { word ->
+                WordRow(word = word, onLookUp = { context.lookUp(word.word) }, onDelete = { onDeleteWord(word) })
+            }
+        }
+    }
+}
+
+/** Export: this book or every book, as Markdown, saved where the reader picks. */
+@Composable
+private fun ExportFooter(exports: EpubAnnotationExports) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var pending by remember { mutableStateOf<EpubMarkdownExport?>(null) }
+    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(MarkdownMime)) { uri ->
+        val export = pending
+        pending = null
+        if (uri == null || export == null) return@rememberLauncherForActivityResult
+        scope.launch { exports.exported(context.writeText(uri, export.text)) }
+    }
+    fun startExport(make: suspend () -> EpubMarkdownExport) {
+        scope.launch {
+            val export = make()
+            pending = export
+            saveLauncher.launch(export.fileName)
+        }
+    }
+    Column(modifier = Modifier.fillMaxWidth().padding(AppLayout.menuInset)) {
+        Text(
+            text = EpubAnnotationCopy.Export,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap)) {
+            AppTextButton(onClick = { startExport(exports::bookExport) }) { Text(EpubAnnotationCopy.ExportBook) }
+            AppTextButton(onClick = { startExport(exports::libraryExport) }) { Text(EpubAnnotationCopy.ExportAll) }
         }
     }
 }

@@ -21,7 +21,8 @@ import kotlinx.coroutines.flow.map
 data class TranslationPreferences(
     val targetLanguage: String? = null,
     val otherLanguage: String? = null,
-    val openOnSelect: Boolean = true,
+    // Off by default in yabaiSY: the selection toolbar holds Highlight, Note and Add to dictionary now.
+    val openOnSelect: Boolean = false,
     val provider: TranslationProvider = TranslationProvider.Device,
 )
 
@@ -54,7 +55,7 @@ internal class DataStoreTranslationPreferencesStore(context: Context) : Translat
     private fun read(values: Preferences) = TranslationPreferences(
         targetLanguage = values[TargetKey],
         otherLanguage = values[OtherKey],
-        openOnSelect = values[OpenOnSelectKey] ?: true,
+        openOnSelect = values[OpenOnSelectKey] ?: false,
         provider = TranslationProvider.entries.firstOrNull { it.name == values[ProviderKey] } ?: TranslationProvider.Device,
     )
 

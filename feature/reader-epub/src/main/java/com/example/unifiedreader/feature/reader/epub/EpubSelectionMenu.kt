@@ -75,20 +75,19 @@ internal class EpubSelectionActionModeCallback(
     private val onCopy: () -> Unit,
     private val onSelectionChanged: () -> Unit,
     private val onSelectionCleared: () -> Unit,
-    private val canAnnotate: () -> Boolean = { false },
-    private val onHighlight: () -> Unit = {},
-    private val onNote: () -> Unit = {},
-    private val onSaveWord: () -> Unit = {},
 ) : ActionMode.Callback {
+    /** Highlight, Note and Add to dictionary; null leaves them out of the toolbar. */
+    var annotationActions: EpubSelectionAnnotationActions? = null
+
     override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
         delegate.onCreateActionMode(mode, menu)
-        if (canAnnotate()) {
-            menu.add(Menu.NONE, HighlightItemId, 0, EpubAnnotationCopy.Highlight)
-            menu.add(Menu.NONE, NoteItemId, 1, EpubAnnotationCopy.Note)
-            menu.add(Menu.NONE, SaveWordItemId, 2, EpubAnnotationCopy.AddToDictionary)
+        if (annotationActions?.isAvailable?.invoke() == true) {
+            menu.add(Menu.NONE, HighlightItemId, HighlightOrder, EpubAnnotationCopy.Highlight)
+            menu.add(Menu.NONE, NoteItemId, NoteOrder, EpubAnnotationCopy.Note)
+            menu.add(Menu.NONE, SaveWordItemId, SaveWordOrder, EpubAnnotationCopy.AddToDictionary)
         }
-        if (canTranslate()) menu.add(Menu.NONE, TranslateItemId, 3, TranslateLabel)
-        menu.add(Menu.NONE, CopyItemId, 4, android.R.string.copy)
+        if (canTranslate()) menu.add(Menu.NONE, TranslateItemId, TranslateOrder, TranslateLabel)
+        menu.add(Menu.NONE, CopyItemId, CopyOrder, android.R.string.copy)
         onSelectionChanged()
         return true
     }
@@ -100,9 +99,9 @@ internal class EpubSelectionActionModeCallback(
 
     override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
         when (item.itemId) {
-            HighlightItemId -> onHighlight()
-            NoteItemId -> onNote()
-            SaveWordItemId -> onSaveWord()
+            HighlightItemId -> annotationActions?.onHighlight?.invoke()
+            NoteItemId -> annotationActions?.onNote?.invoke()
+            SaveWordItemId -> annotationActions?.onSaveWord?.invoke()
             TranslateItemId -> onTranslate()
             CopyItemId -> onCopy()
             else -> return delegate.onActionItemClicked(mode, item)
@@ -123,8 +122,21 @@ internal class EpubSelectionActionModeCallback(
         const val NoteItemId = 0x7EAD04
         const val SaveWordItemId = 0x7EAD05
         const val TranslateLabel = "Translate"
+        const val HighlightOrder = 0
+        const val NoteOrder = 1
+        const val SaveWordOrder = 2
+        const val TranslateOrder = 3
+        const val CopyOrder = 4
     }
 }
+
+/** The selection toolbar's annotation items: shown while [isAvailable] says the book can keep them. */
+internal class EpubSelectionAnnotationActions(
+    val isAvailable: () -> Boolean,
+    val onHighlight: () -> Unit,
+    val onNote: () -> Unit,
+    val onSaveWord: () -> Unit,
+)
 
 /**
  * Turns the toolbar's signals into the translation card's: Translate opens it, a changed

@@ -58,6 +58,7 @@ import com.example.unifiedreader.feature.reader.preferences.DataStoreComicReadin
 import com.example.unifiedreader.feature.reader.core.ReaderScreenFactory
 import com.example.unifiedreader.feature.reader.core.ReaderSessionStore
 import com.example.unifiedreader.feature.reader.core.ReaderWorkCoordinator
+import com.example.unifiedreader.feature.reader.epub.EpubReaderExtras
 import com.example.unifiedreader.feature.reader.epub.epubReaderFactory
 import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
 import com.example.unifiedreader.feature.translation.TranslationService
@@ -861,8 +862,7 @@ object AppModule {
                     ?: remoteDocumentReadCache.documentUriForReading(item)
             },
             displayPreferences = readerDisplay,
-            translation = translationService,
-            annotations = annotationStore,
+            extras = EpubReaderExtras(translation = translationService, annotations = annotationStore),
         ),
         pdfReaderFactory(
             sessionStore = JournalRecordingReaderSessionStore(

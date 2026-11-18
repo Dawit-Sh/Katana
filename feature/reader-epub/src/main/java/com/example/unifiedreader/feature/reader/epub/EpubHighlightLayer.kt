@@ -36,8 +36,9 @@ internal class EpubHighlightLayer(private val scope: CoroutineScope) {
 
     private val listener = object : DecorableNavigator.Listener {
         override fun onDecorationActivated(event: DecorableNavigator.OnActivatedEvent): Boolean {
-            val activated = onActivated ?: return false
-            val fragment = navigator ?: return false
+            val activated = onActivated
+            val fragment = navigator
+            if (activated == null || fragment == null) return false
             val origin = IntArray(2).also { fragment.view?.getLocationInWindow(it) }
             val anchor = event.rect?.let { rect ->
                 Rect(rect.left + origin[0], rect.top + origin[1], rect.right + origin[0], rect.bottom + origin[1])
@@ -98,3 +99,27 @@ internal fun CoroutineScope.withSelectionForAnnotation(
         block(selection, anchor)
     }
 }
+
+/** The toolbar's Highlight, Note and Add to dictionary, reading the selection when tapped. */
+internal fun epubSelectionAnnotationActions(
+    scope: CoroutineScope,
+    navigator: () -> EpubNavigatorFragment?,
+    annotations: () -> EpubSelectionAnnotations?,
+): EpubSelectionAnnotationActions = EpubSelectionAnnotationActions(
+    isAvailable = { annotations() != null },
+    onHighlight = {
+        scope.withSelectionForAnnotation(navigator()) { selection, anchor ->
+            annotations()?.onHighlight?.invoke(selection, anchor, false)
+        }
+    },
+    onNote = {
+        scope.withSelectionForAnnotation(navigator()) { selection, anchor ->
+            annotations()?.onHighlight?.invoke(selection, anchor, true)
+        }
+    },
+    onSaveWord = {
+        scope.withSelectionForAnnotation(navigator()) { selection, _ ->
+            annotations()?.onSaveWord?.invoke(selection)
+        }
+    },
+)
