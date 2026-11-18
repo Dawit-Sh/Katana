@@ -8,6 +8,7 @@ import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.ReadableItemKind
 import com.example.unifiedreader.core.model.SourceType
+import com.example.unifiedreader.core.model.isComicReaderFormat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -237,12 +238,8 @@ private fun List<String>.toJsonArray(): JSONArray = JSONArray().also { array ->
 private inline fun <reified T : Enum<T>> String.enumValueOrNull(): T? =
     runCatching { enumValueOf<T>(this) }.getOrNull()
 
-private fun FormatType.defaultReadableItemKind(): ReadableItemKind = when (this) {
-    FormatType.CBZ,
-    FormatType.CBR -> ReadableItemKind.COMIC
-    FormatType.PDF,
-    FormatType.EPUB -> ReadableItemKind.BOOK
-}
+private fun FormatType.defaultReadableItemKind(): ReadableItemKind =
+    if (isComicReaderFormat()) ReadableItemKind.COMIC else ReadableItemKind.BOOK
 
 private const val APP_ACTIVE_ROUTE_PREFERENCES_NAME = "unified_reader_active_route"
 private const val KEY_HAS_SNAPSHOT = "has_snapshot"

@@ -12,8 +12,19 @@ fun formatReaderFactory(
         onBack: () -> Unit,
         navigationActions: ReaderNavigationActions,
     ) -> Unit,
+): ReaderScreenFactory = formatReaderFactory(formats = formats.toSet(), chrome = chrome, content = content)
+
+/** A reader for every format in [formats]. */
+fun formatReaderFactory(
+    formats: Set<FormatType>,
+    chrome: ReaderChrome,
+    content: @Composable (
+        item: ReadableItem,
+        onBack: () -> Unit,
+        navigationActions: ReaderNavigationActions,
+    ) -> Unit,
 ): ReaderScreenFactory {
-    val supportedFormats = formats.toSet()
+    val supportedFormats = formats
     return object : ReaderScreenFactory {
         override fun supports(item: ReadableItem): Boolean = item.format in supportedFormats
 

@@ -42,7 +42,16 @@ internal class LocalCoverCache(
                 FormatType.CBZ,
                 FormatType.CBR -> cacheComicCover(record, forceRefresh)
                 FormatType.EPUB -> cacheEpubCover(record, forceRefresh)
-                FormatType.PDF -> null
+                FormatType.MOBI,
+                FormatType.AZW,
+                FormatType.AZW3,
+                // The book's own cover, as its metadata names it.
+                FormatType.FB2 -> existingCoverFileName.takeUnless { forceRefresh }
+                    ?: readConvertedBookMetadata(context, Uri.parse(record.uri))?.cover?.let { cover ->
+                        cacheCoverBytes(record.id, coverExtension(cover.mediaType), cover.bytes)
+                    }
+                FormatType.PDF,
+                FormatType.DJVU -> null
             }
         }.getOrNull() ?: existingCoverFileName
         return record.copy(

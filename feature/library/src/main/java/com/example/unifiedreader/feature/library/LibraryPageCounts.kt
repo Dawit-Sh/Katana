@@ -1,11 +1,11 @@
 package com.example.unifiedreader.feature.library
 
-import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.core.model.isKavitaSeriesContainer
 import com.example.unifiedreader.core.model.isStumpSeriesContainer
 import com.example.unifiedreader.core.model.libraryPageCount
+import com.example.unifiedreader.core.model.opensInEpubReader
 
 /**
  * An item's length in pages, as the book page shows it and the Pages filter reads it: what the
@@ -16,7 +16,7 @@ internal fun libraryItemPageCount(
     item: ReadableItem,
     progress: ItemProgressSummary?,
 ): Int? = item.libraryPageCount()
-    ?: progress?.pageCount?.takeIf { count -> count > 0 && item.format != FormatType.EPUB }
+    ?: progress?.pageCount?.takeIf { count -> count > 0 && !item.format.opensInEpubReader() }
 
 /**
  * Each grid item's length for the Pages filter, the Pages sort and the tile's caption: a series

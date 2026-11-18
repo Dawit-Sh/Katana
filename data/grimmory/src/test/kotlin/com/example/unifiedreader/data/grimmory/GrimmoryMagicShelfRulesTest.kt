@@ -192,7 +192,7 @@ class GrimmoryMagicShelfRulesTest {
                     """{"field":"tags","operator":"includes_any","value":["Russia"]}]}]}""",
             ),
             "won't read" to shelf("""{"field":"readStatus","operator":"includes_any","value":["READING","WONT_READ"]}"""),
-            "an unknown file type" to shelf("""{"field":"fileType","operator":"includes_any","value":["mobi"]}"""),
+            "an unknown file type" to shelf("""{"field":"fileType","operator":"includes_any","value":["m4b"]}"""),
             "an unknown shelf" to shelf("""{"field":"shelf","operator":"includes_any","value":[99]}"""),
             "a date that isn't a year's edge" to shelf("""{"field":"publishedDate","operator":"less_than","value":"2020-06-15"}"""),
             "this period" to shelf("""{"field":"addedOn","operator":"this_period","value":"month"}"""),

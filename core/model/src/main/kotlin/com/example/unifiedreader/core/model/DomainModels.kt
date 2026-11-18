@@ -12,6 +12,21 @@ enum class FormatType {
     CBR,
     PDF,
     EPUB,
+
+    /** Mobipocket (MOBI 6, or a MOBI holding a KF8 book too). Read as an EPUB Katana makes from it. */
+    MOBI,
+
+    /** Kindle's AZW: MOBI 6 or KF8 inside. Read as an EPUB Katana makes from it. */
+    AZW,
+
+    /** Kindle's KF8. Read as an EPUB Katana makes from it. */
+    AZW3,
+
+    /** FictionBook 2 (plain or zipped). Read as an EPUB Katana makes from it. */
+    FB2,
+
+    /** DjVu scans, read page by page like a PDF. */
+    DJVU,
 }
 
 enum class ReadableItemKind {
@@ -109,12 +124,8 @@ fun ReadableItem.libraryDisplayLabel(): String = when (kind) {
     ).distinct().joinToString(": ").ifBlank { title }
 }
 
-private fun FormatType.defaultReadableItemKind(): ReadableItemKind = when (this) {
-    FormatType.CBZ,
-    FormatType.CBR -> ReadableItemKind.COMIC
-    FormatType.EPUB,
-    FormatType.PDF -> ReadableItemKind.BOOK
-}
+private fun FormatType.defaultReadableItemKind(): ReadableItemKind =
+    if (isComicReaderFormat()) ReadableItemKind.COMIC else ReadableItemKind.BOOK
 
 fun SourceType.remoteLibraryId(
     remoteId: String,

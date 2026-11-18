@@ -45,6 +45,14 @@ sealed interface ReaderOpenFailure {
 
     data object PdfUnreadable : ReaderOpenFailure
 
+    data object DjvuUnreadable : ReaderOpenFailure
+
+    /** A Kindle book locked to its owner's Kindle (DRM). */
+    data object DrmLocked : ReaderOpenFailure
+
+    /** A newer Kindle format (KFX, Topaz) Katana can't convert. */
+    data object KindleFormatUnsupported : ReaderOpenFailure
+
     data class Unsupported(val format: FormatType) : ReaderOpenFailure
 
     data object Unknown : ReaderOpenFailure
@@ -123,7 +131,10 @@ fun ReaderOpenFailure.reason(): String = when (this) {
     ReaderOpenFailure.NoComicPages -> "This archive has no pages Katana can show."
     ReaderOpenFailure.NoPdfPages -> "This PDF has no pages."
     ReaderOpenFailure.PdfUnreadable -> "This PDF is damaged or locked with a password."
-    is ReaderOpenFailure.Unsupported -> "It reads EPUB, PDF, CBZ and CBR."
+    ReaderOpenFailure.DjvuUnreadable -> "This DjVu file is damaged."
+    ReaderOpenFailure.DrmLocked -> "This Kindle book is locked to its owner’s Kindle (DRM), so Katana can’t open it."
+    ReaderOpenFailure.KindleFormatUnsupported -> "This is a newer Kindle format (KFX or Topaz) that Katana can’t read."
+    is ReaderOpenFailure.Unsupported -> "It reads EPUB, MOBI, AZW, AZW3, FB2, PDF, DjVu, CBZ and CBR."
     ReaderOpenFailure.Unknown -> "Something went wrong while opening it."
 }
 
@@ -143,7 +154,8 @@ fun readerErrorActions(
         failure == ReaderOpenFailure.NotReadable ||
         failure == ReaderOpenFailure.NoComicPages ||
         failure == ReaderOpenFailure.NoPdfPages ||
-        failure == ReaderOpenFailure.PdfUnreadable
+        failure == ReaderOpenFailure.PdfUnreadable ||
+        failure == ReaderOpenFailure.DjvuUnreadable
     if (canDownloadAgain && downloadFixes) return listOf(ReaderErrorAction.DownloadAgain)
     val retryHelps = when (failure) {
         is ReaderOpenFailure.ServerUnreachable,

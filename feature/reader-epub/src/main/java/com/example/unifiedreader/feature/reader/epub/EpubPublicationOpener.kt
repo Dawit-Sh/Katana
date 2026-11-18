@@ -2,6 +2,7 @@ package com.example.unifiedreader.feature.reader.epub
 
 import android.content.Context
 import android.net.Uri
+import com.example.unifiedreader.core.ebookconvert.EbookConversionException
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.feature.reader.core.ReaderOpenFailure
 import com.example.unifiedreader.feature.reader.core.readerOpenFailureOf
@@ -28,8 +29,9 @@ internal sealed interface EpubPublicationState {
 }
 
 /**
- * Copies [documentUri] to the reader's own file and opens it with Readium. A file that can't be
- * copied is gone; one Readium can't open isn't a book it can read.
+ * Copies [documentUri] to the reader's own file (converting a MOBI, AZW, AZW3 or FB2 book to EPUB
+ * first) and opens it with Readium. A file that can't be copied is gone; one that can't be
+ * converted, or that Readium can't open, isn't a book it can read.
  */
 internal suspend fun openEpubPublication(
     context: Context,
@@ -40,6 +42,8 @@ internal suspend fun openEpubPublication(
         prepareImportedEpubFile(context = context, item = item, documentUri = documentUri)
     } catch (error: CancellationException) {
         throw error
+    } catch (error: EbookConversionException) {
+        return EpubPublicationState.Error(error.toReaderOpenFailure())
     } catch (error: Throwable) {
         return EpubPublicationState.Error(readerOpenFailureOf(error, item))
     }

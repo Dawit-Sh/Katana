@@ -84,6 +84,23 @@ class GrimmoryEpubProgressUploadTest {
         assertEquals(0.55, update.percent, 0.0001)
     }
 
+    @Test
+    fun `sends only how far through a MOBI book is, never the place in the EPUB made from it`() {
+        val mobi = item.copy(format = FormatType.AZW3, remoteFileType = "AZW3")
+        val update = checkNotNull(
+            epubSnapshot(
+                """{"href":"part0003.xhtml","type":"application/xhtml+xml",""" +
+                    """"locations":{"fragments":["epubcfi(/6/8!/4/2/10)"],"progression":0.5,"totalProgression":0.39}}""",
+            ).toGrimmoryProgressUpdate(mobi),
+        )
+
+        assertNull(update.positionData)
+        assertNull(update.positionHref)
+        assertNull(update.contentSourceProgressPercent)
+        assertEquals("AZW3", update.bookType)
+        assertEquals(0.39, update.percent, 0.0001)
+    }
+
     private fun epubSnapshot(
         cfi: String,
     ): ReaderProgressSnapshot = ReaderProgressSnapshot(

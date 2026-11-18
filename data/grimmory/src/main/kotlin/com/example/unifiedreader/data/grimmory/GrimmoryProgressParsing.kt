@@ -62,6 +62,23 @@ private fun GrimmoryBookDto.placeIn(
                 updatedAtEpochMillis = updatedAtEpochMillis,
             )
         }
+        // Grimmory keeps MOBI, AZW3 and FB2 places with the EPUB ones, but its positions point into
+        // the original file, not the EPUB Katana reads: only how far through counts.
+        FormatType.MOBI,
+        FormatType.AZW,
+        FormatType.AZW3,
+        FormatType.FB2 -> epubProgress?.percentage.toLocalProgressPercent()
+            ?.takeIf { percent -> percent > 0.0 }
+            ?.let { percent ->
+                ReadingProgress(
+                    itemId = item.id,
+                    locatorType = LocatorType.PERCENT,
+                    percent = percent,
+                    updatedAtEpochMillis = updatedAtEpochMillis,
+                )
+            }
+        // Grimmory doesn't hold DjVu books.
+        FormatType.DJVU -> null
     }
 }
 

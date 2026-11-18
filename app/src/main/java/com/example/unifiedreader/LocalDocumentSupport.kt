@@ -7,6 +7,7 @@ import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.core.model.isComicReaderFormat
+import com.example.unifiedreader.core.model.AppReadableFormats
 import kotlinx.coroutines.flow.StateFlow
 import org.json.JSONArray
 
@@ -153,12 +154,7 @@ internal fun entityToRecord(
     )
 }
 
-internal fun LocalDocumentRecord.isSupportedLocalFormat(): Boolean = when (format) {
-    FormatType.CBZ,
-    FormatType.CBR,
-    FormatType.EPUB,
-    FormatType.PDF -> true
-}
+internal fun LocalDocumentRecord.isSupportedLocalFormat(): Boolean = format in AppReadableFormats
 
 internal object NaturalPageOrderComparator : Comparator<String> {
     override fun compare(left: String, right: String): Int {
@@ -247,7 +243,12 @@ internal fun FormatType.localImportFormatSpec(): LocalImportFormatSpec = when (t
     FormatType.CBZ,
     FormatType.CBR -> comicLocalImportFormatSpec
     FormatType.EPUB -> epubLocalImportFormatSpec
-    FormatType.PDF -> pdfLocalImportFormatSpec
+    FormatType.PDF,
+    FormatType.DJVU -> pdfLocalImportFormatSpec
+    FormatType.MOBI,
+    FormatType.AZW,
+    FormatType.AZW3,
+    FormatType.FB2 -> epubLocalImportFormatSpec
 }
 
 internal fun FormatType.localImportTitleFallback(
@@ -257,6 +258,14 @@ internal fun FormatType.localImportTitleFallback(
     FormatType.CBR -> displayName.comicArchiveTitle()
     FormatType.EPUB -> displayName.removeSuffixIgnoreCase(".epub")
     FormatType.PDF -> displayName.removeSuffixIgnoreCase(".pdf")
+    else -> displayName.bookFileTitle()
+}
+
+/** A book file's name without its extension (`.fb2.zip` as a whole). */
+internal fun String.bookFileTitle(): String = when {
+    endsWith(".fb2.zip", ignoreCase = true) -> dropLast(".fb2.zip".length)
+    contains('.') -> substringBeforeLast('.')
+    else -> this
 }
 
 internal fun isEpubDocument(

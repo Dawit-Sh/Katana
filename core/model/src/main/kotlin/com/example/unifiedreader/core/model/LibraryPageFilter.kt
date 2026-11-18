@@ -21,7 +21,7 @@ data class LibraryPageRange(
  * PDF's page count, an EPUB's printed pages (only Grimmory's metadata has them). Null when unknown.
  */
 fun ReadableItem.libraryPageCount(): Int? =
-    if (format == FormatType.EPUB) printedPageCount() else pageCount?.takeIf { count -> count > 0 }
+    if (format.opensInEpubReader()) printedPageCount() else pageCount?.takeIf { count -> count > 0 }
 
 /**
  * The page counts the Pages slider stops at, closer together where most books and issues are.

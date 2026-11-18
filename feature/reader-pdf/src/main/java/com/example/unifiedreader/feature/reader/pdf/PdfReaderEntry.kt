@@ -47,6 +47,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.LocatorType
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
@@ -124,7 +125,11 @@ fun PdfReaderScreen(
             ReaderDocumentState.Loading -> PdfDocumentInfoState.Loading
             is ReaderDocumentState.Failed -> PdfDocumentInfoState.Error(document.failure)
             is ReaderDocumentState.Ready -> withContext(Dispatchers.IO) {
-                inspectPdfDocument(context = context.applicationContext, item = item, documentUri = document.uri)
+                if (item.format == FormatType.DJVU) {
+                    inspectDjvuDocument(context = context.applicationContext, item = item, documentUri = document.uri)
+                } else {
+                    inspectPdfDocument(context = context.applicationContext, item = item, documentUri = document.uri)
+                }
             }
         }
     }
@@ -164,6 +169,7 @@ fun PdfReaderScreen(
         )
         initialRestoreCompleted = true
     }
+    val pageRenderer = remember(item.id, item.format) { pageImageRenderer(context.applicationContext, item) }
     val pageState by produceState<PdfPageRenderState>(
         initialValue = PdfPageRenderState.Loading,
         documentState.cacheKey,
@@ -176,14 +182,7 @@ fun PdfReaderScreen(
         val renderedState = when {
             uri == null -> PdfPageRenderState.Empty
             pageCount <= 0 -> PdfPageRenderState.Empty
-            else -> withContext(Dispatchers.IO) {
-                renderPdfPage(
-                    context = context.applicationContext,
-                    documentUri = uri,
-                    pageIndex = targetPageIndex,
-                    targetLongEdgePx = renderLongEdgePx,
-                )
-            }
+            else -> withContext(Dispatchers.IO) { pageRenderer(uri, targetPageIndex, renderLongEdgePx) }
         }
         val previousReadyPage = value as? PdfPageRenderState.Ready
         if (
@@ -193,6 +192,9 @@ fun PdfReaderScreen(
             return@produceState
         }
         value = renderedState
+    }
+    if (item.format == FormatType.DJVU) {
+        DisposableEffect(item.id) { onDispose(::releaseDjvuDocument) }
     }
     // The opening state stays until the first page is drawn.
     var firstPageShown by remember(item.id) { mutableStateOf(false) }
@@ -356,7 +358,7 @@ fun PdfReaderScreen(
                 PdfReaderChrome(
                     title = item.title,
                     author = item.bookMetadata?.primaryAuthor(),
-                    context = context.applicationContext,
+                    pageRenderer = pageRenderer,
                     documentState = documentState,
                     pageCount = pageCount,
                     currentPageIndex = safePageIndex,
@@ -707,11 +709,13 @@ private fun pdfOpenStatus(
 ): ReaderOpenStatus = when {
     info is PdfDocumentInfoState.Error -> ReaderOpenStatus.Failed(info.failure)
     firstPageShown -> ReaderOpenStatus.Open
-    page is PdfPageRenderState.Error -> ReaderOpenStatus.Failed(ReaderOpenFailure.PdfUnreadable)
+    page is PdfPageRenderState.Error -> ReaderOpenStatus.Failed(
+        if (item.format == FormatType.DJVU) ReaderOpenFailure.DjvuUnreadable else ReaderOpenFailure.PdfUnreadable,
+    )
     else -> ReaderOpenStatus.Opening(document.openingStep(item))
 }
 
-private sealed interface PdfDocumentInfoState {
+internal sealed interface PdfDocumentInfoState {
     data object Loading : PdfDocumentInfoState
     data class Ready(val pageCount: Int) : PdfDocumentInfoState
     data class Error(val failure: ReaderOpenFailure) : PdfDocumentInfoState

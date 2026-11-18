@@ -4,6 +4,7 @@ import android.net.Uri
 import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.LocatorType
 import com.example.unifiedreader.core.model.ReadableItem
+import com.example.unifiedreader.core.model.isConvertedToEpub
 import com.example.unifiedreader.data.grimmory.GrimmoryApi
 import com.example.unifiedreader.data.grimmory.GrimmoryProgressUpdate
 import com.example.unifiedreader.feature.reader.core.ReaderLocator
@@ -63,6 +64,7 @@ internal fun ReaderProgressSnapshot.toGrimmoryProgressUpdate(
     pageCount: Int? = item.pageCount,
 ): GrimmoryProgressUpdate? {
     val remoteItemId = item.remoteId ?: return null
+    if (item.format.isConvertedToEpub()) return toGrimmoryPercentOnlyUpdate(item, remoteItemId)
     val epubPosition = if (item.format == FormatType.EPUB) {
         toGrimmoryEpubPosition() ?: percent?.let { GrimmoryEpubPosition() } ?: return null
     } else {
@@ -85,6 +87,24 @@ internal fun ReaderProgressSnapshot.toGrimmoryProgressUpdate(
         positionHref = epubPosition?.href,
         percent = percent ?: pagePercent(pageCount) ?: 0.0,
         contentSourceProgressPercent = epubPosition?.chapterProgressPercent,
+        isFinished = isFinished,
+        updatedAtEpochMillis = updatedAtEpochMillis,
+    )
+}
+
+// A MOBI, AZW3 or FB2 place is a position in the EPUB Katana made from it, which Grimmory's web reader
+// (reading the original file) can't use: only how far through goes up.
+private fun ReaderProgressSnapshot.toGrimmoryPercentOnlyUpdate(
+    item: ReadableItem,
+    remoteItemId: String,
+): GrimmoryProgressUpdate? {
+    val percent = percent ?: if (isFinished) 1.0 else return null
+    return GrimmoryProgressUpdate(
+        bookId = remoteItemId,
+        bookFileId = item.remoteFileId,
+        bookType = item.remoteFileType ?: item.format.name,
+        positionData = null,
+        percent = percent,
         isFinished = isFinished,
         updatedAtEpochMillis = updatedAtEpochMillis,
     )

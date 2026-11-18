@@ -67,6 +67,7 @@ dependencies {
     implementation(project(":core:ui-theme"))
     implementation(project(":core:ui-components"))
     implementation(project(":core:model"))
+    implementation(project(":core:ebook-convert"))
     implementation(project(":core:network"))
     implementation(project(":core:database"))
     implementation(project(":data:kavita"))

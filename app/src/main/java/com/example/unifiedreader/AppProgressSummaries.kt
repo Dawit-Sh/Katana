@@ -1,7 +1,7 @@
 package com.example.unifiedreader
 
 import androidx.annotation.VisibleForTesting
-import com.example.unifiedreader.core.model.FormatType
+import com.example.unifiedreader.core.model.isComicReaderFormat
 import com.example.unifiedreader.core.model.LocatorType
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.feature.library.ItemProgressSummary
@@ -22,12 +22,8 @@ internal fun buildProgressSummaries(
     val sessionPageCount = sessionByItemId[item.id]?.pageCount?.takeIf { it > 0 }
     val summary = when (progress.locatorType) {
         LocatorType.PAGE -> {
-            val pageCount = sessionPageCount ?: item.pageCount ?: when (item.format) {
-                FormatType.CBZ,
-                FormatType.CBR -> localPageCountProvider(item)
-                FormatType.EPUB -> 0
-                FormatType.PDF -> 0
-            }
+            val pageCount = sessionPageCount ?: item.pageCount
+                ?: if (item.format.isComicReaderFormat()) localPageCountProvider(item) else 0
             val pageIndex = progress.page ?: if (progress.isFinished) {
                 (pageCount - 1).coerceAtLeast(0)
             } else {

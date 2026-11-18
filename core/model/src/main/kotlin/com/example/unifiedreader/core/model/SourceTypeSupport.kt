@@ -8,8 +8,8 @@ fun SourceType.displayName(): String = when (this) {
 }
 
 /**
- * An EPUB's printed page count, which Grimmory's book metadata gives. Kavita's page count for an
- * EPUB is its number of files and a local EPUB has none, so neither is a length in pages.
+ * An EPUB's (or MOBI's, FB2's...) printed page count, which Grimmory's book metadata gives. Kavita's
+ * page count for an EPUB is its number of files and a local EPUB has none, so neither is a length in pages.
  */
 fun ReadableItem.printedPageCount(): Int? = pageCount
-    ?.takeIf { count -> count > 0 && format == FormatType.EPUB && sourceType == SourceType.GRIMMORY }
+    ?.takeIf { count -> count > 0 && format.opensInEpubReader() && sourceType == SourceType.GRIMMORY }

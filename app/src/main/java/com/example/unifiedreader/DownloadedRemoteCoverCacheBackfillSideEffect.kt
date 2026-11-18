@@ -174,6 +174,12 @@ class DownloadedRemoteCoverCacheBackfiller @Inject constructor(
             FormatType.CBR -> comicCoverBytesFor(item, uri)
             FormatType.EPUB -> epubCoverBytesFor(uri)
             FormatType.PDF -> pdfCoverRenderer.coverBytes(uri)
+            // Their servers have their covers; these aren't backfilled from the file.
+            FormatType.MOBI,
+            FormatType.AZW,
+            FormatType.AZW3,
+            FormatType.FB2,
+            FormatType.DJVU -> null
         }
     }
 
