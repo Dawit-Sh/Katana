@@ -16,6 +16,8 @@ import com.example.unifiedreader.core.database.dao.ReaderSessionStateDao
 import com.example.unifiedreader.core.database.dao.RemoteCatalogDao
 import com.example.unifiedreader.core.database.dao.ListPreferenceDao
 import com.example.unifiedreader.core.database.dao.ReaderAnnotationDao
+import com.example.unifiedreader.core.database.dao.ReaderBookmarkDao
+import com.example.unifiedreader.core.database.dao.SavedWordStudyDao
 import com.example.unifiedreader.core.database.dao.ServerListDao
 import com.example.unifiedreader.core.database.dao.UserListDao
 import com.example.unifiedreader.core.database.entity.DownloadQueueEntryEntity
@@ -36,6 +38,7 @@ import com.example.unifiedreader.core.database.entity.ReaderSessionStateEntity
 import com.example.unifiedreader.core.database.entity.ReadingProgressEntity
 import com.example.unifiedreader.core.database.entity.ListPreferenceEntity
 import com.example.unifiedreader.core.database.entity.ListSettingEntity
+import com.example.unifiedreader.core.database.entity.ReaderBookmarkEntity
 import com.example.unifiedreader.core.database.entity.ReaderHighlightEntity
 import com.example.unifiedreader.core.database.entity.SavedWordEntity
 import com.example.unifiedreader.core.database.entity.ServerListEntity
@@ -71,8 +74,9 @@ import com.example.unifiedreader.core.database.entity.UserListEntryEntity
         ListSettingEntity::class,
         ReaderHighlightEntity::class,
         SavedWordEntity::class,
+        ReaderBookmarkEntity::class,
     ],
-    version = 38,
+    version = 39,
     exportSchema = true,
 )
 abstract class UnifiedReaderDatabase : RoomDatabase() {
@@ -88,6 +92,8 @@ abstract class UnifiedReaderDatabase : RoomDatabase() {
     abstract fun libraryTagChoiceDao(): LibraryTagChoiceDao
     abstract fun listPreferenceDao(): ListPreferenceDao
     abstract fun readerAnnotationDao(): ReaderAnnotationDao
+    abstract fun readerBookmarkDao(): ReaderBookmarkDao
+    abstract fun savedWordStudyDao(): SavedWordStudyDao
 }
 
 object UnifiedReaderDatabaseMigrations {
@@ -1027,4 +1033,5 @@ internal val allMigrations: Array<Migration> = arrayOf(
     MIGRATION_35_36,
     MIGRATION_36_37,
     MIGRATION_37_38,
+    MIGRATION_38_39,
 )
