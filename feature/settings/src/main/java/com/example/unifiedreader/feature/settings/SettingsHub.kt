@@ -135,6 +135,7 @@ internal fun SettingsHub(
                     selected = selectedPage == SettingsPage.Translation,
                     onClick = { onOpenPage(SettingsPage.Translation) },
                 )
+                ReaderComfortSettingsRows()
             }
         }
         AppSettingsGroup(label = "About") {

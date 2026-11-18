@@ -13,9 +13,10 @@ import com.example.unifiedreader.feature.reader.core.ReaderTopBar
 import com.example.unifiedreader.ui.components.AppIcons
 
 /**
- * The EPUB reader's bars and panels: the title over the chapter and author, Aa at the top end;
- * the contents button, the percentage, the slider with its chapter ticks and the page in the
- * dock. [panels] are the contents and settings panels, placed between the bars.
+ * The EPUB reader's bars and panels: the title over the chapter and author, Search, the highlights
+ * and Aa at the top end; the contents button, the percentage, the slider with its chapter ticks and
+ * the page in the dock, with [dockStrip] (a search's matches) over them. [panels] are the contents,
+ * search and settings panels, placed between the bars.
  */
 @Composable
 internal fun EpubReaderChrome(
@@ -38,13 +39,16 @@ internal fun EpubReaderChrome(
     isAnnotationsOpen: Boolean = false,
     // The highlights and saved words panel; null when the book can't keep highlights.
     onAnnotationsClick: (() -> Unit)? = null,
+    isSearchOpen: Boolean = false,
+    onSearchClick: (() -> Unit)? = null,
+    dockStrip: (@Composable () -> Unit)? = null,
     panels: @Composable BoxScope.(ReaderPanelSlot) -> Unit,
 ) {
     val chapterTitle = remember(tocEntries, currentHref, currentProgress) {
         tocEntries.currentEpubChapterTitle(currentProgress = currentProgress, currentHref = currentHref)
     }
     ReaderChromeFrame(
-        panelOpen = isTocOpen || isPreferencesOpen || isAnnotationsOpen,
+        panelOpen = isTocOpen || isPreferencesOpen || isAnnotationsOpen || isSearchOpen,
         onDismissPanel = onDismissPanels,
         modifier = modifier,
         topBar = {
@@ -53,6 +57,14 @@ internal fun EpubReaderChrome(
                 subtitle = epubReaderSubtitle(chapterTitle = chapterTitle, author = author, bookTitle = title),
                 onBack = onBack,
             ) {
+                onSearchClick?.let { onClick ->
+                    ReaderBarButton(
+                        icon = AppIcons.Search,
+                        contentDescription = EpubSearchCopy.Button,
+                        active = isSearchOpen,
+                        onClick = onClick,
+                    )
+                }
                 onAnnotationsClick?.let { onClick ->
                     ReaderBarButton(
                         icon = AppIcons.CollectionsBookmark,
@@ -70,7 +82,7 @@ internal fun EpubReaderChrome(
             }
         },
         dock = {
-            ReaderDock {
+            ReaderDock(strip = dockStrip) {
                 ReaderBarButton(
                     icon = AppIcons.Toc,
                     contentDescription = "Table of contents",
@@ -101,3 +113,12 @@ internal fun epubReaderSubtitle(
     chapterTitle?.trim()?.takeIf { it.isNotEmpty() && !it.equals(bookTitle?.trim(), ignoreCase = true) },
     author?.trim()?.takeIf(String::isNotEmpty),
 ).joinToString(" · ").ifEmpty { null }
+
+/** The panel open between the bars; one at a time. */
+internal enum class EpubReaderPanel {
+    Contents,
+    Settings,
+    Annotations,
+    Search,
+    Light,
+}

@@ -59,10 +59,14 @@ import com.example.unifiedreader.ui.theme.ApplyLaunchSplashTheme
 import com.example.unifiedreader.ui.theme.UnifiedReaderTheme
 import com.example.unifiedreader.ui.theme.applyAndroidThemeMode
 import com.example.unifiedreader.feature.translation.LocalTranslationService
+import com.example.unifiedreader.feature.settings.LocalReaderComfortPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 
 @Composable
-fun UnifiedReaderRoute() {
+fun UnifiedReaderRoute(
+    // The readers' shared settings, for Settings › Reading.
+    readerDisplay: AppReaderDisplayViewModel = hiltViewModel(),
+) {
     val viewModel: AppViewModel = hiltViewModel()
     val updates: AppUpdatesViewModel = hiltViewModel()
     val lists: AppListsViewModel = hiltViewModel()
@@ -81,7 +85,10 @@ fun UnifiedReaderRoute() {
         }
     }
 
-    CompositionLocalProvider(LocalTranslationService provides translation.service) {
+    CompositionLocalProvider(
+        LocalTranslationService provides translation.service,
+        LocalReaderComfortPreferences provides readerDisplay.preferences.comfort,
+    ) {
         UnifiedReaderAppContent(
             viewModel = viewModel,
             onImportLocalFileClick = {

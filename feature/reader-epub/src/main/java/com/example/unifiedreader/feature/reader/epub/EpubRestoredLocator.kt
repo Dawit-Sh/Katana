@@ -66,3 +66,16 @@ internal suspend fun ReaderProgressSnapshot.toProgressionFallbackLocator(
     val progress = percent ?: return null
     return publication.locateProgression(progress.coerceIn(0.0, 1.0))
 }
+
+internal fun Publication.readingOrderPositionFor(
+    locator: Locator,
+): Int? = readingOrderIndexOf(locator)?.plus(1)
+
+internal fun Publication.readingOrderIndexOf(
+    locator: Locator,
+): Int? {
+    val href = locator.href.removeFragment().toString()
+    return readingOrder
+        .indexOfFirst { link -> link.url().removeFragment().toString() == href }
+        .takeUnless { it < 0 }
+}
