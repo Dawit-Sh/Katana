@@ -14,6 +14,7 @@ internal typealias AppUiStateUpdater = ((AppUiState) -> AppUiState) -> Unit
 internal fun RemoteSourceConnectionUiState.withStoredSession(
     session: StoredSourceSession?,
 ): RemoteSourceConnectionUiState = if (session == null) {
+    // Signed out: a line about the last connection ("Connected to Kavita…") no longer holds.
     copy(
         availableLibraries = emptyList(),
         hasStoredSession = false,
@@ -21,6 +22,7 @@ internal fun RemoteSourceConnectionUiState.withStoredSession(
         activeAction = null,
         syncProgressFraction = null,
         syncProgressLabel = null,
+        message = message.takeIf { isError },
     )
 } else {
     copy(

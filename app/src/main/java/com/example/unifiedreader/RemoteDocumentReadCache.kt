@@ -75,6 +75,11 @@ class RemoteDocumentReadCache @Inject constructor(
         return Uri.fromFile(file).takeIf { file.hasReadableContent() }
     }
 
+    /** Where the reader's copy of [item] is kept, there or not; null for a book this cache never holds. */
+    fun cachedDocumentFile(
+        item: ReadableItem,
+    ): File? = readCacheFileFor(item).takeIf { supportsReadCache(item) }
+
     private fun supportsReadCache(
         item: ReadableItem,
     ): Boolean = item.sourceType == SourceType.GRIMMORY &&

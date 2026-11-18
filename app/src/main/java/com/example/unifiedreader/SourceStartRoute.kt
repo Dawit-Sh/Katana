@@ -92,6 +92,8 @@ internal fun rememberSourceSettingsEntries(
     stumpReadingDirectionLibraries: List<ReadingDirectionLibraryUiState> = emptyList(),
     kavitaReaderModeLibraries: List<ReaderModeLibraryUiState> = emptyList(),
     stumpReaderModeLibraries: List<ReaderModeLibraryUiState> = emptyList(),
+    // The Sign out on each server page in Settings; the start flow has none.
+    onSignOut: ((SourceType) -> Unit)? = null,
 ): List<SourceSettingsEntry> {
     val syncTimes = rememberSourceSyncTimes()
     val kavitaActions = remember(viewModel) {
@@ -149,14 +151,14 @@ internal fun rememberSourceSettingsEntries(
             connectivity = connectivityOf(SourceType.KAVITA),
             readingDirectionLibraries = kavitaReadingDirectionLibraries,
             readerModeLibraries = kavitaReaderModeLibraries,
-            actions = kavitaActions,
+            actions = kavitaActions.withSignOut(onSignOut, SourceType.KAVITA),
         ),
         SourceSettingsEntry(
             sourceType = SourceType.GRIMMORY,
             lastSyncedAtEpochMillis = syncTimes[SourceType.GRIMMORY],
             connection = uiState.grimmoryConnection,
             connectivity = connectivityOf(SourceType.GRIMMORY),
-            actions = grimmoryActions,
+            actions = grimmoryActions.withSignOut(onSignOut, SourceType.GRIMMORY),
         ),
         SourceSettingsEntry(
             sourceType = SourceType.STUMP,
@@ -165,10 +167,15 @@ internal fun rememberSourceSettingsEntries(
             connectivity = connectivityOf(SourceType.STUMP),
             readingDirectionLibraries = stumpReadingDirectionLibraries,
             readerModeLibraries = stumpReaderModeLibraries,
-            actions = stumpActions,
+            actions = stumpActions.withSignOut(onSignOut, SourceType.STUMP),
         ),
     )
 }
+
+private fun RemoteSourceSettingsActions.withSignOut(
+    onSignOut: ((SourceType) -> Unit)?,
+    source: SourceType,
+): RemoteSourceSettingsActions = if (onSignOut == null) this else copy(onSignOut = { onSignOut(source) })
 
 private val SourceStartRequestSaver: Saver<SourceStartRequest?, String> = Saver(
     save = { request -> request?.let { "${it.mode.name}:${it.server?.name.orEmpty()}" } ?: "" },

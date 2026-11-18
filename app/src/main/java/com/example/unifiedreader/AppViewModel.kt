@@ -643,6 +643,14 @@ class AppViewModel @Inject constructor(
         )
     }
 
+    /** Files that left the tablet from Settings or the Downloads sheet: the library drops their marks. */
+    fun onLocalCopiesRemoved(itemIds: Set<String>) = updateUiState { state ->
+        state.copy(
+            downloadedRemoteItemIds = state.downloadedRemoteItemIds - itemIds,
+            locallyAvailableRemoteItemIds = state.locallyAvailableRemoteItemIds - itemIds,
+        )
+    }
+
     fun onSetReadStatus(item: ReadableItem, markAsRead: Boolean) = onSetReadStatus(listOf(item), markAsRead)
 
     fun onSetReadStatus(items: List<ReadableItem>, markAsRead: Boolean) {

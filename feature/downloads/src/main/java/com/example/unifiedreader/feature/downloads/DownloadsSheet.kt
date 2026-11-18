@@ -28,6 +28,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -55,9 +56,11 @@ import com.example.unifiedreader.ui.components.AppTextButton
 import com.example.unifiedreader.ui.components.AppTonalButton
 
 /**
- * The Downloads sheet: what is downloading now (a raised block with the file it is on and a bar),
- * what waits, what couldn't download and why, and what finished, by day. A finished row opens the
- * book's page; Read on a single book opens it straight away.
+ * The Downloads sheet: the books on this tablet (downloaded or kept from opening, with their size
+ * and Remove), what is downloading now (a raised block with the file it is on and a bar), what
+ * waits, what couldn't download and why, and what finished, by day. A finished row opens the
+ * book's page; Read on a single book opens it straight away. Under the list, the space the books
+ * take, with Remove finished books and Remove all.
  */
 @Composable
 fun DownloadsSheet(
@@ -72,6 +75,8 @@ fun DownloadsSheet(
     onClearCompleted: () -> Unit,
     onReadEntry: (String) -> Unit,
     onOpenBookPage: (itemId: String, source: SourceType) -> Unit,
+    keptBooks: KeptBooksSnapshot = KeptBooksSnapshot.Empty,
+    keptBookActions: KeptBookActions? = null,
 ) {
     // A finished row's book page opens once the sheet has slid away, instead of the sheet vanishing under it.
     val afterClose = remember { arrayOfNulls<() -> Unit>(1) }
@@ -88,18 +93,19 @@ fun DownloadsSheet(
             afterClose[0] = { onOpenBookPage(itemId, source) }
             dismiss()
         }
+        val kept = ShownKeptBooks(keptBooks, keptBookActions)
         AppPanelHeader(
             title = "Downloads",
-            subtitle = downloadsSheetSummary(snapshot),
+            subtitle = downloadsHeaderSummary(snapshot, kept),
             onClose = closeSheet,
         )
-        if (snapshot.entries.isEmpty()) {
+        if (snapshot.entries.isEmpty() && kept.books.isEmpty()) {
             AppEmptyState(
-                title = "Nothing downloaded",
-                // A book opened once is kept too, but it isn't a download: saying nothing about it
-                // read as "the book you opened is gone".
-                body = "Books you open stay on this tablet and read offline. Download keeps books you " +
-                    "haven't opened yet: use it on a book's page, or long-press covers to pick several.",
+                title = "Nothing on this tablet",
+                // A book opened once is kept too, and shows here once it is: saying nothing about
+                // it read as "the book you opened is gone".
+                body = "Books you open stay on this tablet and read offline, and show here. Download keeps " +
+                    "books you haven't opened yet: use it on a book's page, or long-press covers to pick several.",
             )
             return@AppSideSheet
         }
@@ -109,9 +115,16 @@ fun DownloadsSheet(
         val finishedDays = remember(snapshot, now) { finishedDownloadsByDay(snapshot.entries, now) }
         val rowContext = DownloadRowContext(itemResolver, coverImageUrlProvider, onCoverVisible)
         LazyColumn(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
+            keptBooksSection(
+                kept = kept,
+                now = now,
+                context = rowContext,
+                withNothingDownloading = snapshot.entries.isEmpty(),
+                onOpenBookPage = { book -> openBookPage(book.item.id, book.item.sourceType) },
+            )
             bySection[DownloadsSheetSection.Downloading]?.let { entries ->
                 sectionHeading(DownloadsSheetSection.Downloading)
                 items(entries, key = DownloadEntry::id) { entry ->
@@ -186,11 +199,12 @@ fun DownloadsSheet(
                 }
             }
         }
+        KeptBooksFooter(kept = kept)
     }
 }
 
 /** A download moves between sections (running, finished, failed) and leaves on Clear list instead of cutting. */
-private fun Modifier.downloadRowMotion(scope: LazyItemScope): Modifier = with(scope) {
+internal fun Modifier.downloadRowMotion(scope: LazyItemScope): Modifier = with(scope) {
     this@downloadRowMotion.animateItem(
         fadeInSpec = AppMotion.effects(),
         placementSpec = AppMotion.spatial(IntOffset.VisibilityThreshold),
@@ -201,7 +215,7 @@ private fun Modifier.downloadRowMotion(scope: LazyItemScope): Modifier = with(sc
 private val RunningPanelMargin = 12.dp
 
 /** What every row needs to draw its cover and title. */
-private class DownloadRowContext(
+internal class DownloadRowContext(
     private val itemResolver: (String) -> ReadableItem?,
     val coverImageUrlProvider: (ReadableItem, LibraryCoverImageVariant) -> String?,
     val onCoverVisible: (ReadableItem, LibraryCoverImageVariant) -> Unit,
@@ -212,8 +226,15 @@ private class DownloadRowContext(
 private fun LazyListScope.sectionHeading(
     section: DownloadsSheetSection,
     action: (@Composable RowScope.() -> Unit)? = null,
+) = sheetHeading(key = "section-${section.name}", title = section.title, action = action)
+
+/** A section's heading in the sheet: the page's group label, with an action at its end. */
+internal fun LazyListScope.sheetHeading(
+    key: String,
+    title: String,
+    action: (@Composable RowScope.() -> Unit)? = null,
 ) {
-    item(key = "section-${section.name}") {
+    item(key = key) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -223,7 +244,7 @@ private fun LazyListScope.sectionHeading(
         ) {
             // Two levels in this sheet: a section over its days, so the section takes the page's
             // group label and a day the sheet's label.
-            AppGroupLabel(text = section.title, modifier = Modifier.weight(1f))
+            AppGroupLabel(text = title, modifier = Modifier.weight(1f))
             action?.invoke(this)
         }
     }
@@ -312,28 +333,47 @@ private fun DownloadRow(
     modifier: Modifier = Modifier,
     trailing: @Composable RowScope.() -> Unit,
 ) {
-    // A flat row on the sheet: its text on the sheet's inset, the ripple a little wider.
-    AppBookRow(
+    SheetBookRow(
         title = item?.libraryPrimaryText() ?: entry.selectedItemTitle,
+        line = line,
+        modifier = modifier,
+        lineColor = if (lineIsError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        // An error, or a stopped download beside its two buttons, wraps instead of losing its end.
+        lineMaxLines = when {
+            lineIsError -> 3
+            entry.status == DownloadEntryStatus.Canceled -> 2
+            else -> 1
+        },
+        onClick = onClick,
+        cover = { DownloadCover(item = item, entry = entry, context = context, width = AppBookRowDefaults.coverWidth) },
+        trailing = trailing,
+    )
+}
+
+/** A flat row on the sheet: its text on the sheet's inset, the ripple a little wider. */
+@Composable
+internal fun SheetBookRow(
+    title: String,
+    line: String,
+    cover: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    lineColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    lineMaxLines: Int = 1,
+    onClick: (() -> Unit)? = null,
+    trailing: @Composable RowScope.() -> Unit,
+) {
+    AppBookRow(
+        title = title,
         modifier = modifier.padding(horizontal = 8.dp),
         onClick = onClick,
         contentPadding = PaddingValues(start = AppLayout.inset - 8.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-        cover = { DownloadCover(item = item, entry = entry, context = context, width = AppBookRowDefaults.coverWidth) },
+        cover = cover,
         supporting = {
-            AppBookRowLine(
-                text = line,
-                color = if (lineIsError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                // An error, or a stopped download beside its two buttons, wraps instead of losing its end.
-                maxLines = when {
-                    lineIsError -> 3
-                    entry.status == DownloadEntryStatus.Canceled -> 2
-                    else -> 1
-                },
-            )
+            AppBookRowLine(text = line, color = lineColor, maxLines = lineMaxLines)
         },
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, content = trailing)
-    }
+        // Named: AppBookRow's last slot is `leading`, which put the buttons before the cover.
+        trailing = { Row(verticalAlignment = Alignment.CenterVertically, content = trailing) },
+    )
 }
 
 @Composable

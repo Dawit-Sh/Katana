@@ -775,6 +775,7 @@ fun UnifiedReaderScaffold(
                     )
                 }
                 if (viewModel.isDownloadsSheetVisible) {
+                    val keptBooks = rememberKeptBooksForSheet(viewModel)
                     DownloadsSheet(
                         snapshot = viewModel.downloadsSnapshot,
                         itemResolver = { itemId ->
@@ -793,6 +794,8 @@ fun UnifiedReaderScaffold(
                             viewModel.hideDownloadsSheet()
                             viewModel.openLibrarySource(source)
                         },
+                        keptBooks = keptBooks.snapshot,
+                        keptBookActions = keptBooks.actions,
                     )
                 }
             }
@@ -827,6 +830,7 @@ private fun SettingsRoute(
     val sources = rememberSourceSettingsEntries(
         uiState = uiState,
         viewModel = viewModel,
+        onSignOut = LocalAppSettingsTools.current?.let { tools -> tools::signOut },
         kavitaReadingDirectionLibraries = kavitaReadingDirectionLibraries,
         stumpReadingDirectionLibraries = stumpReadingDirectionLibraries,
         kavitaReaderModeLibraries = kavitaReaderModeLibraries,
@@ -862,6 +866,7 @@ private fun SettingsRoute(
             updateActions = updateActions,
             onScrolledChanged = onScrolledChanged,
             tagsPage = tagsPage,
+            tools = rememberSettingsTools(uiState, viewModel),
         )
     }
 }

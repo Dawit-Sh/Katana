@@ -43,7 +43,6 @@ internal fun SettingsHub(
     sourceOrder: List<SourceType>,
     filterPanelsBySource: Map<SourceType, List<LibraryFilterPanel>>,
     syncSettings: SyncSettingsUiState,
-    tagsSummary: String?,
     versionName: String,
     updateState: AppUpdateState,
     updateActions: AppUpdateActions,
@@ -52,6 +51,7 @@ internal fun SettingsHub(
     contentTopInset: Dp,
     modifier: Modifier = Modifier,
     horizontalPadding: Dp = appGutter(),
+    tools: SettingsTools = SettingsTools(),
 ) {
     SettingsPageContainer(
         contentTopInset = contentTopInset,
@@ -68,6 +68,11 @@ internal fun SettingsHub(
                 trailing = { ThemeCoverPreview() },
             )
         }
+        ReadingSettingsGroup(
+            newBookLook = tools.newBookLook,
+            selectedPage = selectedPage,
+            onOpenPage = onOpenPage,
+        )
         AppSettingsGroup(label = "Sources") {
             sources.forEachIndexed { index, entry ->
                 if (index > 0) AppSettingsRowDivider()
@@ -99,44 +104,15 @@ internal fun SettingsHub(
         }
         AppSettingsGroup(label = "Library") {
             AppSettingsRow(
-                title = SettingsPage.FilterChips.title,
-                icon = AppIcons.FilterList,
-                supporting = filterChipsSummary(sourceOrder, filterPanelsBySource),
-                selected = selectedPage == SettingsPage.FilterChips,
-                onClick = { onOpenPage(SettingsPage.FilterChips) },
-            )
-            if (tagsSummary != null) {
-                AppSettingsRowDivider()
-                AppSettingsRow(
-                    title = SettingsPage.Tags.title,
-                    icon = AppIcons.Sell,
-                    supporting = tagsSummary,
-                    selected = selectedPage == SettingsPage.Tags,
-                    onClick = { onOpenPage(SettingsPage.Tags) },
-                )
-            }
-            AppSettingsRowDivider()
-            AppSettingsRow(
-                title = SettingsPage.DrawerOrder.title,
-                icon = AppIcons.SwapVert,
-                supporting = drawerOrderSummary(sourceOrder),
-                selected = selectedPage == SettingsPage.DrawerOrder,
-                onClick = { onOpenPage(SettingsPage.DrawerOrder) },
+                title = SettingsPage.Library.title,
+                icon = AppIcons.Tune,
+                supporting = librarySettingsSummary(sourceOrder, filterPanelsBySource),
+                selected = selectedPage == SettingsPage.Library || selectedPage?.parent == SettingsPage.Library,
+                onClick = { onOpenPage(SettingsPage.Library) },
             )
         }
-        LocalTranslationService.current?.let { translation ->
-            LaunchedEffect(translation) { translation.start() }
-            val translationState by translation.state.collectAsStateWithLifecycle()
-            AppSettingsGroup(label = "Reading") {
-                AppSettingsRow(
-                    title = SettingsPage.Translation.title,
-                    icon = AppIcons.Translate,
-                    supporting = translationHubSummary(translationState),
-                    selected = selectedPage == SettingsPage.Translation,
-                    onClick = { onOpenPage(SettingsPage.Translation) },
-                )
-            }
-        }
+        tools.storage?.let { storage -> StorageSettingsGroup(storage) }
+        tools.backup?.let { backup -> BackupSettingsGroup(backup) }
         AppSettingsGroup(label = "About") {
             AppUpdateVersionRow(
                 versionName = versionName,
@@ -154,6 +130,43 @@ internal fun SettingsHub(
                 icon = AppIcons.Description,
                 selected = selectedPage == SettingsPage.Licenses || selectedPage?.parent == SettingsPage.Licenses,
                 onClick = { onOpenPage(SettingsPage.Licenses) },
+            )
+        }
+    }
+}
+
+/**
+ * Settings › Reading: the look new books open with, then Translation when the app has it. Left
+ * out when it has neither.
+ */
+@Composable
+private fun ReadingSettingsGroup(
+    newBookLook: NewBookLookSettings?,
+    selectedPage: SettingsPage?,
+    onOpenPage: (SettingsPage) -> Unit,
+) {
+    val translation = LocalTranslationService.current
+    if (newBookLook == null && translation == null) return
+    AppSettingsGroup(label = "Reading") {
+        if (newBookLook != null) {
+            AppSettingsRow(
+                title = SettingsPage.NewBookLook.title,
+                icon = AppIcons.FormatSize,
+                supporting = newBookLookSummary(newBookLook.description),
+                selected = selectedPage == SettingsPage.NewBookLook,
+                onClick = { onOpenPage(SettingsPage.NewBookLook) },
+            )
+        }
+        if (translation != null) {
+            if (newBookLook != null) AppSettingsRowDivider()
+            LaunchedEffect(translation) { translation.start() }
+            val translationState by translation.state.collectAsStateWithLifecycle()
+            AppSettingsRow(
+                title = SettingsPage.Translation.title,
+                icon = AppIcons.Translate,
+                supporting = translationHubSummary(translationState),
+                selected = selectedPage == SettingsPage.Translation,
+                onClick = { onOpenPage(SettingsPage.Translation) },
             )
         }
     }

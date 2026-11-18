@@ -15,6 +15,8 @@ class SettingsPageTest {
     fun `every page survives a save and restore through its key`() {
         val pages = listOf(
             SettingsPage.Theme,
+            SettingsPage.NewBookLook,
+            SettingsPage.Library,
             SettingsPage.FilterChips,
             SettingsPage.DrawerOrder,
             SettingsPage.SyncStatus,
@@ -34,5 +36,16 @@ class SettingsPageTest {
         assertNull(SettingsPage.fromKey(null))
         assertNull(SettingsPage.fromKey("source:NOPE"))
         assertNull(SettingsPage.fromKey("garbage"))
+    }
+
+    @Test
+    fun `the library's own pages go back to the library page, a notice to the list, the rest to the hub`() {
+        listOf(SettingsPage.FilterChips, SettingsPage.Tags, SettingsPage.DrawerOrder).forEach { page ->
+            assertEquals(page.key, SettingsPage.Library, page.parent)
+        }
+        assertEquals(SettingsPage.Licenses, SettingsPage.License("Readium").parent)
+        assertNull(SettingsPage.Library.parent)
+        assertNull(SettingsPage.NewBookLook.parent)
+        assertNull(SettingsPage.Theme.parent)
     }
 }
