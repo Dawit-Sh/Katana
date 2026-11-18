@@ -5,6 +5,10 @@
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
+    <!-- Declared to cap it: otherwise the build adds it, implied by the one above, on every version. -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
 
     <application>
         <!-- Hands a quote card to the app it is shared with. -->

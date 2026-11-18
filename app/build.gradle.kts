@@ -45,13 +45,25 @@ android {
             // Local Fire 7 (2019) build: without the release keys, sign with this PC's debug key
             // so the APK installs; the release stays a fast (non-debuggable) build.
             signingConfig = releaseSigningConfig ?: signingConfigs.getByName("debug")
-            // Translation's native code is ~16 MB per ABI. Upstream ships only arm64-v8a; the
-            // Fire 7 (2019) runs 32-bit Android only, so this local build ships armeabi-v7a.
-            ndk { abiFilters += "armeabi-v7a" }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+        }
+    }
+
+    // One release build makes three APKs (2026-11-19), all with the same versionCode, signature and
+    // Baseline Profile, so a device can move between them: armeabi-v7a only for the Fire 7 (2019, 32-bit
+    // Android), arm64-v8a only for modern phones, and a universal one (armeabi-v7a, arm64-v8a, x86_64)
+    // for anyone unsure. Translation's native code is ~12-17 MB per ABI, which is why the first two
+    // carry one ABI each. `katanaReleaseApks` below gives them their release names. A build that only
+    // asks for debug tasks keeps the single app-debug.apk with every ABI, as before.
+    splits {
+        abi {
+            isEnable = gradle.startParameter.taskNames.any { task -> !task.contains("Debug") }
+            reset()
+            include("armeabi-v7a", "arm64-v8a")
+            isUniversalApk = true
         }
     }
 
@@ -64,6 +76,34 @@ android {
         getByName("androidTest").java.setSrcDirs(listOf("src/androidTest/java", "src/sharedTest/java"))
     }
 }
+
+// The release APKs under their published names, in app/build/outputs/katana-apks:
+// katana-<version>-fire7-armeabi-v7a.apk, katana-<version>-arm64-v8a.apk, katana-<version>-universal.apk.
+// The in-app updater picks among them by these names (feature:updates, ReleaseApkChoice).
+val katanaReleaseApks = tasks.register<Sync>("katanaReleaseApks") {
+    description = "Copies the release APKs to build/outputs/katana-apks under their release names."
+    into(layout.buildDirectory.dir("outputs/katana-apks"))
+}
+androidComponents {
+    onVariants(selector().withBuildType("release")) { variant ->
+        // No 32-bit x86 devices run Android 9+ in practice; leaving x86 out keeps ~17 MB of
+        // translation code out of the universal APK.
+        variant.packaging.jniLibs.excludes.add("lib/x86/**")
+        val version = android.defaultConfig.versionName
+        val releaseNames = mapOf(
+            "app-armeabi-v7a-release.apk" to "katana-$version-fire7-armeabi-v7a.apk",
+            "app-arm64-v8a-release.apk" to "katana-$version-arm64-v8a.apk",
+            "app-universal-release.apk" to "katana-$version-universal.apk",
+        )
+        katanaReleaseApks.configure {
+            from(variant.artifacts.get(com.android.build.api.artifact.SingleArtifact.APK)) {
+                include(releaseNames.keys)
+                rename { apk -> releaseNames.getValue(apk) }
+            }
+        }
+    }
+}
+tasks.named { name -> name == "assembleRelease" }.configureEach { dependsOn(katanaReleaseApks) }
 
 dependencies {
     implementation(project(":core:common"))
