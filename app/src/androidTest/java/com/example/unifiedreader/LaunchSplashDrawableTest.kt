@@ -17,7 +17,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class LaunchSplashDrawableTest {
     @Test
-    fun nativeSplashInflatesInEveryPaletteAndItsEyesAreOpaque() {
+    fun nativeSplashInflatesInEveryPaletteAndRestsOnThePlainKatana() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.runOnMainSync {
             AppLaunchSplash.entries.forEach { palette ->
@@ -28,9 +28,10 @@ class LaunchSplashDrawableTest {
                 try {
                     drawable.setBounds(0, 0, 288, 288)
                     drawable.draw(Canvas(bitmap))
-                    // Inside the left eye, away from its pupil. The canvas is transparent:
-                    // an old punched-out eye would leave alpha 0 instead of theme paper.
-                    assertEquals("${palette.name} eye", 255, Color.alpha(bitmap.getPixel(130, 97)))
+                    // Solid ink on the guard, at least 4 dp from any edge of the drawing.
+                    assertEquals("${palette.name} ink", 255, Color.alpha(bitmap.getPixel(140, 108)))
+                    // The glint's starting point beside the blade: clear until the animation runs.
+                    assertEquals("${palette.name} glint at rest", 0, Color.alpha(bitmap.getPixel(136, 169)))
                     assertTrue("${palette.name} mark renders", (88..222).any { y ->
                         (86..201).any { x -> Color.alpha(bitmap.getPixel(x, y)) > 0 }
                     })

@@ -26,23 +26,28 @@ class AppLaunchSplashResourceTest {
             assertTrue(it.getAttributeNS(android, "duration").toInt() in 1..1000)
             assertTrue(it.getAttributeNS(android, "repeatCount") in listOf("", "0"))
         }
-        assertTrue(targets.any { it.getAttributeNS(android, "name") == "page_back" })
-        assertTrue(targets.any { it.getAttributeNS(android, "name") == "character" })
+        assertEquals(listOf("glint"), targets.map { it.getAttributeNS(android, "name") })
     }
 
     @Test
-    fun `face is opaque and foreground cover hides the body behind the rim`() {
-        val vector = read("drawable/launch_mark.xml")
-        val paths = elements(vector, "path").associateBy { it.getAttributeNS(android, "name") }
-        assertEquals("?attr/launchMarkColor", paths.getValue("head_solid_0").getAttributeNS(android, "fillColor"))
-        assertEquals("?attr/launchPaperColor", paths.getValue("eyes_open_0").getAttributeNS(android, "fillColor"))
-        assertEquals("?attr/launchPaperColor", paths.getValue("book_front_paper_0").getAttributeNS(android, "fillColor"))
-        assertFalse(paths.getValue("head_solid_0").hasAttributeNS(android, "fillAlpha") &&
-            paths.getValue("head_solid_0").getAttributeNS(android, "fillAlpha") == "0")
-        val groups = elements(vector, "group").map { it.getAttributeNS(android, "name") }
-        assertTrue(groups.indexOf("book_back") < groups.indexOf("character"))
-        assertTrue(groups.indexOf("character") < groups.indexOf("book_front"))
-        assertTrue(groups.indexOf("book_front") < groups.indexOf("paws"))
+    fun `the katana is one theme-coloured ink shape and the glint rests hidden over it`() {
+        val still = elements(read("drawable/launch_mark.xml"), "path")
+        assertEquals(listOf("katana_mark"), still.map { it.getAttributeNS(android, "name") })
+        assertEquals("?attr/launchMarkColor", still.single().getAttributeNS(android, "fillColor"))
+        assertFalse(still.single().getAttributeNS(android, "fillAlpha") == "0")
+
+        val animated = read("drawable-v31/launch_mark.xml")
+        val paths = elements(animated, "path").associateBy { it.getAttributeNS(android, "name") }
+        // Drawn in this order: the mark, then the glint's background-coloured gap, then the glint.
+        assertEquals(listOf("katana_mark", "glint_halo", "glint_star"), elements(animated, "path").map {
+            it.getAttributeNS(android, "name")
+        })
+        assertEquals("?attr/launchMarkColor", paths.getValue("katana_mark").getAttributeNS(android, "fillColor"))
+        assertEquals("?attr/launchPaperColor", paths.getValue("glint_halo").getAttributeNS(android, "fillColor"))
+        assertEquals("?attr/launchMarkColor", paths.getValue("glint_star").getAttributeNS(android, "fillColor"))
+        val glint = elements(animated, "group").single { it.getAttributeNS(android, "name") == "glint" }
+        assertEquals("0", glint.getAttributeNS(android, "scaleX"))
+        assertEquals("0", glint.getAttributeNS(android, "scaleY"))
     }
 
     @Test
