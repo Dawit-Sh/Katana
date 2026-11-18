@@ -71,6 +71,8 @@ fun LibraryTopBar(
     onDownloadSelectedItems: () -> Unit = {},
     onAddSelectedToList: (() -> Unit)? = null,
     onMarkSelectedRead: ((Boolean) -> Unit)? = null,
+    // The server's last sync and what waits to upload (LibrarySyncStatus.kt); null for books on the tablet.
+    syncStatus: LibrarySyncStatus? = null,
     // Picking books for a list: its name, and Done.
     addingToList: String? = null,
     onDoneAdding: () -> Unit = {},
@@ -127,6 +129,12 @@ fun LibraryTopBar(
                 },
                 trailing = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        syncStatus?.let { status ->
+                            LibrarySyncStatusButton(
+                                status = status,
+                                onSyncNow = onRefreshClick.takeIf { refreshState.isVisible && refreshState.isEnabled },
+                            )
+                        }
                         DownloadsButton(state = downloadsButtonState, onClick = onDownloadsClick)
                         LibraryTopBarMoreMenu(
                             onImportFile = onImportLocalFileClick,

@@ -646,7 +646,15 @@ fun UnifiedReaderScaffold(
                                             },
                                         )
                                     } else {
+                                        val sourceSyncTimes = rememberSourceSyncTimes()
                                         LibraryTopBar(
+                                            syncStatus = librarySyncStatus(
+                                                source = uiState.selectedSource,
+                                                syncTimes = sourceSyncTimes,
+                                                pending = uiState.pendingRemoteSyncSummary,
+                                                offline = uiState.selectedSourceConnectivity == SourceConnectivityState.Offline,
+                                                syncing = uiState.libraryRefreshTopBarState().isRefreshing,
+                                            ),
                                             selectedSource = uiState.selectedSource,
                                             sourceConnectivity = uiState.selectedSourceConnectivity,
                                             searchQuery = uiState.selectedLibrarySearchQuery,
