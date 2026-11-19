@@ -1,8 +1,9 @@
 # Katana (Android reader, built on yabai)
 
-Katana is a personal fork of yabai (https://github.com/bostannnn/yabai). Most of this file is upstream's and
+Katana is a fork of yabai (https://github.com/bostannnn/yabai). Most of this file is upstream's and
 still holds; the build, signing and device notes further down describe upstream's macOS setup.
-No releases or APKs are published from this repository while upstream has no license.
+Katana is released under GPL v3 or later (`LICENSE`; DjVuLibre is GPL, yabai's author agreed, 2026-11-19).
+Releases with the three APKs go on GitHub (see "Releases" below).
 
 Kotlin + Jetpack Compose reader for EPUB/PDF/CBZ/CBR (plus MOBI, AZW, AZW3, FB2, DjVu) from Kavita, Grimmory,
 Stump, or local files.
@@ -130,12 +131,19 @@ Keystore `~/yabai.jks`, alias `key0`. The release cert SHA-256 must be
 - `ci.yml` runs the unit tests, detekt and lint on every push and on PRs to `fire7` (30 min job timeout).
   It only builds and tests; nothing is published.
 - Upstream's `release-apk.yml` (signed APK and a GitHub Release on every version tag) and its
-  `.github/scripts/release-notes.sh` were removed on 2026-11-19: Katana publishes no releases or APKs while
-  yabai has no license (and DjVuLibre is GPL, see `THIRD_PARTY_NOTICES.md`). Git history keeps both.
+  `.github/scripts/release-notes.sh` were removed on 2026-11-19; git history keeps both.
+
+## Releases
+
+Made by hand from the Windows PC, because its release builds are signed with that PC's debug key (no
+`ANDROID_SIGNING_*` there), the same key as the Fire's install and every APK already handed out. Changing the key
+means an uninstall on every device. For a release: raise `versionCode` and `versionName` in `app/build.gradle.kts`,
+build, then `gh release create v<version> app/build/outputs/katana-apks/*.apk --target fire7` with short, casual
+notes (which APK is for what). The in-app updater only sees published releases (not drafts or pre-releases).
 
 ## In-app updater (`feature:updates`)
 
-- Checks `Dawit-Sh/Katana`'s latest GitHub release (there are none, see above; once a day after the library
+- Checks `Dawit-Sh/Katana`'s latest GitHub release (once a day after the library
   appears, or from Settings › About › Version), downloads the release's `.apk`, checks GitHub's SHA-256, the package
   name, the signing certificate and a higher `versionCode`, then installs through Android's
   `PackageInstaller`. So a release must keep the release key and raise `versionCode`.

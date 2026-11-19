@@ -19,11 +19,10 @@ DjVu pages. Copyright 1999-2001 LizardTech, Inc.; 2002-2014 Léon Bottou, Yann L
 `COPYRIGHT` there). Licensed under the GNU General Public License, version 2 or (at your option) any later
 version; the full text is `core/djvu/src/main/cpp/djvulibre/COPYING`.
 
-**What this means for releases.** Using Katana privately needs nothing. An APK that contains DjVuLibre may
-only be given to others under the GPL: with the complete source of the whole app (Katana and the yabai code
-it is built on) under GPL-compatible terms, and the same freedom to share it. yabai has no licence of its
-own, so a public release with DjVu support first needs its author's agreement to that (or a public build
-without `core:djvu`).
+**What this means for Katana.** An APK that contains DjVuLibre may only be shared under the GPL, so Katana
+as a whole is released under the GNU General Public License, version 3 or (at your option) any later
+version, with the agreement of yabai's author. The full text is `LICENSE` at the top of the repository, and
+the complete source is at https://github.com/Dawit-Sh/Katana.
 
 ## jsoup (MOBI and AZW3 conversion)
 

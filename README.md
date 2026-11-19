@@ -4,117 +4,95 @@
 
 <h1 align="center">Katana</h1>
 
-<p align="center">An Android reader for your own book server and the books on your device.</p>
+<p align="center">An Android book reader for your own book server.</p>
 
-Katana is Dawit's personal Android reader. It reads books from self-hosted book servers, mainly Grimmory,
-and also Kavita and Stump, plus files kept on the device.
-It was made first for the Amazon Fire 7 (2019, Fire OS 7, 32-bit Android 9); phones come later.
+I forked [yabai](https://github.com/bostannnn/yabai) because I wanted a nice reader for my old Fire 7 that
+works with my [Grimmory](https://github.com/grimmory-tools/grimmory) server, and yabai was the closest thing
+I could find. It was missing a few things I needed, mostly highlights and a build that runs on the Fire, so I
+added them, plus a bunch of smaller things along the way. It runs on modern Android phones too.
 
-**Built on yabai.** Katana is a fork of [yabai](https://github.com/bostannnn/yabai) by
-[bostannnn](https://github.com/bostannnn). The reader, the server clients, the library, the journal, the
-design system and most of the code come from yabai. Katana adds the Fire 7 build and the features marked
-below as new.
+Most of what makes it good (the reader, the server connections, the library, the journal and the whole look)
+is yabai's work, by [bostannnn](https://github.com/bostannnn).
 
-## Formats
+## Download
 
-| Format | How Katana opens it |
+Grab an APK from the [latest release](https://github.com/Dawit-Sh/Katana/releases/latest). There are three,
+and they all need Android 9 or newer:
+
+| APK | Use it on |
 | --- | --- |
-| EPUB | Readium |
-| PDF | Android's PDF renderer |
-| CBZ, CBR | the comic reader |
-| MOBI, AZW, AZW3, FB2 | converted to EPUB on the device, so highlights and notes work as in EPUB (new) |
-| DjVu | DjVuLibre, shown in the PDF page view (new) |
+| `katana-…-fire7-armeabi-v7a.apk` | Amazon Fire tablets and other older 32-bit devices |
+| `katana-…-arm64-v8a.apk` | pretty much any phone or tablet from the last several years (Pixel, Samsung and so on) |
+| `katana-…-universal.apk` | anything, if you're not sure which one you need. It's bigger because it carries every version inside |
 
-## Features
+The first time, Android will ask you to allow installs from your browser or file manager. A newer APK
+installs over an older one and keeps your books and highlights, and Katana can update itself from
+Settings › About. The APKs aren't from the Play Store, so Play Protect may show a warning the first time.
 
-**Library and servers**
+## What I added
 
-- Connect to Grimmory, Kavita and Stump, and add files from the device.
-- Browse by library, series, shelves and tags, with filters, sorting and reading status.
-- Download books for reading offline.
-- Reading progress goes to and comes from the server, with a sync status on the library bar.
-- Lists: your own lists and reading orders, Want to read, Grimmory shelves and smart lists such as
-  Stalled.
+- **Fire 7 support.** A 32-bit build, longer network time limits for slow Wi-Fi, and a much faster start
+  (about 2 seconds on the Fire).
+- **Highlights and notes.** Four styles (highlight, underline, strikethrough, squiggly) in five colours, with
+  notes. Syncing them with Grimmory is coming in the next update.
+- **Words.** "Add to dictionary" saves a word with its sentence, and you can go over saved words as
+  flashcards.
+- **Bookmarks**, and one page that collects every book's bookmarks and highlights.
+- **Search inside a book.**
+- **Comfort.** Brightness and a warmth filter just for reading, volume keys to turn pages, and the time and
+  battery in the page corner.
+- **Quote cards.** Share a highlight as an image.
+- **Export and backup.** Highlights and notes as Markdown, and a backup of highlights, words and bookmarks.
+- **More formats.** MOBI, AZW, AZW3, FB2 and DjVu.
+- **Journal bits.** A reading streak card in the side menu and this month's highlights in the journal.
+- **Settings regrouped**, with a Storage page to see and clear what's on the device.
+- **Steadier sync.** The Grimmory sign-in survives flaky Wi-Fi, and Katana notices by itself when the server
+  is back.
+- **Modern phones.** The page keeps clear of camera holes and notches, one page at a time in landscape, and
+  back leaves a book in one swipe.
 
-**Reading**
+## What it already did, thanks to yabai
 
-- Search in the book: results with a snippet and page, matches marked on the page, previous and next (new).
-- Light: brightness just for reading or following the device, a warmth filter that can run only at night,
-  and brightness by sliding along the left edge (new).
-- Volume keys turn pages, and the screen can stay on while you read (new).
-- Default look for new books, themes and fonts, and translation of a selection.
-- Comics and manga: page turns or continuous scroll, two-page spreads and right-to-left reading.
+- Connects to Grimmory, Kavita and Stump, and opens files from your device.
+- Browse by library, series, shelves and tags, with filters and sorting, and download books for offline.
+- Reading progress syncs with the server.
+- EPUB, PDF, and CBZ/CBR comics and manga (right to left, two-page spreads, scrolling).
+- Your own lists and reading orders, plus Grimmory shelves.
+- A reading journal with stats, translation of a selection, themes and fonts.
 
-**Highlights, notes and words** (new)
+## Build it yourself
 
-- Highlights in four styles (highlight, underline, strikethrough, squiggly) and five colours, with notes.
-- Save a word with its sentence and review saved words as flashcards.
-- Page bookmarks, and a Bookmarks page that gathers every book's marks with search and filters.
-- Quote cards: share a highlight as an image or save it to Pictures.
-- Export one book's highlights and notes, or all of them, as Markdown.
-
-**Journal**
-
-- Reading days, the hours you usually read, finished books and reading stats.
-- This month's highlights, and a reading card with your streak in the side menu (new).
-
-**Settings**
-
-- Appearance, Reading, Sources, Library, Storage (sizes, manage and remove books, clear covers) and
-  Highlights and backup: a JSON backup of highlights, words and bookmarks, and a restore that only adds (new).
-
-## Build
-
-You need JDK 21 and the Android SDK with platform 37 (Android Studio brings both). Then, from the
-repository folder:
+You need JDK 21 and the Android SDK with platform 37 (Android Studio brings both). Then:
 
 ```bash
 ./gradlew :app:assembleRelease
 ```
 
-On Windows use `gradlew.bat`. One release build makes three APKs, in `app/build/outputs/katana-apks/`:
+On Windows use `gradlew.bat`. The three APKs land in `app/build/outputs/katana-apks/`. If you set the
+`ANDROID_SIGNING_*` environment variables they're signed with your key; otherwise with your computer's debug
+key, so a new build only installs over an older one made on the same computer.
 
-| APK | For |
+`./gradlew testDebugUnitTest detekt lintDebug` runs the tests and the code checks, same as CI.
+
+## Where things are
+
+| Folder | What's in it |
 | --- | --- |
-| `katana-<version>-fire7-armeabi-v7a.apk` | the Fire 7 (2019) and other 32-bit Android devices |
-| `katana-<version>-arm64-v8a.apk` | modern 64-bit phones and tablets (Pixel, Samsung Galaxy and most others) |
-| `katana-<version>-universal.apk` | any device (armeabi-v7a, arm64-v8a and x86_64); bigger, for anyone unsure |
+| `app/` | start-up, navigation and the wiring between modules |
+| `core/` | the data model, database, networking, theme and components, the MOBI/AZW/FB2 converter, DjVu |
+| `data/` | the Grimmory, Kavita and Stump clients |
+| `feature/` | each part of the app: library, readers, highlights, journal, lists, downloads, settings, updates |
+| `build-logic/`, `config/`, `tools/` | Gradle plugins, detekt rules, small helper scripts |
+| `docs/` | architecture notes, the design system and yabai's old plans ([docs/README.md](docs/README.md)) |
 
-- **ABIs.** Translation's native code is 12 to 17 MB per ABI, so the first two carry one ABI each. All three
-  have the same version code, signature and Baseline Profile, so a device can move from one to another with a
-  normal update. The 64-bit native libraries are 16 KB aligned, as Android 15 and later devices with 16 KB
-  memory pages need. A build that asks only for debug tasks (`assembleDebug`) still makes one
-  `app-debug.apk` with every ABI.
-- **Updates.** The in-app updater picks the APK made for the device's ABI from a release, so a release
-  should attach all three under these names.
-- **Signing.** With the `ANDROID_SIGNING_*` environment variables set, the release build is signed with
-  that key. Without them it is signed with your computer's debug key, so a new build installs over an older
-  one only when both came from the same computer.
-- **Checks.** `./gradlew testDebugUnitTest detekt lintDebug` runs the unit tests and the code checks, as
-  CI does on every push.
+The Kotlin package is still `com.example.unifiedreader`, same as yabai.
 
-The minimum Android version is 9 (API 28).
+## License
 
-## Project layout
+Katana is free software under the [GNU GPL, version 3 or later](LICENSE). DjVu support uses DjVuLibre, which
+is GPL, so the whole app is shared that way, and bostannnn is fine with yabai's code going out under it.
 
-The code follows the module layout of Google's
-[Now in Android](https://github.com/android/nowinandroid) sample.
+## Credits
 
-| Folder | What it holds |
-| --- | --- |
-| `app/` | the app shell: start-up, top-level navigation and wiring the modules together |
-| `core/` | shared pieces: the data model, the Room database, networking, the theme and component kit, the MOBI/AZW/FB2 converter and DjVuLibre |
-| `data/` | the Grimmory, Kavita and Stump clients, and the repositories that combine them |
-| `feature/` | each part of the app: library, the readers (EPUB, PDF, comics), highlights and bookmarks, journal, lists, downloads, settings, translation, updates |
-| `build-logic/` | the Gradle convention plugins every module shares |
-| `config/` | detekt rules |
-| `docs/` | architecture rules, the design system and yabai's earlier plans (see [docs/README.md](docs/README.md)) |
-
-The Kotlin package is still `com.example.unifiedreader`, as in yabai.
-
-## Status
-
-Katana is a personal fork, in daily use on one Fire 7. **No releases or APKs are published**: yabai has no
-license, so its author keeps all rights to its code, and Katana is shared here as source only until that
-changes. DjVu support uses DjVuLibre, which is GPL licensed; see
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for what that means for any future release.
+- [yabai](https://github.com/bostannnn/yabai) by bostannnn, which everything here is built on.
+- Fonts, icons and libraries: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
