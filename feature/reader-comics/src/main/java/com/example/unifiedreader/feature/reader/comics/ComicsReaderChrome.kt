@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import com.example.unifiedreader.core.model.ReadableItem
+import com.example.unifiedreader.feature.annotations.PageBookmarkCopy
 import com.example.unifiedreader.feature.reader.core.ReaderBarButton
 import com.example.unifiedreader.feature.reader.core.ReaderChromeDefaults
 import com.example.unifiedreader.feature.reader.core.ReaderChromeFrame
@@ -57,6 +58,8 @@ internal fun ComicsReaderChrome(
     onPageSelected: (Int) -> Unit,
     onProgressSelected: (Float) -> Unit,
     onPageNumbersVisibleChanged: (Boolean) -> Unit,
+    // Bookmarks the page on screen, or takes its bookmark off; null when the book can't keep them.
+    bookmark: ComicBookmarkButton? = null,
 ) {
     val titles = remember(item) { comicReaderTitles(item) }
     var openPanel by rememberSaveable(item.id) { mutableStateOf(ComicsReaderPanel.None) }
@@ -71,11 +74,10 @@ internal fun ComicsReaderChrome(
         onDismissPanel = { openPanel = ComicsReaderPanel.None },
         topBar = {
             ReaderTopBar(title = titles.title, subtitle = titles.subtitle, onBack = onBack) {
-                ReaderBarButton(
-                    icon = AppIcons.Tune,
-                    contentDescription = "Reading settings",
-                    active = openPanel == ComicsReaderPanel.Settings,
-                    onClick = { toggle(ComicsReaderPanel.Settings) },
+                ComicsTopBarButtons(
+                    bookmark = bookmark,
+                    settingsOpen = openPanel == ComicsReaderPanel.Settings,
+                    onSettingsClick = { toggle(ComicsReaderPanel.Settings) },
                 )
             }
         },
@@ -175,4 +177,33 @@ private fun ComicsReaderDock(
             onProgressSelected = onProgressSelected,
         )
     }
+}
+
+/** The top bar's bookmark button: filled while the page on screen is bookmarked. */
+internal class ComicBookmarkButton(
+    val isPageBookmarked: Boolean,
+    val onClick: () -> Unit,
+)
+
+/** The top bar's buttons: bookmark (when the book keeps bookmarks) and the reading settings. */
+@Composable
+private fun ComicsTopBarButtons(
+    bookmark: ComicBookmarkButton?,
+    settingsOpen: Boolean,
+    onSettingsClick: () -> Unit,
+) {
+    bookmark?.let { button ->
+        ReaderBarButton(
+            icon = if (button.isPageBookmarked) AppIcons.BookmarkFilled else AppIcons.Bookmark,
+            contentDescription = if (button.isPageBookmarked) PageBookmarkCopy.RemoveBookmark else PageBookmarkCopy.Bookmark,
+            active = button.isPageBookmarked,
+            onClick = button.onClick,
+        )
+    }
+    ReaderBarButton(
+        icon = AppIcons.Tune,
+        contentDescription = "Reading settings",
+        active = settingsOpen,
+        onClick = onSettingsClick,
+    )
 }

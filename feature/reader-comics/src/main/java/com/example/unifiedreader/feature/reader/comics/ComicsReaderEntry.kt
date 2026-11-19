@@ -19,6 +19,11 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.example.unifiedreader.core.model.ReadableItem
+import com.example.unifiedreader.core.model.primaryAuthor
+import com.example.unifiedreader.feature.annotations.PageBookmarkJumpEffect
+import com.example.unifiedreader.feature.annotations.PageBookmarkRibbon
+import com.example.unifiedreader.feature.annotations.PageBookmarkSources
+import com.example.unifiedreader.feature.annotations.rememberPageBookmarks
 import com.example.unifiedreader.feature.reader.core.ImmersiveReaderOverlay
 import com.example.unifiedreader.feature.reader.core.ReaderLeave
 import com.example.unifiedreader.feature.reader.core.ReaderOpenMode
@@ -52,6 +57,7 @@ fun ComicsReaderScreen(
     journalReadingSessionRecorder: JournalReadingSessionRecorder? = null,
     pageNumberPreferences: ReaderPageNumberPreferencesStore = remember { InMemoryReaderPageNumberPreferencesStore() },
     comfortPreferences: ReaderComfortPreferencesStore = remember { InMemoryReaderComfortPreferencesStore() },
+    bookmarkSources: PageBookmarkSources? = null,
     onBack: () -> Unit,
     openMode: ReaderOpenMode = ReaderOpenMode.Default,
     readerWorkCoordinator: ReaderWorkCoordinator? = null,
@@ -69,6 +75,7 @@ fun ComicsReaderScreen(
     val savedPagesByItemId by progressStore.savedPagesFlow.collectAsStateWithLifecycle()
     val pageNumbersVisible by pageNumberPreferences.isVisibleFlow.collectAsStateWithLifecycle()
     val volumeKeysTurnPages = comfortPreferences.comfortFlow.collectAsStateWithLifecycle().value.volumeKeysTurnPages
+    val pageBookmarks = rememberPageBookmarks(bookmarkSources, item.id, item.title, item.bookMetadata?.primaryAuthor())
     val restoredPreferences by preferencesStore.observePreferences(item).collectAsStateWithLifecycle(initialValue = null)
 
     if (pages.isEmpty()) {
@@ -449,6 +456,10 @@ fun ComicsReaderScreen(
             if (abs(targetPage - from) > 1) jumpBack.jumped(from, from + 1)
             goToPage(targetPage)
         }
+        // A bookmark opened from the Bookmarks page or the book's page.
+        PageBookmarkJumpEffect(pageBookmarks, item.id, ready = progressHydrated && preferencesHydrated) { pageIndex ->
+            goToPage(pageIndex.coerceIn(0, pages.lastIndex))
+        }
         ImmersiveReaderOverlay(
             overlayState = overlayState,
             autoHideDelayMillis = 0L,
@@ -538,9 +549,17 @@ fun ComicsReaderScreen(
                         jumpTo((selectedProgress * (pages.size - 1)).roundToInt().coerceIn(0, pages.lastIndex))
                     },
                     onPageNumbersVisibleChanged = pageNumberPreferences::setVisible,
+                    bookmark = pageBookmarks?.let { bookmarks ->
+                        val pageIndex = readerState.currentPage
+                        ComicBookmarkButton(
+                            isPageBookmarked = bookmarks.onPage(pageIndex).isNotEmpty(),
+                            onClick = { bookmarks.toggle(pageIndex, pages.size) },
+                        )
+                    },
                 )
             },
         )
+        PageBookmarkRibbon(visible = pageBookmarks?.onPage(readerState.currentPage)?.isNotEmpty() == true)
     }
 }
 

@@ -174,11 +174,7 @@ internal fun PdfReaderContent(
     }
     PdfVolumeKeys(enabled = volumeKeysTurnPages && pageCount > 0, navigation = navigation)
     // After a jump from the slider or the page strip: "Back to page 8" for a moment.
-    val jumpBack = rememberReaderJumpBack<Int>(item.id) { pageIndex -> navigation.toPage(pageIndex) }
-    val jumpTo = { target: Int ->
-        if (abs(target - place.pageIndex) > 1) jumpBack.jumped(place.pageIndex, place.safePageIndex(pageCount) + 1)
-        navigation.toPage(target)
-    }
+    val jumpTo = rememberPdfJumpTo(item.id, place, pageCount, navigation)
     val safePageIndex = place.safePageIndex(pageCount)
     val pageNumbersVisible by pageNumberPreferences.isVisibleFlow.collectAsStateWithLifecycle()
     Box(modifier = modifier.fillMaxSize().background(readerOverlayTokens().colors.fallbackPage)) {
@@ -305,5 +301,20 @@ private fun PdfVolumeKeys(enabled: Boolean, navigation: PdfNavigation) {
             ReaderTapSide.Right -> navigation.next()
             ReaderTapSide.Middle -> Unit
         }
+    }
+}
+
+/** Moves to a page the slider or the page strip picked, offering "Back to page 8" after a jump of more than one page. */
+@Composable
+private fun rememberPdfJumpTo(
+    itemId: String,
+    place: PdfReaderPlace,
+    pageCount: Int,
+    navigation: PdfNavigation,
+): (Int) -> Unit {
+    val jumpBack = rememberReaderJumpBack<Int>(itemId) { pageIndex -> navigation.toPage(pageIndex) }
+    return { target: Int ->
+        if (abs(target - place.pageIndex) > 1) jumpBack.jumped(place.pageIndex, place.safePageIndex(pageCount) + 1)
+        navigation.toPage(target)
     }
 }

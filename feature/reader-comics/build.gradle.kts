@@ -13,6 +13,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":feature:reader-preferences"))
     implementation(project(":feature:reader-core"))
+    implementation(project(":feature:annotations"))
     implementation(platform(libs.androidx.compose.bom))
     implementation("androidx.compose.animation:animation")
     implementation("androidx.compose.foundation:foundation")

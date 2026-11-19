@@ -150,12 +150,12 @@ fun PageBookmarkJumpEffect(
 
 /** The ribbon hanging from the page's top edge while the page is bookmarked, as in an EPUB. */
 @Composable
-fun BoxScope.PageBookmarkRibbon(visible: Boolean) {
+fun BoxScope.PageBookmarkRibbon(visible: Boolean, modifier: Modifier = Modifier) {
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn(),
         exit = fadeOut(),
-        modifier = Modifier.align(Alignment.TopEnd).padding(end = PageRibbonEndInset),
+        modifier = modifier.align(Alignment.TopEnd).padding(end = PageRibbonEndInset),
     ) {
         BookmarkRibbon(width = PageRibbonWidth, height = PageRibbonHeight)
     }

@@ -843,6 +843,7 @@ object AppModule {
             preferencesStore = adapter,
             journalReadingSessionRecorder = journalReadingSessionRecorder,
             displayPreferences = readerDisplay,
+            bookmarks = PageBookmarkSources(store = annotationStore, jumps = annotationJumps),
         ),
         epubReaderFactory(
             sessionStore = JournalRecordingReaderSessionStore(
