@@ -30,3 +30,6 @@ output/
 # Claude Code: worktrees and personal settings (.claude/CLAUDE.md is shared)
 .claude/worktrees/
 .claude/settings.local.json
+
+# Written by the Website workflow from the newest release
+site/latest.json

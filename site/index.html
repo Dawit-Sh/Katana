@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Katana · a reader for your Grimmory books</title>
+  <meta name="description" content="Katana is a simple Android reader for your own book server (Grimmory, Kavita, Stump). A fork of yabai, free under the GPL.">
+  <meta property="og:title" content="Katana">
+  <meta property="og:description" content="A simple Android reader for your own book server. Download it here.">
+  <meta property="og:image" content="https://dawitsh.dev/Katana/katana-icon.png">
+  <meta property="og:url" content="https://dawitsh.dev/Katana/">
+  <meta name="theme-color" content="#0b0c0e">
+  <link rel="icon" href="katana-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Noto+Serif+JP:wght@500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ground: #0b0c0e;
+      --card: #15171a;
+      --line: #26292e;
+      --ink: #eceae6;
+      --quiet: #a3a19c;
+      --accent: #d9d4ca;
+      --on-accent: #0b0c0e;
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--ground);
+      color: var(--ink);
+      font: 400 17px/1.6 "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    main { max-width: 640px; margin: 0 auto; padding: 56px 20px 40px; }
+    a { color: var(--ink); text-underline-offset: 3px; }
+    a:hover { color: #fff; }
+
+    .head { display: flex; align-items: center; gap: 18px; }
+    .head img { width: 84px; height: 84px; border-radius: 20px; border: 1px solid var(--line); }
+    h1 { margin: 0; font-size: 40px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; }
+    h1 .kanji { font-family: "Noto Serif JP", serif; font-weight: 500; font-size: 28px; color: var(--quiet); margin-left: 6px; }
+    .tagline { margin: 6px 0 0; color: var(--quiet); }
+
+    .intro { margin: 32px 0 0; }
+
+    .download {
+      margin: 32px 0 0; padding: 22px; border: 1px solid var(--line); border-radius: 18px; background: var(--card);
+    }
+    .button {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%; min-height: 56px; padding: 14px 20px; border-radius: 14px;
+      background: var(--accent); color: var(--on-accent); text-decoration: none;
+      font-weight: 700; font-size: 18px;
+    }
+    .button:hover { color: var(--on-accent); background: #fff; }
+    .button svg { width: 22px; height: 22px; flex: none; }
+    .for { margin: 10px 0 0; text-align: center; color: var(--quiet); font-size: 15px; }
+    .others { margin: 18px 0 0; padding: 16px 0 0; border-top: 1px solid var(--line); font-size: 15px; color: var(--quiet); }
+    .others ul { margin: 6px 0 0; padding: 0; list-style: none; }
+    .others li { padding: 4px 0; }
+    .others a { font-weight: 600; }
+    .install { margin: 14px 0 0; font-size: 14px; color: var(--quiet); }
+
+    h2 { margin: 44px 0 10px; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+    ul.features { margin: 0; padding-left: 20px; }
+    ul.features li { margin: 6px 0; }
+    ul.features li::marker { color: var(--quiet); }
+
+    .note { margin: 0; }
+    footer { margin: 52px 0 0; padding: 20px 0 0; border-top: 1px solid var(--line); font-size: 14px; color: var(--quiet); }
+    footer p { margin: 4px 0; }
+
+    @media (max-width: 420px) {
+      main { padding-top: 36px; }
+      .head img { width: 68px; height: 68px; border-radius: 16px; }
+      h1 { font-size: 34px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="head">
+      <img src="katana-icon.png" alt="Katana icon: an ink katana on black" width="84" height="84">
+      <div>
+        <h1>Katana<span class="kanji" lang="ja">刀</span></h1>
+        <p class="tagline">A simple Android reader for your own book server.</p>
+      </div>
+    </header>
+
+    <p class="intro">
+      I made Katana because I wanted a nice way to read the books on my
+      <a href="https://github.com/grimmory-tools/grimmory">Grimmory</a> server, on my old Fire tablet and on my phone.
+      It's a fork of <a href="https://github.com/bostannnn/yabai">yabai</a>, with the things I was missing added in:
+      highlights that sync, a build that runs well on the Fire, and a bunch of small comforts.
+    </p>
+
+    <section class="download" aria-label="Download">
+      <a class="button" id="download" href="https://github.com/Dawit-Sh/Katana/releases/latest">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>
+        <span id="download-label">Download the latest version</span>
+      </a>
+      <p class="for" id="download-for">For Android 9 or newer</p>
+      <div class="others">
+        Other versions of the same app:
+        <ul>
+          <li><a id="link-arm64" href="https://github.com/Dawit-Sh/Katana/releases/latest">64-bit</a>: almost any phone or tablet from the last several years (Pixel, Samsung and so on)</li>
+          <li><a id="link-fire7" href="https://github.com/Dawit-Sh/Katana/releases/latest">Fire tablets and older 32-bit devices</a></li>
+          <li><a id="link-universal" href="https://github.com/Dawit-Sh/Katana/releases/latest">Universal</a>: works everywhere, just bigger. Pick this one if you're not sure</li>
+        </ul>
+      </div>
+      <p class="install">
+        The first time, Android asks you to allow installs from your browser. Katana isn't on the Play Store, so
+        Play Protect may warn you too. Once it's installed, Katana updates itself from Settings › About,
+        and an update keeps your books and highlights.
+      </p>
+    </section>
+
+    <h2>What it does</h2>
+    <ul class="features">
+      <li>Reads your books from Grimmory, and also Kavita and Stump, or from files on your device.</li>
+      <li>EPUB, PDF, comics (CBZ and CBR), MOBI, AZW3, FB2 and DjVu.</li>
+      <li>Highlights and notes in four styles, synced both ways with Grimmory, so they show up in its web reader and in KOReader too.</li>
+      <li>Your reading place syncs with the server, and books download for offline reading, picking up where they stopped if the Wi-Fi drops.</li>
+      <li>Save words and go over them as flashcards, bookmark pages, search inside a book, and share a highlight as a quote card.</li>
+      <li>Export your highlights and notes as Markdown, and back everything up to a file.</li>
+      <li>Works away from home too, over something like Tailscale.</li>
+      <li>Runs on old Amazon Fire tablets and on new phones alike.</li>
+    </ul>
+
+    <h2>What it isn't</h2>
+    <p class="note">
+      Katana isn't trying to be a reader with every feature piled in. It does what I need, and I'll keep fixing
+      what breaks. If you like it but want something it doesn't do, fork it and make it yours, with whatever
+      AI agent you like to work with. That's pretty much how Katana started.
+    </p>
+
+    <footer>
+      <p>Built on <a href="https://github.com/bostannnn/yabai">yabai</a> by bostannnn. Katana is free software under the
+        <a href="https://github.com/Dawit-Sh/Katana/blob/fire7/LICENSE">GNU GPL v3</a>.</p>
+      <p><a href="https://github.com/Dawit-Sh/Katana">Source code</a> · <a href="https://github.com/Dawit-Sh/Katana/releases">All releases</a> · <a href="https://dawitsh.dev">dawitsh.dev</a></p>
+    </footer>
+  </main>
+
+  <script>
+    // Points the buttons at the newest release's APKs and shows its version, so this page never
+    // needs editing for a new release: latest.json is written by the Website workflow whenever a
+    // release is published (read from the same site, so GitHub's API limits never get in the way).
+    // Without it, the links still go to the latest release page.
+    (function () {
+      var ua = navigator.userAgent || "";
+      var isAndroid = /Android/i.test(ua);
+      var isFire = /Silk|\bKF[A-Z]{2,4}\b/.test(ua);
+      var pick = isFire ? "fire7" : (isAndroid ? "arm64" : "universal");
+
+      function sizeLabel(bytes) {
+        return Math.round(bytes / 1048576) + " MB";
+      }
+
+      fetch("latest.json", { cache: "no-store" })
+        .then(function (response) { return response.ok ? response.json() : Promise.reject(response.status); })
+        .then(function (latest) {
+          var version = String(latest.version || "");
+          var apks = latest.apks || {};
+          ["arm64", "fire7", "universal"].forEach(function (kind) {
+            var asset = apks[kind];
+            var link = document.getElementById("link-" + kind);
+            if (asset && asset.url && link) link.href = asset.url;
+          });
+          var chosen = apks[pick] || apks.universal;
+          if (!chosen || !chosen.url || !version) return;
+          document.getElementById("download").href = chosen.url;
+          document.getElementById("download-label").textContent = "Download v" + version;
+          var forText = isFire ? "For Fire tablets" : (isAndroid ? "For this phone" : "Universal APK");
+          document.getElementById("download-for").textContent =
+            forText + " · " + sizeLabel(chosen.size) + " · Android 9 or newer";
+        })
+        .catch(function () { /* the links already go to the latest release page */ });
+    })();
+  </script>
+</body>
+</html>

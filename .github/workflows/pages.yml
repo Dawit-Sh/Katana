@@ -1,0 +1,59 @@
+# Publishes site/ (the one-page download site) to GitHub Pages: https://dawitsh.dev/Katana/
+# Every published release runs it again and writes site/latest.json (the version and the three APKs'
+# links), which the page reads, so its Download button follows new releases with no edits.
+name: Website
+
+on:
+  push:
+    branches: [fire7]
+    paths:
+      - "site/**"
+      - ".github/workflows/pages.yml"
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fire7
+      - name: Write latest.json from the newest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ github.repository }}/releases/latest" | jq '{
+            version: (.tag_name | ltrimstr("v")),
+            tag: .tag_name,
+            published: .published_at,
+            page: .html_url,
+            apks: ([.assets[] | select(.name | endswith(".apk")) | {
+              key: (if (.name | test("universal")) then "universal"
+                    elif (.name | test("arm64-v8a")) then "arm64"
+                    elif (.name | test("armeabi-v7a")) then "fire7"
+                    else .name end),
+              value: {name, url: .browser_download_url, size}
+            }] | from_entries)
+          }' > site/latest.json
+          cat site/latest.json
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4
