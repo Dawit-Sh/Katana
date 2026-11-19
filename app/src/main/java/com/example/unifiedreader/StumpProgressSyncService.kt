@@ -40,7 +40,7 @@ class StumpProgressSyncService @Inject constructor(
                 )
             }
         }
-        applyRemoteProgressSyncDecision(
+        applyOrOfferRemoteProgress(
             store = progressSyncStore,
             item = item,
             pageCount = item.pageCount,

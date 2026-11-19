@@ -504,12 +504,31 @@ class AppReaderCoordinator @Inject constructor(
         attemptedItems = attemptedItems,
     )
 
+    /**
+     * Opens the book held by the stay-or-go question ([AppUiState.progressOfferPrompt]) once it is
+     * answered; the caller has already saved the place chosen.
+     */
+    fun openAfterProgressOffer(
+        prompt: AppProgressOfferPrompt,
+        updateState: AppUiStateUpdater,
+    ) {
+        BackwardProgressOffers.withdraw(prompt.item.id)
+        updateState { it.copy(progressOfferPrompt = null) }
+        openReader(prompt.item, prompt.selectedReaderItem, prompt.openMode, updateState)
+    }
+
     private fun openReader(
         item: ReadableItem,
         selectedReaderItem: ReadableItem?,
         openMode: ReaderOpenMode,
         updateState: AppUiStateUpdater,
     ) {
+        // The server has an older place than this device, from a newer read: ask before opening.
+        val offer = BackwardProgressOffers.current(item.id)
+        if (offer != null && openMode == ReaderOpenMode.Default) {
+            updateState { it.copy(progressOfferPrompt = AppProgressOfferPrompt(item, selectedReaderItem, openMode, offer)) }
+            return
+        }
         readerWorkCoordinator.notifyReaderOpening(item.id)
         updateState { state ->
             state.copy(

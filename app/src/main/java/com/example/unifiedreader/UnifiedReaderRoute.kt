@@ -275,6 +275,12 @@ fun UnifiedReaderAppContent(
                         viewModel = viewModel,
                         listsViewModel = listsViewModel,
                     )
+                    ProgressOfferHost(
+                        prompt = uiState.progressOfferPrompt,
+                        store = viewModel.readerSessionStore,
+                        onAnswer = viewModel::answerProgressOffer,
+                        onDismiss = viewModel::dismissProgressOffer,
+                    )
                     KeepReaderListContext(uiState = uiState, viewModel = viewModel)
                     val isLibraryVisible = !isReaderMode &&
                         uiState.topLevel == TopLevelDestination.Library &&

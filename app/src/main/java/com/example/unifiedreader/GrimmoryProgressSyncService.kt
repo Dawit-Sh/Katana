@@ -38,7 +38,7 @@ class GrimmoryProgressSyncService @Inject constructor(
                 )
             }
         } ?: return
-        applyRemoteProgressSyncDecision(
+        applyOrOfferRemoteProgress(
             store = progressSyncStore,
             item = entry.item,
             pageCount = entry.item.pageCount,

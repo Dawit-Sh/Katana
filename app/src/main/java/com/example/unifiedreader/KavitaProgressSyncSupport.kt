@@ -35,12 +35,12 @@ internal suspend fun pushDirtyKavitaProgress(
         ProgressPushPlan.Push(
             push = {
                 tokens.run push@{ token, _ ->
-                    val serverCopy = progress.newerServerCopy(
+                    val serverAnswer = progress.serverAnswer(
                         remote = api.getProgress(accessToken = token, chapterId = chapterId)
                             .toReadingProgress(itemId = item.id, pageCount = item.pageCount),
                         localRefinesRemote = ::kavitaLocalRefinesRemote,
                     )
-                    if (serverCopy != null) return@push PendingProgressPush.ServerNewer(serverCopy)
+                    if (serverAnswer != null) return@push serverAnswer
                     val progressPage = if (progress.isExplicitUnreadReset) 0 else progress.kavitaPageNum(item)
                     val update = item.toKavitaProgressUpdate(
                         page = progressPage,

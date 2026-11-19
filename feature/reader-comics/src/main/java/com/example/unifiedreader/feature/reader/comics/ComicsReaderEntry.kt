@@ -29,6 +29,7 @@ import com.example.unifiedreader.feature.reader.core.ReaderPageNumberPills
 import com.example.unifiedreader.feature.reader.core.ReaderWorkCoordinator
 import com.example.unifiedreader.feature.reader.core.ReportReaderOpening
 import com.example.unifiedreader.feature.reader.core.rememberReaderActiveSessionTracker
+import com.example.unifiedreader.feature.reader.core.rememberReaderJumpBack
 import com.example.unifiedreader.feature.reader.core.rememberReaderOverlayState
 import com.example.unifiedreader.feature.reader.core.rememberReaderSessionLifecycle
 import com.example.unifiedreader.feature.reader.preferences.ComicReaderMode
@@ -38,6 +39,7 @@ import com.example.unifiedreader.feature.reader.preferences.ReaderComfortPrefere
 import com.example.unifiedreader.feature.reader.preferences.ReaderPageNumberPreferencesStore
 import com.example.unifiedreader.journal.JournalReadingSessionRecorder
 import com.example.unifiedreader.ui.theme.UnifiedReaderThemeTokens
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
@@ -430,6 +432,23 @@ fun ComicsReaderScreen(
             pagedSpreads.indexOfPage(readerState.resumeAnchorPage, readerState.resumeSegment),
         )
         val containerSize = IntSize(constraints.maxWidth, constraints.maxHeight)
+        // Moves the reader the way its controls ask: a page in paged mode, the top of a page while scrolling.
+        val goToPage = { targetPage: Int ->
+            when (readerState.readerMode) {
+                ComicReaderMode.Paged -> readerState.onPageSettled(targetPage)
+                ComicReaderMode.VerticalScroll -> readerState.onContinuousPositionSettled(
+                    pageIndex = targetPage,
+                    offsetRatio = 0f,
+                )
+            }
+        }
+        // After a jump from the slider, the page strip or the pages panel: "Back to page 8" for a moment.
+        val jumpBack = rememberReaderJumpBack<Int>(item.id) { pageIndex -> goToPage(pageIndex) }
+        val jumpTo = { targetPage: Int ->
+            val from = readerState.currentPage
+            if (abs(targetPage - from) > 1) jumpBack.jumped(from, from + 1)
+            goToPage(targetPage)
+        }
         ImmersiveReaderOverlay(
             overlayState = overlayState,
             autoHideDelayMillis = 0L,
@@ -496,17 +515,6 @@ fun ComicsReaderScreen(
                 }
             },
             overlay = {
-                // Moves the reader the way its controls ask: a page in paged mode, the top of a
-                // page while scrolling.
-                val goToPage = { targetPage: Int ->
-                    when (readerState.readerMode) {
-                        ComicReaderMode.Paged -> readerState.onPageSettled(targetPage)
-                        ComicReaderMode.VerticalScroll -> readerState.onContinuousPositionSettled(
-                            pageIndex = targetPage,
-                            offsetRatio = 0f,
-                        )
-                    }
-                }
                 ComicsReaderChrome(
                     item = item,
                     chromePages = ComicsChromePages(
@@ -525,9 +533,9 @@ fun ComicsReaderScreen(
                     pageNumbersVisible = pageNumbersVisible,
                     overlayVisible = overlayState.isVisible,
                     onBack = closeReader,
-                    onPageSelected = goToPage,
+                    onPageSelected = jumpTo,
                     onProgressSelected = { selectedProgress ->
-                        goToPage((selectedProgress * (pages.size - 1)).roundToInt().coerceIn(0, pages.lastIndex))
+                        jumpTo((selectedProgress * (pages.size - 1)).roundToInt().coerceIn(0, pages.lastIndex))
                     },
                     onPageNumbersVisibleChanged = pageNumberPreferences::setVisible,
                 )

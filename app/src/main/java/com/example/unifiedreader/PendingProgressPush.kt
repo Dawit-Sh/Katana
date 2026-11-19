@@ -19,40 +19,53 @@ internal sealed interface PendingProgressPush {
 }
 
 /**
- * The server's copy to keep instead of pushing this queued save, or null to push it. The most
- * recent read wins, by the rule a pull follows ([decideRemoteProgressSync]); no server copy, or one
- * without a date, never beats a local save.
+ * What becomes of this queued save, given the server's copy: null to push it. The most recent read wins,
+ * by the rule a pull follows ([decideRemoteProgressSync]); no server copy, or one without a date, never
+ * beats a local save. A server copy that wins ([PendingProgressPush.ServerNewer]) replaces the save,
+ * unless it is behind this device's place: then the save stays queued and the server's place waits as an
+ * offer the book asks about before it opens ([BackwardProgressOffers]).
  */
-internal fun ReaderProgressSnapshot.newerServerCopy(
+internal fun ReaderProgressSnapshot.serverAnswer(
     remote: ReadingProgress?,
     localRefinesRemote: (ProgressSyncSnapshot, ReadingProgress?) -> Boolean = { _, _ -> false },
-): ReaderProgressSnapshot? {
+): PendingProgressPush? {
+    val local = ProgressSyncSnapshot(
+        itemId = itemId,
+        locatorType = locatorType,
+        page = page,
+        cfi = cfi,
+        percent = percent,
+        isFinished = isFinished,
+        isExplicitUnreadReset = isExplicitUnreadReset,
+        syncState = syncState,
+        updatedAtEpochMillis = updatedAtEpochMillis,
+    )
     val decision = decideRemoteProgressSync(
-        local = ProgressSyncSnapshot(
-            itemId = itemId,
-            locatorType = locatorType,
-            page = page,
-            cfi = cfi,
-            percent = percent,
-            isFinished = isFinished,
-            isExplicitUnreadReset = isExplicitUnreadReset,
-            syncState = syncState,
-            updatedAtEpochMillis = updatedAtEpochMillis,
-        ),
+        local = local,
         remote = remote,
         nowEpochMillis = updatedAtEpochMillis,
         localRefinesRemote = localRefinesRemote,
-    ) as? RemoteProgressSyncDecision.ApplyRemote ?: return null
-    return ReaderProgressSnapshot(
-        itemId = itemId,
-        locatorType = decision.locator.locatorType,
-        page = decision.locator.page,
-        cfi = decision.locator.cfi,
-        percent = decision.locator.percent,
-        isFinished = decision.isFinished,
-        syncState = SyncState.CLEAN,
-        updatedAtEpochMillis = decision.updatedAtEpochMillis,
-    )
+    ).askingBeforeGoingBack(local)
+    if (decision !is RemoteProgressSyncDecision.OfferRemote) BackwardProgressOffers.withdraw(itemId)
+    return when (decision) {
+        is RemoteProgressSyncDecision.OfferRemote -> {
+            BackwardProgressOffers.offer(decision.toOffer(itemId))
+            PendingProgressPush.Skipped
+        }
+        is RemoteProgressSyncDecision.ApplyRemote -> PendingProgressPush.ServerNewer(
+            ReaderProgressSnapshot(
+                itemId = itemId,
+                locatorType = decision.locator.locatorType,
+                page = decision.locator.page,
+                cfi = decision.locator.cfi,
+                percent = decision.locator.percent,
+                isFinished = decision.isFinished,
+                syncState = SyncState.CLEAN,
+                updatedAtEpochMillis = decision.updatedAtEpochMillis,
+            ),
+        )
+        else -> null
+    }
 }
 
 /** Records how pushing [progress] went, unless a newer local save replaced it meanwhile. */

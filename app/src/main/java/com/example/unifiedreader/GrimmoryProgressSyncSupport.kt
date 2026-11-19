@@ -35,10 +35,10 @@ internal suspend fun pushDirtyGrimmoryProgress(
         ProgressPushPlan.Push(
             push = {
                 tokens.run { token ->
-                    val serverCopy = progress.newerServerCopy(
+                    val serverAnswer = progress.serverAnswer(
                         remote = api.getBookEntry(accessToken = token, bookId = remoteItemId)?.progress,
                     )
-                    if (serverCopy != null) return@run PendingProgressPush.ServerNewer(serverCopy)
+                    if (serverAnswer != null) return@run serverAnswer
                     if (update == null) {
                         api.resetBookProgress(accessToken = token, bookId = remoteItemId)
                     } else {
