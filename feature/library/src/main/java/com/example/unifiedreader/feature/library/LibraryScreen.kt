@@ -611,7 +611,7 @@ fun LibraryScreen(
                 )
             }
             val gridMetrics = LibraryGridMetrics(gridPresentation.selectedGridSize.cellSizeDp, compactWindow)
-            val gridCoverImageVariant = gridMetrics.coverImageVariant
+            val gridCoverImageVariant = gridPresentation.coverImageVariant
             val showGridTitles = LibraryCoverSize.of(gridPresentation.selectedGridSize.cellSizeDp).showsTitle
             val gridTitleLines = libraryCoverTitleLines(gridPresentation.selectedGridSize.cellWidthDp.dp)
             VisibleRemoteCoverPrefetcher(

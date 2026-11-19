@@ -30,6 +30,14 @@ class LibraryCoverImageRequestsTest {
     }
 
     @Test
+    fun `small grid covers decode the grid thumbnail at about half size`() {
+        assertEquals(IntSize(240, 360), libraryCoverImageRequestSize(LibraryCoverImageVariant.GridSmall))
+        // A 411 dp phone at 2.625x: 273 px for cells of 63 to 99 dp (165 to 260 px), a third of the grid's pixels.
+        assertEquals(IntSize(273, 410), libraryCoverImageRequestSize(LibraryCoverImageVariant.GridSmall, density = 2.625f))
+        assertEquals(IntSize(480, 720), libraryCoverImageRequestSize(LibraryCoverImageVariant.Grid, density = 2.625f))
+    }
+
+    @Test
     fun `libraryCoverImageRequestSize grows for very dense displays`() {
         assertEquals(
             IntSize(960, 1440),

@@ -200,6 +200,9 @@ internal data class LibraryGridPresentation(
     val scrollingPrefetchItemLimit: Int,
     // While a docked panel narrows the grid it lays out exactly `selectedGridSize.columnCount` columns.
     val fixedColumns: Boolean = false,
+    // The image the grid's covers ask for. On a phone it follows the size asked for, the smaller of two sizes that
+    // lay out alike there (Large and Huge at 360 dp); from 600 dp it follows the selected size, as it always did.
+    val coverImageVariant: LibraryCoverImageVariant = libraryGridCoverImageVariant(selectedGridSize.minCellWidthDp),
 )
 
 fun sanitizeLibraryGridCellSizeDp(
@@ -260,24 +263,33 @@ internal fun libraryGridPresentation(
         undockedGridSize
     }
     val compactGrid = selectedGridSize.minCellWidthDp <= LibraryCoverSize.Medium.cellSizeDp
+    val imageCellWidthDp = if (compactWindow) {
+        LibraryCoverSize.of(requestedGridCellSizeDp).minCellWidthDp(compactWindow = true)
+    } else {
+        selectedGridSize.minCellWidthDp
+    }
     return LibraryGridPresentation(
         selectedGridSize = selectedGridSize,
         availableGridSizes = availableGridSizes,
         scrollingPrefetchItemLimit = if (compactGrid) 2 else 4,
         fixedColumns = docked,
+        coverImageVariant = libraryGridCoverImageVariant(imageCellWidthDp),
     )
 }
 
 /**
- * The cover image a grid cell asks for. [minCellWidthDp] is the narrowest the cells get: a phone's cells (144 dp at
- * most) take the grid thumbnail, which is 480 px wide, rather than the larger ones made for a tablet's Large and Huge.
+ * The cover image a grid cell asks for, sized to the cell. [minCellWidthDp] is the narrowest the cells get. A tablet's
+ * stops keep the images they had. On a phone Medium and Large take the grid thumbnail (480 px wide) rather than the
+ * 720 px one, Huge (two columns, up to 240 dp) the 720 px one rather than the 960 px one, and Tiny and Small decode the
+ * grid thumbnail at about half size.
  */
 fun libraryGridCoverImageVariant(
     minCellWidthDp: Int,
 ): LibraryCoverImageVariant = when {
     minCellWidthDp >= extraLargeGridCoverCellSizeDp -> LibraryCoverImageVariant.GridExtraLarge
     minCellWidthDp >= largeGridCoverCellSizeDp -> LibraryCoverImageVariant.GridLarge
-    else -> LibraryCoverImageVariant.Grid
+    minCellWidthDp > smallGridCoverMaxCellSizeDp -> LibraryCoverImageVariant.Grid
+    else -> LibraryCoverImageVariant.GridSmall
 }
 
 fun availableLibraryGridSizeOptions(
@@ -392,5 +404,7 @@ private const val TinyCoverUpperBoundDp = 83
 private const val SmallCoverUpperBoundDp = 118
 private const val MediumCoverUpperBoundDp = 150
 private const val HugeCoverLowerBoundDp = 220
-private const val largeGridCoverCellSizeDp = defaultLibraryGridCellSizeDp
+// Huge on a phone (144) and up; a tablet's stops below Large (140 at most) stay on the grid thumbnail.
+private const val largeGridCoverCellSizeDp = 144
 private const val extraLargeGridCoverCellSizeDp = 200
+private const val smallGridCoverMaxCellSizeDp = 72

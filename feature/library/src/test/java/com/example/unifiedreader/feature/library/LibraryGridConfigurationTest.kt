@@ -77,16 +77,21 @@ class LibraryGridConfigurationTest {
     }
 
     @Test
-    fun `phone covers ask for the grid thumbnail and tablet covers keep theirs`() {
-        LibraryCoverSize.entries.forEach { size ->
-            assertEquals(
-                LibraryCoverImageVariant.Grid,
-                LibraryGridMetrics(cellSizeDp = size.cellSizeDp, compactWindow = true).coverImageVariant,
-            )
-        }
+    fun `phone covers ask for images no larger than their cells and tablet covers keep theirs`() {
+        // Tiny, Small, Medium, Large, Huge.
         assertEquals(
             listOf(
+                LibraryCoverImageVariant.GridSmall,
+                LibraryCoverImageVariant.GridSmall,
                 LibraryCoverImageVariant.Grid,
+                LibraryCoverImageVariant.Grid,
+                LibraryCoverImageVariant.GridLarge,
+            ),
+            LibraryCoverSize.entries.map { size -> LibraryGridMetrics(cellSizeDp = size.cellSizeDp, compactWindow = true).coverImageVariant },
+        )
+        assertEquals(
+            listOf(
+                LibraryCoverImageVariant.GridSmall,
                 LibraryCoverImageVariant.Grid,
                 LibraryCoverImageVariant.Grid,
                 LibraryCoverImageVariant.GridLarge,
@@ -94,6 +99,33 @@ class LibraryGridConfigurationTest {
             ),
             LibraryCoverSize.entries.map { size -> LibraryGridMetrics(cellSizeDp = size.cellSizeDp).coverImageVariant },
         )
+    }
+
+    @Test
+    fun `the default size on a phone asks for the grid thumbnail, not the tablet's larger images`() {
+        listOf(360, 384, 411).forEach { width ->
+            val presentation = libraryGridPresentation(width.dp, 16.dp, 16.dp, defaultLibraryGridCellSizeDp, compactWindow = true)
+            assertEquals("at $width dp", LibraryCoverImageVariant.Grid, presentation.coverImageVariant)
+        }
+        // The Fire 7 keeps what it had: Large lays out like Huge at 600 dp and takes Huge's image.
+        val fire = libraryGridPresentation(600.dp, 24.dp, 24.dp, defaultLibraryGridCellSizeDp)
+        assertEquals(LibraryCoverImageVariant.GridExtraLarge, fire.coverImageVariant)
+    }
+
+    @Test
+    fun `every phone cell gets an image at least as wide as it draws`() {
+        // Phones from 1.75x to 3x at any width, and 3.5x (1440 px) phones up to 411 dp; 5% of stretch allowed.
+        val phones = listOf(1.75f, 1.875f, 2f, 2.625f, 3f).map { scale -> scale to 599 } + (3.5f to 411)
+        phones.forEach { (scale, widest) ->
+            (320..widest).forEach { width ->
+                LibraryCoverSize.entries.forEach { size ->
+                    val presentation = libraryGridPresentation(width.dp, 16.dp, 16.dp, size.cellSizeDp, compactWindow = true)
+                    val cellPx = presentation.selectedGridSize.cellWidthDp * scale
+                    val imagePx = libraryCoverImageRequestSize(presentation.coverImageVariant, scale).width
+                    assertTrue("${size.label} at $width dp, ${scale}x: $imagePx px for $cellPx", imagePx >= cellPx * 0.95f)
+                }
+            }
+        }
     }
 
     @Test
@@ -251,7 +283,9 @@ class LibraryGridConfigurationTest {
 
     @Test
     fun `large grid cells use larger cover thumbnails`() {
-        assertEquals(LibraryCoverImageVariant.Grid, libraryGridCoverImageVariant(160))
+        assertEquals(LibraryCoverImageVariant.GridSmall, libraryGridCoverImageVariant(72))
+        assertEquals(LibraryCoverImageVariant.Grid, libraryGridCoverImageVariant(140))
+        assertEquals(LibraryCoverImageVariant.GridLarge, libraryGridCoverImageVariant(144))
         assertEquals(LibraryCoverImageVariant.GridLarge, libraryGridCoverImageVariant(180))
         assertEquals(LibraryCoverImageVariant.GridExtraLarge, libraryGridCoverImageVariant(200))
         assertEquals(LibraryCoverImageVariant.GridExtraLarge, libraryGridCoverImageVariant(240))

@@ -13,6 +13,11 @@ import kotlin.math.ceil
 import kotlin.math.max
 
 enum class LibraryCoverImageVariant {
+    /**
+     * Tiny and Small covers on a phone, Tiny on a tablet: the grid thumbnail decoded at about half its size, as wide
+     * as the cell's pixels need, instead of the 480 px a cell twice as wide needs.
+     */
+    GridSmall,
     Grid,
     GridLarge,
     GridExtraLarge,
@@ -57,6 +62,7 @@ internal fun libraryCoverImageRequestSize(
 private fun libraryCoverImageMinimumRequestSize(
     variant: LibraryCoverImageVariant,
 ): IntSize = when (variant) {
+    LibraryCoverImageVariant.GridSmall -> IntSize(240, 360)
     LibraryCoverImageVariant.Grid -> IntSize(480, 720)
     LibraryCoverImageVariant.GridLarge -> IntSize(720, 1080)
     LibraryCoverImageVariant.GridExtraLarge -> IntSize(960, 1440)
@@ -68,6 +74,8 @@ private fun libraryCoverImageMinimumRequestSize(
 private fun libraryCoverImageLogicalSize(
     variant: LibraryCoverImageVariant,
 ): IntSize = when (variant) {
+    // The widest a Tiny or Small cell gets on a phone (three columns of Small at 360 dp come to 99).
+    LibraryCoverImageVariant.GridSmall -> IntSize(104, 156)
     LibraryCoverImageVariant.Grid -> IntSize(160, 240)
     LibraryCoverImageVariant.GridLarge -> IntSize(180, 270)
     LibraryCoverImageVariant.GridExtraLarge -> IntSize(240, 360)
@@ -94,6 +102,7 @@ internal data class LibraryCoverImageDecodePolicy(
 internal fun libraryCoverImageDecodePolicy(
     variant: LibraryCoverImageVariant,
 ): LibraryCoverImageDecodePolicy = when (variant) {
+    LibraryCoverImageVariant.GridSmall,
     LibraryCoverImageVariant.Grid,
     LibraryCoverImageVariant.GridLarge,
     LibraryCoverImageVariant.GridExtraLarge -> LibraryCoverImageDecodePolicy(
