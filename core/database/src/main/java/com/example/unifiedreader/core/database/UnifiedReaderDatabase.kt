@@ -19,6 +19,7 @@ import com.example.unifiedreader.core.database.dao.RemoteCatalogDao
 import com.example.unifiedreader.core.database.dao.ListPreferenceDao
 import com.example.unifiedreader.core.database.dao.ReaderAnnotationDao
 import com.example.unifiedreader.core.database.dao.ReaderBookmarkDao
+import com.example.unifiedreader.core.database.dao.ReaderBookmarkSyncDao
 import com.example.unifiedreader.core.database.dao.SavedWordStudyDao
 import com.example.unifiedreader.core.database.dao.ServerListDao
 import com.example.unifiedreader.core.database.dao.UserListDao
@@ -78,7 +79,7 @@ import com.example.unifiedreader.core.database.entity.UserListEntryEntity
         SavedWordEntity::class,
         ReaderBookmarkEntity::class,
     ],
-    version = 39,
+    version = 40,
     exportSchema = true,
 )
 abstract class UnifiedReaderDatabase : RoomDatabase() {
@@ -97,6 +98,7 @@ abstract class UnifiedReaderDatabase : RoomDatabase() {
     abstract fun readerHighlightSyncDao(): ReaderHighlightSyncDao
     abstract fun readerHighlightPlacementDao(): ReaderHighlightPlacementDao
     abstract fun readerBookmarkDao(): ReaderBookmarkDao
+    abstract fun readerBookmarkSyncDao(): ReaderBookmarkSyncDao
     abstract fun savedWordStudyDao(): SavedWordStudyDao
 }
 
@@ -1038,4 +1040,5 @@ internal val allMigrations: Array<Migration> = arrayOf(
     MIGRATION_36_37,
     MIGRATION_37_38,
     MIGRATION_38_39,
+    MIGRATION_39_40,
 )

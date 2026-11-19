@@ -26,6 +26,9 @@ interface ReaderBookmarkStore {
     ): ReaderBookmark
 
     suspend fun deleteBookmark(id: String)
+
+    /** The reader's name and note for a bookmark; a blank one removes it. */
+    suspend fun nameBookmark(id: String, title: String, note: String)
 }
 
 /** Studying the saved words: a word's own note, and its flashcard answers. */
@@ -83,6 +86,11 @@ internal class RoomReaderBookmarkStore(
         dao.markBookmarkDeleted(id, syncState = SYNC_DIRTY, atEpochMillis = now())
     }
 
+    override suspend fun nameBookmark(id: String, title: String, note: String) = withContext(ioDispatcher) {
+        val name = title.oneLine().takeIf(String::isNotEmpty)
+        dao.setBookmarkNaming(id, title = name, note = note.trim().takeIf(String::isNotEmpty), atEpochMillis = now())
+    }
+
     private companion object {
         /** A change no server has yet; a sync (later) sends these. */
         const val SYNC_DIRTY = "DIRTY"
@@ -123,4 +131,6 @@ internal fun ReaderBookmarkEntity.toModel(): ReaderBookmark = ReaderBookmark(
     pageCount = pageCount,
     text = text,
     createdAtEpochMillis = createdAtEpochMillis,
+    title = title,
+    note = note,
 )

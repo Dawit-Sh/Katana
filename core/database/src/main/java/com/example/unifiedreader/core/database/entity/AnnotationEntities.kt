@@ -100,10 +100,14 @@ data class SavedWordEntity(
 
 /**
  * A page the reader bookmarked in a book ([itemId]). [locatorJson] is the Readium locator of the
- * page's start, which finds it again at any text size; [page] of [pageCount] and [progression]
- * (through the book, 0..1) say where it was when it was made, and [text] keeps the page's first
- * words for lists. Like a highlight, a removed bookmark stays as [deleted] until a sync has told a
- * server ([syncState], [remoteId]).
+ * page's start, which finds it again at any text size (a page-based book's is `{"page": n}`); [page]
+ * of [pageCount] and [progression] (through the book, 0..1) say where it was when it was made, and
+ * [text] keeps the page's first words for lists and search. Like a highlight, a removed bookmark
+ * stays as [deleted] until a sync has told a server ([syncState], [remoteId]); [remoteCfi] is an
+ * EPUB bookmark's place the server's way (a CFI), worked out by the reader, or the place a bookmark
+ * made on the server came with, until the reader finds it in this device's copy (an empty
+ * [locatorJson] until then). [title] is the reader's own name for it and [note] what they wrote
+ * about it, both shared with the server. Database 40 added these three.
  */
 @Entity(
     tableName = "reader_bookmarks",
@@ -126,4 +130,14 @@ data class ReaderBookmarkEntity(
     val deleted: Boolean,
     val syncState: String,
     val remoteId: String?,
+    val remoteCfi: String? = null,
+    val title: String? = null,
+    val note: String? = null,
+)
+
+/** A bookmark waiting to go to its server: which book, and the change (the bookmark and when). */
+data class WaitingBookmarkKey(
+    val itemId: String,
+    val id: String,
+    val updatedAtEpochMillis: Long,
 )

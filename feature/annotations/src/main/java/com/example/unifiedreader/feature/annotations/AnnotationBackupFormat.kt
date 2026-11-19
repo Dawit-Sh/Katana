@@ -95,6 +95,9 @@ internal data class BackupBookmark(
     val updatedAt: Long,
     val syncState: String = "DIRTY",
     val remoteId: String? = null,
+    val remoteCfi: String? = null,
+    val title: String? = null,
+    val note: String? = null,
 )
 
 internal fun ReaderHighlightEntity.toBackup() = BackupHighlight(
@@ -188,6 +191,9 @@ internal fun ReaderBookmarkEntity.toBackup() = BackupBookmark(
     updatedAt = updatedAtEpochMillis,
     syncState = syncState,
     remoteId = remoteId,
+    remoteCfi = remoteCfi,
+    title = title,
+    note = note,
 )
 
 internal fun BackupBookmark.toEntity() = ReaderBookmarkEntity(
@@ -207,6 +213,9 @@ internal fun BackupBookmark.toEntity() = ReaderBookmarkEntity(
     deleted = false,
     syncState = syncState,
     remoteId = remoteId,
+    remoteCfi = remoteCfi,
+    title = title,
+    note = note,
 )
 
 internal const val BACKUP_APP = "Katana"

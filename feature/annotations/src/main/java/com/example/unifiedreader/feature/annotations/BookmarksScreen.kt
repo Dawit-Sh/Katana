@@ -55,8 +55,15 @@ import com.example.unifiedreader.ui.theme.UnifiedReaderThemeTokens
 /** A book's cover as the library draws it, sized by [Modifier]; the app gives it (it knows the catalog). */
 typealias MarkedBookCover = @Composable (book: AnnotatedBook, modifier: Modifier) -> Unit
 
+/** A bookmark's changes from the Bookmarks screens: removing it, and its name and note (blank removes them). */
+interface BookmarkEdits {
+    fun deleteBookmark(id: String)
+
+    fun nameBookmark(id: String, title: String, note: String)
+}
+
 /** What the Bookmarks screens ask of the app and the store. */
-interface BookmarksActions {
+interface BookmarksActions : BookmarkEdits {
     /** Opens the book where it was left. */
     fun continueReading(book: AnnotatedBook)
 
@@ -66,7 +73,6 @@ interface BookmarksActions {
     /** "p. 8 of 78" for a book's Continue, when its place is known. */
     fun progressLabel(itemId: String): String?
 
-    fun deleteBookmark(id: String)
 
     fun deleteWord(id: String)
 

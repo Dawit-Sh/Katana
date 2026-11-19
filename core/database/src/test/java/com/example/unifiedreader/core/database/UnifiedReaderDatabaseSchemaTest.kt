@@ -106,6 +106,35 @@ class UnifiedReaderDatabaseSchemaTest {
     }
 
     @Test
+    fun `migration 39 to 40 gives the exported 40 schema and keeps every bookmark, unnamed and unplaced`() {
+        val name = "schema-39-40-${System.nanoTime()}"
+        helper.createDatabase(name, 39).use { database ->
+            database.execSQL(
+                """
+                INSERT INTO reader_bookmarks (id, itemId, bookTitle, bookAuthor, href, locatorJson, chapterTitle,
+                    progression, page, pageCount, text, createdAtEpochMillis, updatedAtEpochMillis, deleted,
+                    syncState, remoteId)
+                VALUES ('b1', 'local:item:9', 'Pride and Prejudice', 'Jane Austen', 'OEBPS/c43.xhtml',
+                    '{"href":"OEBPS/c43.xhtml"}', 'XLIII', 0.64, 229, 357, 'turned out very wild', 5, 5, 0, 'DIRTY', NULL)
+                """.trimIndent(),
+            )
+        }
+
+        helper.runMigrationsAndValidate(name, 40, true, MIGRATION_39_40).use { database ->
+            database.query("SELECT id, page, text, syncState, remoteCfi, title, note FROM reader_bookmarks").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("b1", cursor.getString(0))
+                assertEquals(229, cursor.getInt(1))
+                assertEquals("turned out very wild", cursor.getString(2))
+                assertEquals("DIRTY", cursor.getString(3))
+                assertTrue(cursor.isNull(4))
+                assertTrue(cursor.isNull(5))
+                assertTrue(cursor.isNull(6))
+            }
+        }
+    }
+
+    @Test
     fun `room opens a version 36 database at the current version with every migration`() {
         val name = "schema-36-current-${System.nanoTime()}"
         helper.createDatabase(name, 36).close()

@@ -103,7 +103,9 @@ data class SavedWord(
 
 /**
  * A page bookmarked in a book: where it starts ([place]), which page of how many it was when it
- * was made, and the page's first words ([text]) to recognise it by.
+ * was made, and the page's first words ([text]) to recognise it by; the reader's own name for it
+ * ([title]) and [note], when given. [isPlaced] is false for one from the server not yet found in
+ * this device's copy of the book (it opens the book where it was left until then).
  */
 data class ReaderBookmark(
     val id: String,
@@ -113,7 +115,12 @@ data class ReaderBookmark(
     val pageCount: Int?,
     val text: String?,
     val createdAtEpochMillis: Long,
-)
+    val title: String? = null,
+    val note: String? = null,
+) {
+    val isPlaced: Boolean
+        get() = place.locatorJson.isNotEmpty()
+}
 
 /** What a new highlight gets when none is chosen: the style and colour of the last one made. */
 data class HighlightLook(

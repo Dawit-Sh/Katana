@@ -102,7 +102,10 @@ fun LazyListScope.bookPageBookmarks(
     item(key = "bookmarks-end") { AppSheetSectionEnd() }
 }
 
-/** One bookmark: the amber ribbon, "Page 8 of 78 · 9%", its first words or chapter, and delete when given. */
+/**
+ * One bookmark: the amber ribbon, its name or "Page 8 of 78 · 9%", its first words or chapter, its
+ * note, then name-or-note ([onEdit]) and delete when given.
+ */
 @Composable
 fun BookmarkLine(
     bookmark: ReaderBookmark,
@@ -110,6 +113,7 @@ fun BookmarkLine(
     onDelete: (() -> Unit)?,
     modifier: Modifier = Modifier,
     showWhen: Boolean = false,
+    onEdit: (() -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
@@ -125,29 +129,10 @@ fun BookmarkLine(
             tint = MarkTint.Bookmark,
             modifier = Modifier.size(LineIcon),
         )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = bookmarkTitle(bookmark),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            val words = bookmark.text ?: chapterOf(bookmark.place.chapterTitle, bookmark.book)
-            words?.let { line ->
-                Text(
-                    text = line,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (showWhen) {
-                MetaLine(
-                    listOfNotNull(
-                        chapterOf(bookmark.place.chapterTitle, bookmark.book)?.takeIf { bookmark.text != null },
-                        BookmarksCopy.moment(bookmark.createdAtEpochMillis),
-                    ),
-                )
+        BookmarkLineText(bookmark, showWhen, Modifier.weight(1f))
+        onEdit?.let { edit ->
+            AppIconButton(onClick = edit) {
+                Icon(imageVector = AppIcons.Edit, contentDescription = BookmarkNamingCopy.Edit)
             }
         }
         onDelete?.let { delete ->
@@ -158,6 +143,47 @@ fun BookmarkLine(
     }
 }
 
+/** A bookmark's lines: its name or place, its first words or chapter, its note, and when ([showWhen]). */
+@Composable
+private fun BookmarkLineText(bookmark: ReaderBookmark, showWhen: Boolean, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        Text(
+            text = bookmarkHeadline(bookmark),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        bookmarkSubline(bookmark)?.let { line ->
+            Text(
+                text = line,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        bookmark.note?.let { note ->
+            Text(
+                text = note,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+                maxLines = NOTE_LINES,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (showWhen) {
+            MetaLine(
+                listOfNotNull(
+                    chapterOf(bookmark.place.chapterTitle, bookmark.book)?.takeIf { bookmark.text != null || bookmark.title != null },
+                    BookmarksCopy.moment(bookmark.createdAtEpochMillis),
+                ),
+            )
+        }
+    }
+}
+
+private const val NOTE_LINES = 2
 private val LineIcon = 18.dp
 private val LineMinHeight = 48.dp
 

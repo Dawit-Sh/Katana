@@ -1,11 +1,13 @@
 package com.example.unifiedreader
 
 import com.example.unifiedreader.core.common.ApplicationScope
+import com.example.unifiedreader.core.database.entity.WaitingBookmarkKey
 import com.example.unifiedreader.core.database.entity.WaitingHighlightKey
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceConnectivityState
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.data.repository.ReadableItemRepository
+import com.example.unifiedreader.feature.annotations.BookmarkSyncStore
 import com.example.unifiedreader.feature.annotations.HighlightSyncStore
 import com.example.unifiedreader.feature.reader.core.ReaderWorkCoordinator
 import java.util.concurrent.atomic.AtomicBoolean
@@ -37,8 +39,8 @@ interface HighlightSyncTriggers {
 }
 
 /**
- * When highlights sync with Grimmory ([GrimmoryHighlightSync] says how), so a change made offline
- * goes up later and is never lost:
+ * When highlights and bookmarks sync with Grimmory ([GrimmoryHighlightSync] and [GrimmoryBookmarkSync]
+ * say how), so a change made offline goes up later and is never lost:
  * - a change made here goes a few seconds after the last one (more often follow), when Grimmory is
  *   online, and as soon as it is online again;
  * - a book opened brings its highlights down (and sends its waiting changes);
@@ -50,24 +52,30 @@ class AppHighlightSyncCoordinator @Inject constructor(
     @param:ApplicationScope private val scope: CoroutineScope,
     private val sync: GrimmoryHighlightSync,
     private val store: HighlightSyncStore,
+    private val bookmarkSync: GrimmoryBookmarkSync,
+    private val bookmarkStore: BookmarkSyncStore,
     private val catalog: ReadableItemRepository,
     private val readerWork: ReaderWorkCoordinator,
     private val connectivity: RemoteSourceConnectivityPolicy,
 ) : HighlightSyncTriggers {
     private val waiting = MutableStateFlow<List<WaitingHighlightKey>>(emptyList())
+    private val waitingBookmarks = MutableStateFlow<List<WaitingBookmarkKey>>(emptyList())
     private val started = AtomicBoolean(false)
 
     @OptIn(FlowPreview::class)
     override fun start() {
         if (!started.compareAndSet(false, true)) return
         scope.launch { store.observeWaiting().collect { keys -> waiting.value = keys } }
+        scope.launch { bookmarkStore.observeWaiting().collect { keys -> waitingBookmarks.value = keys } }
         scope.launch {
-            combine(waiting, connectivity.reachabilityFlow) { keys, reachability ->
-                keys to (reachability[SourceType.GRIMMORY] == SourceConnectivityState.Online)
+            combine(waiting, waitingBookmarks, connectivity.reachabilityFlow) { keys, bookmarkKeys, reachability ->
+                Triple(keys, bookmarkKeys, reachability[SourceType.GRIMMORY] == SourceConnectivityState.Online)
             }
                 .distinctUntilChanged()
                 .debounce(CHANGE_DEBOUNCE_MILLIS)
-                .collect { (keys, online) -> if (online && keys.isNotEmpty()) syncWaitingBooks() }
+                .collect { (keys, bookmarkKeys, online) ->
+                    if (online && (keys.isNotEmpty() || bookmarkKeys.isNotEmpty())) syncWaitingBooks()
+                }
         }
         scope.launch {
             var openItemIds = emptySet<String>()
@@ -78,25 +86,40 @@ class AppHighlightSyncCoordinator @Inject constructor(
                 catalog.getItems()
                     .filter { item -> item.id in opened && item.syncsHighlightsWithGrimmory() }
                     .takeIf(List<ReadableItem>::isNotEmpty)
-                    ?.let { books -> sync.syncBooks(books) }
+                    ?.let { books ->
+                        sync.syncBooks(books)
+                        bookmarkSync.syncBooks(books)
+                    }
             }
         }
         scope.launchPendingSyncRetries(hasWork = ::hasWaitingUploads, retry = ::retry)
     }
 
-    override fun hasWaitingUploads(): Boolean = waitingBooks().isNotEmpty()
+    override fun hasWaitingUploads(): Boolean = waitingBooks().isNotEmpty() || waitingBookmarkBooks().isNotEmpty()
 
     override fun retry() {
         scope.launch { syncWaitingBooks() }
     }
 
     override fun afterLibrarySync() {
-        scope.launch { sync.syncLibrary(catalog.getItems(), store.booksOnServer()) }
+        scope.launch {
+            val items = catalog.getItems()
+            sync.syncLibrary(items, store.booksOnServer())
+            bookmarkSync.syncLibrary(items, bookmarkStore.booksOnServer())
+        }
     }
 
     private suspend fun syncWaitingBooks() {
         val books = waitingBooks()
         if (books.isNotEmpty()) sync.syncBooks(books)
+        val bookmarkBooks = waitingBookmarkBooks()
+        if (bookmarkBooks.isNotEmpty()) bookmarkSync.syncBooks(bookmarkBooks)
+    }
+
+    private fun waitingBookmarkBooks(): List<ReadableItem> {
+        val itemIds = waitingBookmarks.value.mapTo(mutableSetOf(), WaitingBookmarkKey::itemId)
+        if (itemIds.isEmpty()) return emptyList()
+        return catalog.getItems().filter { item -> item.id in itemIds && item.syncsHighlightsWithGrimmory() }
     }
 
     private fun waitingBooks(): List<ReadableItem> {

@@ -7,11 +7,14 @@ import androidx.compose.runtime.rememberUpdatedState
 import android.util.Log
 import com.example.unifiedreader.core.model.runSuspendCatching
 import com.example.unifiedreader.feature.annotations.AnnotationPlace
+import com.example.unifiedreader.feature.annotations.BookmarkPlace
+import com.example.unifiedreader.feature.annotations.BookmarkPlacementStore
 import com.example.unifiedreader.feature.annotations.HighlightPlacementStore
 import com.example.unifiedreader.feature.annotations.HighlightToPlace
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONException
 import org.json.JSONObject
@@ -50,7 +53,7 @@ internal sealed interface EpubLocalPlace {
  * around them, which Katana keeps) into the EPUB CFI Grimmory's web reader and KOReader keep, and a
  * CFI back into a locator. Reads the chapters from the book itself (the last few kept parsed).
  */
-internal class EpubHighlightPlaces(private val publication: Publication) {
+internal class EpubHighlightPlaces(internal val publication: Publication) {
     private var spine: EpubPackageSpine? = null
     private val chapters = object : LinkedHashMap<String, EpubChapterText>(CHAPTERS_KEPT, LOAD_FACTOR, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, EpubChapterText>?): Boolean =
@@ -93,7 +96,7 @@ internal class EpubHighlightPlaces(private val publication: Publication) {
         }
     }
 
-    private suspend fun locatorFor(link: Link, path: String, quote: EpubTextQuote): Locator = Locator(
+    internal suspend fun locatorFor(link: Link, path: String, quote: EpubTextQuote): Locator = Locator(
         href = link.url(),
         mediaType = link.mediaType ?: MediaType.XHTML,
         title = link.title,
@@ -105,7 +108,7 @@ internal class EpubHighlightPlaces(private val publication: Publication) {
     )
 
     // The package's spine; without the package document, the reading order (as if no item were non-linear).
-    private suspend fun spine(): EpubPackageSpine {
+    internal suspend fun spine(): EpubPackageSpine {
         val known = spine
         if (known != null) return known
         val fromPackage = runSuspendCatching {
@@ -121,10 +124,10 @@ internal class EpubHighlightPlaces(private val publication: Publication) {
         },
     )
 
-    private fun chapterLink(path: String): Link? =
+    internal fun chapterLink(path: String): Link? =
         (publication.readingOrder + publication.resources).firstOrNull { it.url().bookPath() == path }
 
-    private suspend fun chapterAt(path: String): Pair<Link, EpubChapterText>? {
+    internal suspend fun chapterAt(path: String): Pair<Link, EpubChapterText>? {
         val link = chapterLink(path) ?: return null
         val chapter = chapters[path] ?: readChapter(link, path)?.also { chapters[path] = it }
         return chapter?.let { link to it }
@@ -163,7 +166,7 @@ private fun EpubChapterText.wordsAt(range: EpubCfiRange, words: String): EpubTex
 }
 
 /** A Readium href as a path from the book's root, decoded and without a fragment. */
-private fun Url.bookPath(): String? = removeFragment().path?.removePrefix("./")?.trimStart('/')?.takeIf(String::isNotEmpty)
+internal fun Url.bookPath(): String? = removeFragment().path?.removePrefix("./")?.trimStart('/')?.takeIf(String::isNotEmpty)
 
 // A decoded path as a URL path: each segment percent-encoded.
 private fun String.encodedPath(): String = split('/').joinToString("/") { segment -> android.net.Uri.encode(segment) }
@@ -187,6 +190,8 @@ internal fun EpubHighlightPlacementEffect(
         if (store == null || store == HighlightPlacementStore.None) return@LaunchedEffect
         delay(PLACEMENT_START_DELAY_MILLIS)
         val places = EpubHighlightPlaces(publication)
+        // The book's bookmarks, alongside: the same places, one chapter read at a time.
+        launch { placeBookmarks(places, store.bookmarks, itemId, latestChapterTitleOf) }
         // Ones whose place isn't in this copy (another edition's): not tried again until the book reopens.
         val notHere = mutableSetOf<String>()
         // Each new list starts over: a placed highlight leaves the list, so the rest come round again.
@@ -225,6 +230,49 @@ internal fun EpubHighlightPlacementEffect(
 }
 
 private enum class PlacementOutcome { Done, NotHere, Unreadable }
+
+// New bookmarks made here get their CFI; ones from the server get their place here. A chapter that can't
+// be read just now is tried again with the next change of the list (the book reopening, say).
+private suspend fun placeBookmarks(
+    places: EpubHighlightPlaces,
+    store: BookmarkPlacementStore,
+    itemId: String,
+    chapterTitleOf: (Locator) -> String?,
+) {
+    if (store == BookmarkPlacementStore.None) return
+    val notHere = mutableSetOf<String>()
+    store.bookmarksToPlace(itemId).collectLatest { waiting ->
+        waiting.filterNot { it.id in notHere }.forEach { bookmark ->
+            withContext(Dispatchers.IO) {
+                val serverPlace = bookmark.serverPlace
+                if (serverPlace == null) {
+                    when (val found = bookmark.locatorJson.toLocatorOrNull()?.let { places.bookmarkServerPlaceOf(it, bookmark.text) }) {
+                        is EpubServerPlace.Found -> store.setServerPlace(bookmark.id, found.cfi)
+                        EpubServerPlace.Unreadable -> Unit
+                        else -> store.keepOnDevice(bookmark.id)
+                    }
+                } else {
+                    val (found, words) = places.bookmarkLocalPlaceOf(serverPlace)
+                    when (found) {
+                        is EpubLocalPlace.Found -> {
+                            val locator = found.locator
+                            val page = places.pageAt(locator.locations.totalProgression)
+                            val place = AnnotationPlace(
+                                href = locator.href.toString(),
+                                locatorJson = locator.toJSON().toString(),
+                                chapterTitle = bookmark.chapterTitle ?: chapterTitleOf(locator),
+                                progression = locator.locations.totalProgression,
+                            )
+                            store.place(bookmark.id, BookmarkPlace(place, page?.first, page?.second, words))
+                        }
+                        EpubLocalPlace.NotFound -> notHere += bookmark.id
+                        EpubLocalPlace.Unreadable -> Unit
+                    }
+                }
+            }
+        }
+    }
+}
 
 // A highlight made here gets its place the server's way (or stays on this device).
 private suspend fun EpubHighlightPlaces.placeServerSide(highlight: HighlightToPlace, store: HighlightPlacementStore): PlacementOutcome {

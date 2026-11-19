@@ -126,6 +126,40 @@ class ReaderAnnotationDaoTest {
     }
 
     @Test
+    fun `a bookmark's name and note are kept, and the change waits for its server`() = runBlocking {
+        bookmarks.upsertBookmark(bookmark(id = "b", progression = 0.1, createdAt = 1).copy(syncState = "CLEAN", remoteId = "r1"))
+
+        bookmarks.setBookmarkNaming("b", title = "the box", note = "mandarins", atEpochMillis = 5)
+
+        val stored = bookmarks.observeBookmarks("grimmory:item:1").first().single()
+        assertEquals("the box", stored.title)
+        assertEquals("mandarins", stored.note)
+        assertEquals("DIRTY", stored.syncState)
+        assertEquals(listOf("b"), database.readerBookmarkSyncDao().observeWaitingBookmarks().first().map { it.id })
+    }
+
+    @Test
+    fun `a new bookmark waits for its place, and one from the server is placed once`() = runBlocking {
+        bookmarks.upsertBookmark(bookmark(id = "mine", progression = 0.1, createdAt = 1))
+        bookmarks.upsertBookmark(
+            bookmark(id = "theirs", progression = null, createdAt = 2)
+                .copy(locatorJson = "", text = null, syncState = "CLEAN", remoteId = "r2", remoteCfi = "epubcfi(/6/4!/4/2,/1:0,/1:5)"),
+        )
+        val sync = database.readerBookmarkSyncDao()
+        assertTrue(sync.observeWaitingBookmarks().first().isEmpty())
+        assertEquals(setOf("mine", "theirs"), bookmarks.observeBookmarksToPlace("grimmory:item:1").first().map { it.id }.toSet())
+
+        bookmarks.setBookmarkCfi("mine", "epubcfi(/6/4!/4/2,/1:9,/1:20)")
+        bookmarks.placeBookmark("theirs", "c1.xhtml", "{\"href\":\"c1.xhtml\"}", 0.3, 24, 78, "the words there", "Chapter 1")
+
+        assertTrue(bookmarks.observeBookmarksToPlace("grimmory:item:1").first().isEmpty())
+        assertEquals(listOf("mine"), sync.observeWaitingBookmarks().first().map { it.id })
+        val placed = sync.getBookmark("theirs")!!
+        assertEquals(24, placed.page)
+        assertEquals("the words there", placed.text)
+    }
+
+    @Test
     fun `a word keeps its note and its flashcard review`() = runBlocking {
         dao.upsertWord(word(id = "w", word = "solar", progression = 0.1, createdAt = 1))
         val fresh = study.getWord("w")!!
