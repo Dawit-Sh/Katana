@@ -13,6 +13,7 @@ import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.feature.annotations.AnnotatedBook
 import com.example.unifiedreader.feature.annotations.AnnotationExports
 import com.example.unifiedreader.feature.annotations.AnnotationJumps
+import com.example.unifiedreader.feature.annotations.BookmarkEdits
 import com.example.unifiedreader.feature.annotations.BookmarksActions
 import com.example.unifiedreader.feature.annotations.BookmarksBar
 import com.example.unifiedreader.feature.annotations.BookmarksCopy
@@ -75,6 +76,10 @@ class AppBookmarksScreen(
             store.deleteBookmark(id)
             toasts?.show(AppToastMessage(text = BookmarksCopy.BookmarkRemoved, icon = AppToastIcon.Removed))
         }
+    }
+
+    fun nameBookmark(id: String, title: String, note: String) {
+        scope.launch { store.nameBookmark(id, title, note) }
     }
 
     fun deleteWord(id: String, toasts: AppToastState?) {
@@ -184,6 +189,13 @@ private fun rememberBookmarksActions(
     }
 }
 
+/** Removing a bookmark and naming it, through the screen's store. */
+private class AppBookmarkEdits(private val bookmarks: AppBookmarksScreen, private val toasts: AppToastState?) : BookmarkEdits {
+    override fun deleteBookmark(id: String) = bookmarks.deleteBookmark(id, toasts)
+
+    override fun nameBookmark(id: String, title: String, note: String) = bookmarks.nameBookmark(id, title, note)
+}
+
 /** The screen's actions: books open through the library's own opening, marks change in the store. */
 private class AppBookmarksActions(
     private val bookmarks: AppBookmarksScreen,
@@ -191,7 +203,7 @@ private class AppBookmarksActions(
     private val progress: Map<String, ItemProgressSummary>,
     private val onOpenBook: (ReadableItem) -> Unit,
     private val toasts: AppToastState?,
-) : BookmarksActions {
+) : BookmarksActions, BookmarkEdits by AppBookmarkEdits(bookmarks, toasts) {
     override fun continueReading(book: AnnotatedBook) = open(book) {}
 
     override fun openAt(book: AnnotatedBook, locatorJson: String) = open(book) { bookmarks.openAt(book.itemId, locatorJson) }
@@ -206,7 +218,6 @@ private class AppBookmarksActions(
         }
     }
 
-    override fun deleteBookmark(id: String) = bookmarks.deleteBookmark(id, toasts)
 
     override fun deleteWord(id: String) = bookmarks.deleteWord(id, toasts)
 

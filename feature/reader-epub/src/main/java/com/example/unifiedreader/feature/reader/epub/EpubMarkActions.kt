@@ -82,6 +82,11 @@ internal class EpubBookmarkActions(
             toasts()?.show(AppToastMessage(text = EpubAnnotationCopy.BookmarkRemoved, icon = AppToastIcon.Removed))
         }
     }
+
+    /** The reader's name and note for a bookmark; blank removes it. */
+    fun name(bookmarkId: String, title: String, note: String) {
+        scope.launch { store.nameBookmark(bookmarkId, title, note) }
+    }
 }
 
 /** Export highlights: this book's marks as Markdown, and the toast once the file is written or not. */

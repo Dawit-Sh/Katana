@@ -92,9 +92,19 @@ internal fun MarkedBookPage(
                 )
             }
         }
-        if (kind == MarkKind.All || kind == MarkKind.Bookmarks) bookmarkRows(shown, actions)
+        if (kind == MarkKind.All || kind == MarkKind.Bookmarks) bookmarkRows(state, shown, actions)
         if (kind == MarkKind.All || kind == MarkKind.Highlights) highlightRows(shown, actions)
         if (kind == MarkKind.All || kind == MarkKind.Words) wordRows(shown, actions)
+    }
+    state.editing?.let { bookmark ->
+        BookmarkNameDialog(
+            bookmark = bookmark,
+            onDismiss = { state.editing = null },
+            onSave = { title, note ->
+                actions.nameBookmark(bookmark.id, title, note)
+                state.editing = null
+            },
+        )
     }
 }
 
@@ -164,7 +174,7 @@ private fun MarkKindChips(book: MarkedBook, selected: MarkKind, onSelect: (MarkK
     }
 }
 
-private fun LazyListScope.bookmarkRows(book: MarkedBook, actions: BookmarksActions) {
+private fun LazyListScope.bookmarkRows(state: BookmarksState, book: MarkedBook, actions: BookmarksActions) {
     if (book.bookmarks.isEmpty()) return
     item(key = "bookmarks-label") { SectionLabel(bookmarksHeading(book.bookmarks.size)) }
     items(book.bookmarks, key = { "b-${it.id}" }) { bookmark ->
@@ -177,10 +187,11 @@ private fun LazyListScope.bookmarkRows(book: MarkedBook, actions: BookmarksActio
             )
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(RowLineGap)) {
                 Text(
-                    text = bookmarkTitle(bookmark),
+                    text = bookmarkHeadline(bookmark),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                 )
+                bookmark.title?.let { Text(text = bookmarkTitle(bookmark), style = MaterialTheme.typography.bodySmall) }
                 bookmark.text?.let { text ->
                     Text(
                         text = text,
@@ -191,9 +202,13 @@ private fun LazyListScope.bookmarkRows(book: MarkedBook, actions: BookmarksActio
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                bookmark.note?.let { note -> NoteBox(note) }
                 MetaLine(
                     listOfNotNull(chapterOf(bookmark.place.chapterTitle, book.book), BookmarksCopy.moment(bookmark.createdAtEpochMillis)),
                 )
+            }
+            AppIconButton(onClick = { state.editing = bookmark }) {
+                Icon(imageVector = AppIcons.Edit, contentDescription = BookmarkNamingCopy.Edit)
             }
             AppIconButton(onClick = { actions.deleteBookmark(bookmark.id) }) {
                 Icon(imageVector = AppIcons.Delete, contentDescription = BookmarksCopy.Delete)

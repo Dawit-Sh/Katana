@@ -40,6 +40,10 @@ interface HighlightPlacementStore {
     /** Where a highlight from the server is in this device's copy of the book. */
     suspend fun place(highlightId: String, place: AnnotationPlace)
 
+    /** The same for the book's bookmarks (nothing to place for a book whose marks don't sync). */
+    val bookmarks: BookmarkPlacementStore
+        get() = BookmarkPlacementStore.None
+
     /** For a book whose highlights don't sync: nothing to place. */
     data object None : HighlightPlacementStore {
         override fun highlightsToPlace(itemId: String): Flow<List<HighlightToPlace>> = flowOf(emptyList())
@@ -54,6 +58,7 @@ interface HighlightPlacementStore {
 
 class RoomHighlightPlacementStore(
     private val dao: ReaderHighlightPlacementDao,
+    override val bookmarks: BookmarkPlacementStore = BookmarkPlacementStore.None,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : HighlightPlacementStore {
     override fun highlightsToPlace(itemId: String): Flow<List<HighlightToPlace>> =

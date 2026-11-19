@@ -31,10 +31,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.unifiedreader.feature.annotations.AnnotationMarkdown
+import com.example.unifiedreader.feature.annotations.BookmarkLine
+import com.example.unifiedreader.feature.annotations.BookmarkNameDialog
 import com.example.unifiedreader.feature.annotations.MarkSearch
 import com.example.unifiedreader.feature.annotations.MarkSearchField
-import com.example.unifiedreader.feature.annotations.MarkTint
 import com.example.unifiedreader.feature.annotations.bookmarksHeading
 import com.example.unifiedreader.feature.annotations.ReaderBookmark
 import com.example.unifiedreader.feature.annotations.ReaderHighlight
@@ -83,6 +83,17 @@ internal fun EpubAnnotationsPanel(
             onClose = onDismissRequest,
         )
         var query by rememberSaveable { mutableStateOf("") }
+        var editing by remember { mutableStateOf<ReaderBookmark?>(null) }
+        editing?.let { bookmark ->
+            BookmarkNameDialog(
+                bookmark = bookmark,
+                onDismiss = { editing = null },
+                onSave = { title, note ->
+                    controller.bookmarks.name(bookmark.id, title, note)
+                    editing = null
+                },
+            )
+        }
         if (bookmarks.isNotEmpty() || highlights.isNotEmpty() || words.isNotEmpty()) {
             MarkSearchField(
                 query = query,
@@ -101,6 +112,7 @@ internal fun EpubAnnotationsPanel(
                 onDismissRequest()
             },
             onDeleteBookmark = { bookmark -> controller.bookmarks.delete(bookmark.id) },
+            onEditBookmark = { bookmark -> editing = bookmark },
             onDeleteWord = { word -> controller.deleteWord(word.id) },
             modifier = Modifier.weight(1f),
         )
@@ -117,6 +129,7 @@ private fun AnnotationsList(
     searching: Boolean,
     onJump: (String) -> Unit,
     onDeleteBookmark: (ReaderBookmark) -> Unit,
+    onEditBookmark: (ReaderBookmark) -> Unit,
     onDeleteWord: (SavedWord) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -138,10 +151,11 @@ private fun AnnotationsList(
         if (bookmarks.isNotEmpty()) {
             item { PanelSectionTitle(bookmarksHeading(bookmarks.size)) }
             items(bookmarks, key = { "b-${it.id}" }) { bookmark ->
-                BookmarkRow(
+                BookmarkLine(
                     bookmark = bookmark,
                     onClick = { onJump(bookmark.place.locatorJson) },
                     onDelete = { onDeleteBookmark(bookmark) },
+                    onEdit = { onEditBookmark(bookmark) },
                 )
             }
         }
@@ -179,43 +193,6 @@ private fun PanelSectionTitle(text: String) {
         style = MaterialTheme.typography.titleSmall,
         modifier = Modifier.padding(top = AppLayout.headingGap),
     )
-}
-
-@Composable
-private fun BookmarkRow(bookmark: ReaderBookmark, onClick: () -> Unit, onDelete: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            imageVector = AppIcons.BookmarkFilled,
-            contentDescription = null,
-            tint = MarkTint.Bookmark,
-            modifier = Modifier.size(ButtonIcon),
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = AnnotationMarkdown.bookmarkPlace(bookmark),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            (bookmark.text ?: bookmark.place.chapterTitle)?.let { line ->
-                Text(
-                    text = line,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        AppIconButton(onClick = onDelete) {
-            Icon(imageVector = AppIcons.Delete, contentDescription = EpubAnnotationCopy.Delete)
-        }
-    }
 }
 
 @Composable

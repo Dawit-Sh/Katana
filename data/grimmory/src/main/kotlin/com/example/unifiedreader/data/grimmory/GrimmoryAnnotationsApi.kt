@@ -84,6 +84,10 @@ interface GrimmoryAnnotationsApi {
 
     /** False when the server no longer had it, which is as good as removed. */
     suspend fun delete(accessToken: String, annotationId: String): Boolean
+
+    /** Grimmory's bookmarks, at the same server and session. */
+    val bookmarks: GrimmoryBookmarksApi
+        get() = error("Grimmory bookmarks are not implemented.")
 }
 
 /**
@@ -97,6 +101,8 @@ class KtorGrimmoryAnnotationsApi(
     private val serverZone: ZoneId = ZoneId.systemDefault(),
 ) : GrimmoryAnnotationsApi {
     private val baseUrl = baseUrl.trimEnd('/')
+
+    override val bookmarks: GrimmoryBookmarksApi = KtorGrimmoryBookmarksApi(httpClient, baseUrl, serverZone)
 
     override suspend fun bookHighlights(accessToken: String, bookId: String): List<GrimmoryAnnotation> =
         authenticatedRequest {

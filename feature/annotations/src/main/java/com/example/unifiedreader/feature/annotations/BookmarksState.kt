@@ -33,6 +33,9 @@ class BookmarksState {
     /** The search on a book's page; it starts as the books' search, so a book found by it shows what matched. */
     var bookQuery: String by mutableStateOf("")
 
+    /** The bookmark whose name and note are being changed, if any. */
+    var editing: ReaderBookmark? by mutableStateOf(null)
+
     /** The word review under way, if any. */
     var round: WordReviewRound? by mutableStateOf(null)
 
