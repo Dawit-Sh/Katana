@@ -237,6 +237,29 @@ class EpubTableOfContentsModelTest {
         assertEquals("1 chapter", epubTocSubtitle(bookTitle = "", chapterCount = 1))
     }
 
+    @Test
+    fun chaptersSharingOneFileAreNotAllNamedTheLast() {
+        // A book that is one long page: every chapter's entry is the same file, starting where it starts.
+        val entries = listOf(
+            tocEntry(id = "1", title = "I", href = "book.xhtml", progression = 0.0),
+            tocEntry(id = "2", title = "II", href = "book.xhtml", progression = 0.0),
+            tocEntry(id = "3", title = "X", href = "book.xhtml", progression = 0.0),
+        )
+
+        assertNull(entries.currentEpubChapterTitle(currentProgress = 0.18, currentHref = "book.xhtml"))
+    }
+
+    @Test
+    fun aChapterAndItsSectionsInOneFileStillNameTheChapter() {
+        val entries = listOf(
+            tocEntry(id = "1", title = "One", href = "one.xhtml", progression = 0.0),
+            tocEntry(id = "2", title = "One, part 2", href = "one.xhtml", progression = 0.0, depth = 1),
+            tocEntry(id = "3", title = "Two", href = "two.xhtml", progression = 0.5),
+        )
+
+        assertEquals("One", entries.currentEpubChapterTitle(currentProgress = 0.1, currentHref = "one.xhtml"))
+    }
+
     private fun tocEntry(
         id: String,
         title: String,

@@ -102,15 +102,25 @@ internal fun List<EpubTocEntry>.activeEpubTocEntry(
     currentHref: String?,
 ): EpubTocEntry? {
     val clampedProgress = currentProgress.coerceIn(0.0, 1.0)
-    return currentHref?.let { href ->
-        lastOrNull { entry -> entry.href == href }
-    } ?: asSequence()
-        .filter { entry ->
-            entry.progression != null &&
-                entry.progression <= clampedProgress + EpubTocProgressEpsilon
-        }
-        .maxByOrNull { entry -> entry.progression ?: 0.0 }
+    val inThisFile = currentHref?.let { href -> filter { entry -> entry.href == href } }.orEmpty()
+    return when {
+        inThisFile.isEmpty() -> latestEpubTocEntryAt(clampedProgress)
+        // Several chapters in one file (a book that is one long page with anchors): the file can't say which
+        // is on screen, and every entry starts where the file does. Naming the last would put every place in
+        // the last chapter, so none is named. A chapter and its own sections in one file are still one chapter.
+        inThisFile.map { epubTocChapterEntry(it)?.id }.distinct().size > 1 ->
+            inThisFile.takeIf { entries -> entries.mapNotNull { it.progression }.distinct().size == entries.size }
+                ?.latestEpubTocEntryAt(clampedProgress)
+        else -> inThisFile.last()
+    }
 }
+
+private fun List<EpubTocEntry>.latestEpubTocEntryAt(progress: Double): EpubTocEntry? = asSequence()
+    .filter { entry ->
+        entry.progression != null &&
+            entry.progression <= progress + EpubTocProgressEpsilon
+    }
+    .maxByOrNull { entry -> entry.progression ?: 0.0 }
 
 /** Which chapter the reader is in, counted among the chapter entries ([epubTocChapterIndices]). */
 internal data class EpubTocChapterPosition(

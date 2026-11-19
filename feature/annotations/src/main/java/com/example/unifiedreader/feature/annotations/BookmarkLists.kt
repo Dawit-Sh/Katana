@@ -9,11 +9,13 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -24,8 +26,8 @@ import com.example.unifiedreader.ui.components.AppIcons
 import com.example.unifiedreader.ui.components.AppLayout
 import com.example.unifiedreader.ui.components.AppSearchField
 import com.example.unifiedreader.ui.components.AppSheetDivider
-import com.example.unifiedreader.ui.components.AppSheetSectionEnd
 import com.example.unifiedreader.ui.components.AppSheetLabel
+import com.example.unifiedreader.ui.components.AppSheetSectionEnd
 
 /** "Bookmarks · 3": a list's heading with how many it holds. */
 fun bookmarksHeading(count: Int): String = if (count > 0) "${BookmarksCopy.Bookmarks} · $count" else BookmarksCopy.Bookmarks
@@ -73,14 +75,29 @@ fun LazyListScope.bookPageBookmarks(
             )
         }
     }
-    items(bookmarks, key = { "bookmark-${it.id}" }) { bookmark ->
-        BookmarkLine(
-            bookmark = bookmark,
-            onClick = { onOpen(bookmark) },
-            onDelete = null,
-            modifier = Modifier.padding(horizontal = AppLayout.inset),
-            showWhen = true,
-        )
+    if (bookmarks.isNotEmpty()) {
+        // A box of its own that scrolls once there are more than about four, so a book with many
+        // bookmarks doesn't push About and the rest of the page far down.
+        item(key = "bookmarks-list") {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = BookPageListMaxHeight)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                bookmarks.forEach { bookmark ->
+                    key(bookmark.id) {
+                        BookmarkLine(
+                            bookmark = bookmark,
+                            onClick = { onOpen(bookmark) },
+                            onDelete = null,
+                            modifier = Modifier.padding(horizontal = AppLayout.inset),
+                            showWhen = true,
+                        )
+                    }
+                }
+            }
+        }
     }
     item(key = "bookmarks-end") { AppSheetSectionEnd() }
 }
@@ -143,3 +160,6 @@ fun BookmarkLine(
 
 private val LineIcon = 18.dp
 private val LineMinHeight = 48.dp
+
+// About four and a half bookmarks, so the next one peeks out and the box reads as one that scrolls.
+private val BookPageListMaxHeight = 330.dp
