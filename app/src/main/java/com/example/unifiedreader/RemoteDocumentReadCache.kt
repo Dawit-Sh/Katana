@@ -35,7 +35,10 @@ class RemoteDocumentReadCache @Inject constructor(
     ): Uri? {
         if (!supportsReadCache(item)) return null
         val file = readCacheFileFor(item)
-        if (file.hasReadableContent()) return Uri.fromFile(file)
+        if (file.hasReadableContent()) {
+            rememberKept(item)
+            return Uri.fromFile(file)
+        }
         if (!remoteSourceConnectivityPolicy.canAttemptReaderContent(item.sourceType)) return null
         val session = grimmoryCredentialStore.activeSessionFor(item) ?: return null
         val remoteItemId = item.remoteId ?: return null
@@ -74,7 +77,40 @@ class RemoteDocumentReadCache @Inject constructor(
         if (downloadedFromNetwork) {
             remoteSourceConnectivityPolicy.recordReaderContentSuccess(SourceType.GRIMMORY)
         }
-        return Uri.fromFile(file).takeIf { file.hasReadableContent() }
+        return Uri.fromFile(file).takeIf { file.hasReadableContent() }?.also { rememberKept(item) }
+    }
+
+    /**
+     * The books whose copy this cache keeps, by id. A book opened and closed again before its place was
+     * saved has no reading progress, so without this the Storage page and the Downloads sheet would never
+     * show its file (a 500 MB PDF, say) or let it be removed.
+     */
+    fun keptItemIds(): Set<String> = keptItems.getStringSet(KEPT_ITEM_IDS_KEY, null).orEmpty().toSet()
+
+    /** Forgets [itemIds] whose copy is gone (removed, or cleared by the system). */
+    fun forgetKept(itemIds: Collection<String>) {
+        if (itemIds.isEmpty()) return
+        synchronized(keptItems) {
+            val current = keptItemIds()
+            val remaining = current - itemIds.toSet()
+            if (remaining.size != current.size) keptItems.edit().putStringSet(KEPT_ITEM_IDS_KEY, remaining).apply()
+        }
+    }
+
+    /** When the copy of [item] here was last written: when it was opened, for a book never read. */
+    fun keptSinceEpochMillis(
+        item: ReadableItem,
+    ): Long? = cachedDocumentFile(item)?.takeIf(File::hasReadableContent)?.lastModified()?.takeIf { it > 0L }
+
+    private fun rememberKept(item: ReadableItem) {
+        synchronized(keptItems) {
+            val current = keptItemIds()
+            if (item.id !in current) keptItems.edit().putStringSet(KEPT_ITEM_IDS_KEY, current + item.id).apply()
+        }
+    }
+
+    private val keptItems by lazy {
+        context.applicationContext.getSharedPreferences(KEPT_ITEMS_PREFERENCES, Context.MODE_PRIVATE)
     }
 
     /** Where the reader's copy of [item] is kept, there or not; null for a book this cache never holds. */
@@ -99,3 +135,6 @@ class RemoteDocumentReadCache @Inject constructor(
 }
 
 private fun File.hasReadableContent(): Boolean = isFile && length() > 0L
+
+private const val KEPT_ITEMS_PREFERENCES = "grimmory_reader_kept_items"
+private const val KEPT_ITEM_IDS_KEY = "item_ids"

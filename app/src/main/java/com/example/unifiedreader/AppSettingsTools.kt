@@ -179,6 +179,8 @@ class AppSettingsToolsViewModel @Inject constructor(
         val candidates = keptBookCandidates()
         val free = withContext(Dispatchers.IO) { context.filesDir.usableSpace }
         val books = withContext(Dispatchers.IO) { keptBookFiles.measure(candidates) }
+        // A remembered copy that is gone (removed here, or cleared by the system) is forgotten.
+        remoteDocumentReadCache.forgetKept(remoteDocumentReadCache.keptItemIds() - books.mapTo(mutableSetOf()) { it.item.id })
         keptState.value = KeptBooksSnapshot(books = books, freeBytes = free, isLoaded = true)
         if (measureCovers) coverBytes.value = withContext(Dispatchers.IO) { coverCacheBytes(context) }
         storageState.value = StorageSettingsState(
@@ -191,30 +193,46 @@ class AppSettingsToolsViewModel @Inject constructor(
         )
     }
 
-    /** Every server book read on this device or downloaded to it: those that may have a file here. */
+    /**
+     * Every server book read on this device, downloaded to it, or opened here without being read (its copy
+     * kept all the same): those that may have a file here.
+     */
     private suspend fun keptBookCandidates(): List<KeptBookCandidate> {
         readerSessionStore.isHydratedFlow.first { hydrated -> hydrated }
         val progress = readerSessionStore.progressByItemIdFlow.value
         val downloaded = downloadQueue.observeEntries().first().entries
             .filter { entry -> entry.status == DownloadEntryStatus.Completed }
             .flatMapTo(mutableSetOf()) { entry -> entry.completedItemIds }
-        val items = readableItemLookup.getItemsByIds((progress.keys + downloaded).toList())
+        val openedOnly = withContext(Dispatchers.IO) { remoteDocumentReadCache.keptItemIds() }
+        val items = readableItemLookup.getItemsByIds((progress.keys + downloaded + openedOnly).toList())
         return items
             .filter { item -> !item.isLocalImport && downloadDataSources.downloadDataSourceFor(item) != null }
-            .map { item -> keptBookCandidate(item, progress[item.id], isDownload = item.id in downloaded) }
+            .map { item ->
+                keptBookCandidate(
+                    item = item,
+                    progress = progress[item.id],
+                    isDownload = item.id in downloaded,
+                    keptSinceEpochMillis = withContext(Dispatchers.IO) { remoteDocumentReadCache.keptSinceEpochMillis(item) },
+                )
+            }
     }
 
 }
 
+/**
+ * One book that may have a file here. A book opened but never read has no progress; [keptSinceEpochMillis]
+ * (when its copy was written) stands for when it was opened, so it reads "opened today", not "not opened yet".
+ */
 internal fun keptBookCandidate(
     item: ReadableItem,
     progress: ReaderProgressSnapshot?,
     isDownload: Boolean,
+    keptSinceEpochMillis: Long? = null,
 ): KeptBookCandidate {
     val percent = progress?.percent?.coerceIn(0.0, 1.0)
     return KeptBookCandidate(
         item = item,
-        openedAtEpochMillis = progress?.updatedAtEpochMillis,
+        openedAtEpochMillis = progress?.updatedAtEpochMillis ?: keptSinceEpochMillis.takeUnless { isDownload },
         readPercent = percent?.let { (it * PERCENT).roundToInt() },
         isFinished = progress != null && (progress.isFinished || (percent ?: 0.0) >= 1.0),
         isDownload = isDownload,
