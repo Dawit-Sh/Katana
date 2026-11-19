@@ -598,19 +598,22 @@ fun LibraryScreen(
             }
             // The docked panel takes its width and the gutter after it; the covers keep the size they had without it.
             val undockedMaxWidth = if (filtersDocked) maxWidth + AppLayout.sheetWidth + gutter else maxWidth
-            val gridPresentation = remember(maxWidth, undockedMaxWidth, gutter, gridEndPadding, gridCellSizeDp) {
+            // Under 600 dp the covers take their phone sizes and the grid keeps two columns at least.
+            val compactWindow = isLibraryCompactWindow()
+            val gridPresentation = remember(maxWidth, undockedMaxWidth, gutter, gridEndPadding, gridCellSizeDp, compactWindow) {
                 libraryGridPresentation(
                     maxWidth = maxWidth,
                     startPadding = gutter,
                     endPadding = gridEndPadding,
                     requestedGridCellSizeDp = gridCellSizeDp,
                     undockedMaxWidth = undockedMaxWidth,
+                    compactWindow = compactWindow,
                 )
             }
-            val gridCoverImageVariant = libraryGridCoverImageVariant(
-                gridPresentation.selectedGridSize.cellSizeDp,
-            )
+            val gridMetrics = LibraryGridMetrics(gridPresentation.selectedGridSize.cellSizeDp, compactWindow)
+            val gridCoverImageVariant = gridMetrics.coverImageVariant
             val showGridTitles = LibraryCoverSize.of(gridPresentation.selectedGridSize.cellSizeDp).showsTitle
+            val gridTitleLines = libraryCoverTitleLines(gridPresentation.selectedGridSize.cellWidthDp.dp)
             VisibleRemoteCoverPrefetcher(
                 browseContextKey = browseContextKey,
                 gridState = gridState,
@@ -646,6 +649,7 @@ fun LibraryScreen(
                         else -> itemPrimaryText(item)
                     },
                     showTitle = showGridTitles,
+                    titleLines = gridTitleLines,
                     isSelectionMode = isDownloadSelectionMode,
                     isSelected = item.id in selectedDownloadItemIdSet,
                     onClick = { onItemSelected(item) },
@@ -674,11 +678,7 @@ fun LibraryScreen(
                 columns = if (gridPresentation.fixedColumns) {
                     GridCells.Fixed(gridPresentation.selectedGridSize.columnCount)
                 } else {
-                    LibraryViewMode.Grid.gridCells(
-                        maxWidth = maxWidth,
-                        maxHeight = maxHeight,
-                        gridCellSizeDp = gridPresentation.selectedGridSize.cellSizeDp,
-                    )
+                    gridMetrics.gridCells
                 },
                 state = gridState,
                 modifier = Modifier.fillMaxSize(),
@@ -708,7 +708,7 @@ fun LibraryScreen(
                     ) {
                         // The default size whatever the cover size: the slider sizes All books only, so its row, which the
                         // sort menu hangs from, stays put (Huge stacked the reading card and pushed the row off screen).
-                        shownTopContent(LibraryGridMetrics())
+                        shownTopContent(LibraryGridMetrics(compactWindow = compactWindow))
                     }
                 }
 
@@ -794,9 +794,7 @@ fun LibraryScreen(
                             ),
                         ) {
                             if (showGridLoading) {
-                                LoadingLibraryState(
-                                    gridCellSizeDp = gridPresentation.selectedGridSize.cellSizeDp,
-                                )
+                                LoadingLibraryState(gridMetrics = gridMetrics)
                             } else {
                                 LibraryEmptyState(
                                     reason = libraryEmptyReason(

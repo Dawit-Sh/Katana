@@ -10,7 +10,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -77,6 +76,8 @@ import com.example.unifiedreader.core.model.isKavitaSeriesContainer
 import com.example.unifiedreader.core.model.libraryPrimaryText
 import com.example.unifiedreader.feature.library.ItemProgressSummary
 import com.example.unifiedreader.feature.library.libraryBookTitle
+import com.example.unifiedreader.feature.library.libraryWindowGridMetrics
+import com.example.unifiedreader.feature.library.libraryWindowGridTitleLines
 import com.example.unifiedreader.ui.components.AppButton
 import com.example.unifiedreader.ui.components.AppChip
 import com.example.unifiedreader.ui.components.AppIcons
@@ -203,8 +204,11 @@ fun UserListPage(
     }
     val mixesSources = remember(books) { books.map { it.entry.sourceType }.distinct().size > 1 }
     val gutter = appGutter()
+    // The library's columns for its cover size: on a phone narrower covers, two columns at least.
+    val gridMetrics = libraryWindowGridMetrics(cellSizeDp)
+    val titleLines = libraryWindowGridTitleLines(gridMetrics)
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = cellSizeDp.dp),
+        columns = gridMetrics.gridCells,
         state = gridState,
         modifier = modifier,
         contentPadding = PaddingValues(
@@ -312,6 +316,7 @@ fun UserListPage(
                 showSource = mixesSources,
                 cover = cover,
                 isSeries = book.item?.isKavitaSeriesContainer() == true,
+                titleLines = titleLines,
                 selected = selection?.contains(itemId),
                 onClick = {
                     when {
@@ -488,6 +493,7 @@ private fun UserListBookTile(
     showSource: Boolean,
     cover: ListCover,
     isSeries: Boolean,
+    titleLines: Int,
     selected: Boolean?,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)?,
@@ -550,7 +556,8 @@ private fun UserListBookTile(
         Text(
             text = title,
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-            maxLines = 1,
+            maxLines = titleLines,
+            minLines = titleLines,
             overflow = TextOverflow.Ellipsis,
         )
         Text(

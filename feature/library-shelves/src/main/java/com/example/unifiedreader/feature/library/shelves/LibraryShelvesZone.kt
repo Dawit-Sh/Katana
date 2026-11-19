@@ -24,6 +24,7 @@ import com.example.unifiedreader.feature.library.LibraryGridMetrics
 import com.example.unifiedreader.feature.library.LibraryItemActionContext
 import com.example.unifiedreader.feature.library.LocalLibraryCoverGeneration
 import com.example.unifiedreader.feature.library.LibraryReadingCard
+import com.example.unifiedreader.feature.library.libraryCoverTitleLines
 import com.example.unifiedreader.feature.library.libraryGridColumns
 import com.example.unifiedreader.feature.library.readingCardBesideWidth
 
@@ -92,7 +93,11 @@ fun LibraryShelvesZone(
         val covers = if (beside) {
             ShelfCoverLayout(width = ShelfBesideCardCoverWidth, imageVariant = gridMetrics.coverImageVariant, showSupportingText = false)
         } else {
-            ShelfCoverLayout(width = columns.cellWidth, imageVariant = gridMetrics.coverImageVariant)
+            ShelfCoverLayout(
+                width = columns.cellWidth,
+                imageVariant = gridMetrics.coverImageVariant,
+                titleLines = libraryCoverTitleLines(columns.cellWidth),
+            )
         }
         val card = @Composable { cardModifier: Modifier ->
             if (orderCard != null) {

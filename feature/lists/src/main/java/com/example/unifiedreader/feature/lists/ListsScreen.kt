@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.unifiedreader.core.model.ReadableItem
+import com.example.unifiedreader.feature.library.libraryWindowGridMetrics
 import com.example.unifiedreader.ui.components.AppChip
 import com.example.unifiedreader.ui.components.AppLayout
 import com.example.unifiedreader.ui.components.AppLetterStrip
@@ -126,9 +127,11 @@ fun ListsScreen(
     BoxWithConstraints(modifier = modifier) {
         val available = maxWidth - gutter * 2
         // A list is a mosaic of four covers: at the library's larger cover sizes two lists filled a
-        // tablet's screen, so list tiles stop at a smaller size and more of them fit across.
-        val tileSize = minOf(cellSizeDp.dp, ListsTileMaxSize)
-        val columns = ((available + gap) / (tileSize + gap)).toInt().coerceAtLeast(1)
+        // tablet's screen, so list tiles stop at a smaller size and more of them fit across. On a phone
+        // the tiles take the library grid's phone width and two columns at least, as its covers do.
+        val gridMetrics = libraryWindowGridMetrics(cellSizeDp)
+        val tileSize = minOf(gridMetrics.minCellWidthDp.dp, ListsTileMaxSize)
+        val columns = ((available + gap) / (tileSize + gap)).toInt().coerceAtLeast(gridMetrics.minColumns)
         val page = remember(catalog, shown, choices) {
             if (shown == ListsFilter.All) null else catalog.placePage(shown, choices.placeChoice(shown))
         }

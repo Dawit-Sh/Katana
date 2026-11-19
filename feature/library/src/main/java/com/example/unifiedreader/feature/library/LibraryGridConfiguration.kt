@@ -1,5 +1,7 @@
 package com.example.unifiedreader.feature.library
 
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -17,27 +19,42 @@ const val defaultLibraryGridCellSizeDp: Int = 176
 const val minLibraryGridCellSizeDp: Int = 70
 const val maxLibraryGridCellSizeDp: Int = 240
 
+/**
+ * The fewest columns a cover grid lays out in a window under 600 dp. One cover as wide as a phone showed a book or
+ * two per screen, which is no way to browse a library.
+ */
+const val libraryCompactGridMinColumns: Int = 2
+
+/** The fewest columns in a window of this kind: [libraryCompactGridMinColumns] under 600 dp, else one. */
+fun libraryGridMinColumns(compactWindow: Boolean): Int = if (compactWindow) libraryCompactGridMinColumns else 1
+
 internal val supportedLibraryGridCellSizesDp: List<Int> = LibraryCoverSize.entries.map(LibraryCoverSize::cellSizeDp)
 
 /**
- * The cover sizes the sort menu's slider offers, smallest first. Grids saved at 160 or 200 dp, sizes it no
- * longer has, read as Large. Tiny is half of Medium and gives a phone 4 columns, Small 3, Medium 2,
- * Large 1 or 2, Huge 1.
+ * The cover sizes the sort menu's slider offers, smallest first. [cellSizeDp] is the size the menu saves and the
+ * narrowest a cover gets from 600 dp. A phone (a window under 600 dp) asks for narrower covers, [compactCellSizeDp],
+ * and keeps at least two columns: Tiny gives it 4 or 5 columns (360 or 411 wide), Small 3 or 4, Medium 3, Large 2
+ * or 3 (3 from 376 wide), Huge 2. From 600 dp nothing changes: the tablet's Large is still 2 columns at 600 dp.
+ * Grids saved at 160 or 200 dp, sizes the menu no longer has, read as Large.
  */
 enum class LibraryCoverSize(
     val label: String,
     val cellSizeDp: Int,
+    val compactCellSizeDp: Int,
 ) {
-    Tiny("Tiny", minLibraryGridCellSizeDp),
-    Small("Small", 96),
-    Medium("Medium", 140),
-    Large("Large", defaultLibraryGridCellSizeDp),
-    Huge("Huge", maxLibraryGridCellSizeDp),
+    Tiny("Tiny", minLibraryGridCellSizeDp, compactCellSizeDp = 56),
+    Small("Small", 96, compactCellSizeDp = 72),
+    Medium("Medium", 140, compactCellSizeDp = 88),
+    Large("Large", defaultLibraryGridCellSizeDp, compactCellSizeDp = 104),
+    Huge("Huge", maxLibraryGridCellSizeDp, compactCellSizeDp = 144),
     ;
 
     /** Tiny tiles leave the title out: beside the ••• it would be a few letters. */
     val showsTitle: Boolean
         get() = this != Tiny
+
+    /** The narrowest its covers get: [compactCellSizeDp] in a window under 600 dp, [cellSizeDp] from 600 dp. */
+    fun minCellWidthDp(compactWindow: Boolean): Int = if (compactWindow) compactCellSizeDp else cellSizeDp
 
     companion object {
         fun of(gridCellSizeDp: Int): LibraryCoverSize {
@@ -54,23 +71,43 @@ internal val libraryGridNavigationEndPaddingDp: Dp = 44.dp
 
 const val LibraryCoverAspectRatio: Float = 2f / 3f
 
+/**
+ * A cover size as the grid lays it out in one width: [cellSizeDp] is the size the menu saved (it names the stop),
+ * [minCellWidthDp] the narrowest its covers get in this window (narrower on a phone), [cellWidthDp] how wide they
+ * come out once the columns share the width.
+ */
 data class LibraryGridSizeOption(
     val cellSizeDp: Int,
     val columnCount: Int,
+    val minCellWidthDp: Int = cellSizeDp,
+    val cellWidthDp: Float = minCellWidthDp.toFloat(),
 )
 
 /**
  * The library grid's column setup, handed to content drawn above the grid (the shelves) so its covers
- * match the grid's covers in size and line up with its columns.
+ * match the grid's covers in size and line up with its columns. [compactWindow]: a window under 600 dp,
+ * where covers take their phone sizes and the grid keeps at least two columns.
  */
 data class LibraryGridMetrics(
     val cellSizeDp: Int = defaultLibraryGridCellSizeDp,
+    val compactWindow: Boolean = false,
 ) {
     val spacing: Dp
         get() = libraryGridHorizontalSpacingDp
 
+    /** The narrowest a cover gets in this window. */
+    val minCellWidthDp: Int
+        get() = LibraryCoverSize.of(cellSizeDp).minCellWidthDp(compactWindow)
+
+    val minColumns: Int
+        get() = libraryGridMinColumns(compactWindow)
+
     val coverImageVariant: LibraryCoverImageVariant
-        get() = libraryGridCoverImageVariant(cellSizeDp)
+        get() = libraryGridCoverImageVariant(minCellWidthDp)
+
+    /** The grid's cells: as many columns as [minCellWidthDp] allows, never fewer than [minColumns]. */
+    val gridCells: GridCells
+        get() = LibraryGridCells(minCellWidth = minCellWidthDp.dp, minColumns = minColumns)
 }
 
 data class LibraryGridColumns(
@@ -80,7 +117,7 @@ data class LibraryGridColumns(
 
 /**
  * The columns the grid lays out across [availableWidth] (its width inside the content padding).
- * Mirrors `GridCells.Adaptive`, which the grid uses, so a full-span row can reproduce its cells.
+ * Counted the way [LibraryGridCells], which the grid uses, counts them, so a full-span row can reproduce its cells.
  */
 fun Density.libraryGridColumns(
     availableWidth: Dp,
@@ -88,14 +125,74 @@ fun Density.libraryGridColumns(
 ): LibraryGridColumns {
     val availableWidthPx = availableWidth.roundToPx()
     val spacingPx = metrics.spacing.roundToPx()
-    val minCellWidthPx = sanitizeLibraryGridCellSizeDp(metrics.cellSizeDp).dp.roundToPx()
-    val count = maxOf((availableWidthPx + spacingPx) / (minCellWidthPx + spacingPx), 1)
+    val count = libraryGridColumnCount(
+        availableWidthPx = availableWidthPx,
+        spacingPx = spacingPx,
+        minCellWidthPx = metrics.minCellWidthDp.dp.roundToPx(),
+        minColumns = metrics.minColumns,
+    )
     val cellWidthPx = ((availableWidthPx - spacingPx * (count - 1)) / count).coerceAtLeast(0)
     return LibraryGridColumns(
         count = count,
         cellWidth = cellWidthPx.toDp(),
     )
 }
+
+/**
+ * A cover grid's cells: as many columns as [minCellWidth] allows across the width, the rest of the width shared out
+ * among them, as `GridCells.Adaptive` does, but never fewer than [minColumns].
+ */
+@Immutable
+class LibraryGridCells(
+    private val minCellWidth: Dp,
+    private val minColumns: Int = 1,
+) : GridCells {
+    init {
+        require(minCellWidth > 0.dp) { "minCellWidth must be positive" }
+        require(minColumns >= 1) { "minColumns must be at least 1" }
+    }
+
+    override fun Density.calculateCrossAxisCellSizes(availableSize: Int, spacing: Int): List<Int> {
+        val count = libraryGridColumnCount(
+            availableWidthPx = availableSize,
+            spacingPx = spacing,
+            minCellWidthPx = minCellWidth.roundToPx(),
+            minColumns = minColumns,
+        )
+        return with(GridCells.Fixed(count)) { calculateCrossAxisCellSizes(availableSize, spacing) }
+    }
+
+    override fun equals(other: Any?): Boolean =
+        other is LibraryGridCells && minCellWidth == other.minCellWidth && minColumns == other.minColumns
+
+    override fun hashCode(): Int = minCellWidth.hashCode() * HASH_MULTIPLIER + minColumns
+
+    private companion object {
+        const val HASH_MULTIPLIER = 31
+    }
+}
+
+/** The cells for the cover size the menu saved, [gridCellSizeDp], in this kind of window. */
+fun libraryGridCells(
+    gridCellSizeDp: Int,
+    compactWindow: Boolean,
+): GridCells = LibraryGridMetrics(cellSizeDp = gridCellSizeDp, compactWindow = compactWindow).gridCells
+
+/** How many columns of at least [minCellWidthPx] fit across [availableWidthPx], and at least [minColumns]. */
+internal fun libraryGridColumnCount(
+    availableWidthPx: Int,
+    spacingPx: Int,
+    minCellWidthPx: Int,
+    minColumns: Int,
+): Int = maxOf((availableWidthPx + spacingPx) / (minCellWidthPx + spacingPx).coerceAtLeast(1), minColumns, 1)
+
+/**
+ * Lines for the title under a cover [cellWidth] wide: two, both kept, on covers narrower than 160 dp (a phone's,
+ * a tablet's Small), where one line cut most titles to a word or two; one, scrolling once when long, on wider covers.
+ */
+fun libraryCoverTitleLines(cellWidth: Dp): Int = if (cellWidth < libraryTwoLineTitleMaxCellWidth) 2 else 1
+
+private val libraryTwoLineTitleMaxCellWidth: Dp = 160.dp
 
 internal data class LibraryGridPresentation(
     val selectedGridSize: LibraryGridSizeOption,
@@ -120,7 +217,8 @@ fun sanitizeLibraryGridCellSizeDp(
  * [undockedMaxWidth] is the grid's width without a docked panel beside it. While a panel narrows the grid, the
  * covers keep the width they have there: the grid drops columns, and the ones left come as close to that width as
  * whole columns allow, instead of stretching to fill the way the adaptive grid would (Large covers growing by a
- * third, Huge to a single column).
+ * third, Huge to a single column). [compactWindow]: a window under 600 dp, where covers take their phone sizes and
+ * the grid keeps at least two columns.
  */
 internal fun libraryGridPresentation(
     maxWidth: Dp,
@@ -128,6 +226,7 @@ internal fun libraryGridPresentation(
     endPadding: Dp,
     requestedGridCellSizeDp: Int,
     undockedMaxWidth: Dp = maxWidth,
+    compactWindow: Boolean = false,
 ): LibraryGridPresentation {
     val docked = undockedMaxWidth > maxWidth
     val layoutWidth = if (docked) undockedMaxWidth else maxWidth
@@ -135,6 +234,7 @@ internal fun libraryGridPresentation(
         maxWidth = layoutWidth,
         startPadding = startPadding,
         endPadding = endPadding,
+        compactWindow = compactWindow,
     )
     val undockedGridSize = selectedLibraryGridSizeOption(
         options = availableGridSizes,
@@ -142,25 +242,24 @@ internal fun libraryGridPresentation(
         startPadding = startPadding,
         endPadding = endPadding,
         requestedGridCellSizeDp = requestedGridCellSizeDp,
+        compactWindow = compactWindow,
     )
     val selectedGridSize = if (docked) {
+        val columnCount = libraryGridColumnCountNearest(
+            maxWidth = maxWidth,
+            startPadding = startPadding,
+            endPadding = endPadding,
+            cellWidthDp = undockedGridSize.cellWidthDp,
+            minColumns = libraryGridMinColumns(compactWindow),
+        )
         undockedGridSize.copy(
-            columnCount = libraryGridColumnCountNearest(
-                maxWidth = maxWidth,
-                startPadding = startPadding,
-                endPadding = endPadding,
-                cellWidthDp = libraryGridCellWidthDp(
-                    maxWidth = undockedMaxWidth,
-                    startPadding = startPadding,
-                    endPadding = endPadding,
-                    columnCount = undockedGridSize.columnCount,
-                ),
-            ),
+            columnCount = columnCount,
+            cellWidthDp = libraryGridCellWidthDp(maxWidth, startPadding, endPadding, columnCount),
         )
     } else {
         undockedGridSize
     }
-    val compactGrid = selectedGridSize.cellSizeDp <= LibraryCoverSize.Medium.cellSizeDp
+    val compactGrid = selectedGridSize.minCellWidthDp <= LibraryCoverSize.Medium.cellSizeDp
     return LibraryGridPresentation(
         selectedGridSize = selectedGridSize,
         availableGridSizes = availableGridSizes,
@@ -169,11 +268,15 @@ internal fun libraryGridPresentation(
     )
 }
 
+/**
+ * The cover image a grid cell asks for. [minCellWidthDp] is the narrowest the cells get: a phone's cells (144 dp at
+ * most) take the grid thumbnail, which is 480 px wide, rather than the larger ones made for a tablet's Large and Huge.
+ */
 fun libraryGridCoverImageVariant(
-    gridCellSizeDp: Int,
+    minCellWidthDp: Int,
 ): LibraryCoverImageVariant = when {
-    gridCellSizeDp >= extraLargeGridCoverCellSizeDp -> LibraryCoverImageVariant.GridExtraLarge
-    gridCellSizeDp >= largeGridCoverCellSizeDp -> LibraryCoverImageVariant.GridLarge
+    minCellWidthDp >= extraLargeGridCoverCellSizeDp -> LibraryCoverImageVariant.GridExtraLarge
+    minCellWidthDp >= largeGridCoverCellSizeDp -> LibraryCoverImageVariant.GridLarge
     else -> LibraryCoverImageVariant.Grid
 }
 
@@ -181,18 +284,9 @@ fun availableLibraryGridSizeOptions(
     maxWidth: Dp,
     startPadding: Dp,
     endPadding: Dp,
-): List<LibraryGridSizeOption> = supportedLibraryGridCellSizesDp
-    .map { cellSizeDp ->
-        LibraryGridSizeOption(
-            cellSizeDp = cellSizeDp,
-            columnCount = libraryGridColumnCount(
-                maxWidth = maxWidth,
-                startPadding = startPadding,
-                endPadding = endPadding,
-                minCellSizeDp = cellSizeDp,
-            ),
-        )
-    }
+    compactWindow: Boolean = false,
+): List<LibraryGridSizeOption> = LibraryCoverSize.entries
+    .map { size -> libraryGridSizeOption(size, maxWidth, startPadding, endPadding, compactWindow) }
     .groupBy(LibraryGridSizeOption::columnCount)
     .values
     .map { optionsForColumnCount ->
@@ -200,22 +294,46 @@ fun availableLibraryGridSizeOptions(
     }
     .sortedBy(LibraryGridSizeOption::cellSizeDp)
 
+private fun libraryGridSizeOption(
+    size: LibraryCoverSize,
+    maxWidth: Dp,
+    startPadding: Dp,
+    endPadding: Dp,
+    compactWindow: Boolean,
+): LibraryGridSizeOption {
+    val minCellWidthDp = size.minCellWidthDp(compactWindow)
+    val columnCount = libraryGridColumnCount(
+        maxWidth = maxWidth,
+        startPadding = startPadding,
+        endPadding = endPadding,
+        minCellSizeDp = minCellWidthDp,
+        minColumns = libraryGridMinColumns(compactWindow),
+    )
+    return LibraryGridSizeOption(
+        cellSizeDp = size.cellSizeDp,
+        columnCount = columnCount,
+        minCellWidthDp = minCellWidthDp,
+        cellWidthDp = libraryGridCellWidthDp(maxWidth, startPadding, endPadding, columnCount),
+    )
+}
+
 private fun selectedLibraryGridSizeOption(
     options: List<LibraryGridSizeOption>,
     maxWidth: Dp,
     startPadding: Dp,
     endPadding: Dp,
     requestedGridCellSizeDp: Int,
+    compactWindow: Boolean,
 ): LibraryGridSizeOption {
-    val sanitizedGridCellSizeDp = sanitizeLibraryGridCellSizeDp(requestedGridCellSizeDp)
-    val requestedColumnCount = libraryGridColumnCount(
+    val requested = libraryGridSizeOption(
+        size = LibraryCoverSize.of(requestedGridCellSizeDp),
         maxWidth = maxWidth,
         startPadding = startPadding,
         endPadding = endPadding,
-        minCellSizeDp = sanitizedGridCellSizeDp,
+        compactWindow = compactWindow,
     )
-    return options.firstOrNull { option -> option.columnCount == requestedColumnCount }
-        ?: options.minBy { option -> abs(option.cellSizeDp - sanitizedGridCellSizeDp) }
+    return options.firstOrNull { option -> option.columnCount == requested.columnCount }
+        ?: options.minBy { option -> abs(option.cellSizeDp - requested.cellSizeDp) }
 }
 
 private fun libraryGridColumnCount(
@@ -223,12 +341,14 @@ private fun libraryGridColumnCount(
     startPadding: Dp,
     endPadding: Dp,
     minCellSizeDp: Int,
+    minColumns: Int = 1,
 ): Int {
     val availableWidthDp = libraryGridAvailableWidthDp(maxWidth, startPadding, endPadding)
     val minCellWidthDp = minCellSizeDp.toFloat()
     val spacingDp = libraryGridHorizontalSpacingDp.value
     return floor((availableWidthDp + spacingDp) / (minCellWidthDp + spacingDp))
         .toInt()
+        .coerceAtLeast(minColumns)
         .coerceAtLeast(1)
 }
 
@@ -238,12 +358,14 @@ private fun libraryGridColumnCountNearest(
     startPadding: Dp,
     endPadding: Dp,
     cellWidthDp: Float,
+    minColumns: Int,
 ): Int {
     val atLeastAsWide = libraryGridColumnCount(
         maxWidth = maxWidth,
         startPadding = startPadding,
         endPadding = endPadding,
         minCellSizeDp = floor(cellWidthDp).toInt(),
+        minColumns = minColumns,
     )
     return listOf(atLeastAsWide, atLeastAsWide + 1).minBy { columnCount ->
         abs(ln(libraryGridCellWidthDp(maxWidth, startPadding, endPadding, columnCount) / cellWidthDp))

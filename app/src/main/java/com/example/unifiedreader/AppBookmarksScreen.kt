@@ -6,7 +6,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -29,6 +28,7 @@ import com.example.unifiedreader.feature.library.ItemProgressSummary
 import com.example.unifiedreader.feature.library.LibraryCoverAspectRatio
 import com.example.unifiedreader.feature.library.LibraryCoverImageVariant
 import com.example.unifiedreader.feature.library.VisibleResolvedLibraryCover
+import com.example.unifiedreader.feature.library.libraryWindowGridMetrics
 import com.example.unifiedreader.ui.components.AppToastIcon
 import com.example.unifiedreader.ui.components.AppToastMessage
 import com.example.unifiedreader.ui.components.AppToastState
@@ -136,7 +136,7 @@ internal fun BookmarksRoute(
         library = library,
         actions = actions,
         cover = cover,
-        gridCellSize = uiState.libraryGridCellSizeDp.dp,
+        gridCells = libraryWindowGridMetrics(uiState.libraryGridCellSizeDp).gridCells,
         contentTopInset = contentTopInset,
         modifier = modifier,
     )

@@ -9,17 +9,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -43,15 +37,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.unifiedreader.core.model.ReadableItem
-import com.example.unifiedreader.feature.library.LibraryCoverActionCard
 import com.example.unifiedreader.feature.library.LibraryCoverImageVariant
-import com.example.unifiedreader.feature.library.LibraryCoverProgressBar
-import com.example.unifiedreader.feature.library.LibraryCoverSize
 import com.example.unifiedreader.feature.library.LibraryItemActionContext
 import com.example.unifiedreader.feature.library.LibraryItemPageButton
 import com.example.unifiedreader.feature.library.defaultLibraryGridCellSizeDp
 import com.example.unifiedreader.feature.library.isDownloaded
-import com.example.unifiedreader.feature.library.libraryGridCoverImageVariant
+import com.example.unifiedreader.feature.library.isLibraryCompactWindow
 import com.example.unifiedreader.feature.library.menu.LibraryItemMenuButtonStyle
 import com.example.unifiedreader.feature.library.sanitizeLibraryGridCellSizeDp
 import com.example.unifiedreader.ui.components.AppBackground
@@ -188,6 +179,7 @@ fun LibraryShelfItemsBrowser(
         variant = shelfBrowserCoverImageVariant(
             showListView = showListView,
             gridCellSizeDp = sanitizedGridCellSizeDp,
+            compactWindow = isLibraryCompactWindow(),
         ),
         coverPrefetchKeyProvider = coverPrefetchKeyProvider,
         onCoverVisible = onCoverVisible,
@@ -304,58 +296,6 @@ private fun ShelfBrowserHeader(
 }
 
 @Composable
-private fun ShelfBrowserGrid(
-    kind: LibraryShelfBrowserKind,
-    entries: List<LibraryShelfBrowserEntry>,
-    header: @Composable () -> Unit,
-    contentTopInset: Dp,
-    gridCellSizeDp: Int,
-    gridState: LazyGridState,
-    switchedAtMillis: Long,
-    itemActionContext: LibraryItemActionContext,
-    coverImageUrlProvider: (ReadableItem, LibraryCoverImageVariant) -> String?,
-    onItemSelected: (ReadableItem) -> Unit,
-) {
-    val compactGrid = gridCellSizeDp <= LibraryCoverSize.Medium.cellSizeDp
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(gridCellSizeDp.dp),
-        state = gridState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = appGutter(),
-            end = appGutter(),
-            top = contentTopInset + AppLayout.contentTop,
-            bottom = AppLayout.contentBottom,
-        ),
-        verticalArrangement = Arrangement.spacedBy(if (compactGrid) 12.dp else AppLayout.gridGap),
-        horizontalArrangement = Arrangement.spacedBy(AppLayout.gridGap),
-    ) {
-        item(key = ShelfBrowserHeaderKey, span = { GridItemSpan(maxLineSpan) }) { header() }
-        items(
-            items = entries,
-            // Per shelf, so switching tabs replaces the tiles (they fade) instead of moving them.
-            key = { entry -> "${kind.name}:${entry.item.id}" },
-        ) { entry ->
-            ShelfBrowserGridCard(
-                entry = entry,
-                coverSize = LibraryCoverSize.of(gridCellSizeDp),
-                imageVariant = libraryGridCoverImageVariant(gridCellSizeDp),
-                itemActionContext = itemActionContext,
-                coverImageUrlProvider = coverImageUrlProvider,
-                onItemSelected = { onItemSelected(entry.item) },
-                modifier = Modifier
-                    .animateItem(
-                        fadeInSpec = AppMotion.effects(),
-                        placementSpec = null,
-                        fadeOutSpec = tween(durationMillis = ShelfSwitchFadeOutMillis),
-                    )
-                    .shelfSwitchEntrance(switchedAtMillis),
-            )
-        }
-    }
-}
-
-@Composable
 private fun ShelfBrowserList(
     kind: LibraryShelfBrowserKind,
     entries: List<LibraryShelfBrowserEntry>,
@@ -418,59 +358,6 @@ private fun ShelfBrowserList(
     }
 }
 
-/** The home strip's tile, at the grid's cover size. */
-@Composable
-private fun ShelfBrowserGridCard(
-    entry: LibraryShelfBrowserEntry,
-    coverSize: LibraryCoverSize,
-    imageVariant: LibraryCoverImageVariant,
-    itemActionContext: LibraryItemActionContext,
-    coverImageUrlProvider: (ReadableItem, LibraryCoverImageVariant) -> String?,
-    onItemSelected: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    LibraryCoverActionCard(
-        item = entry.item,
-        title = entry.title,
-        showTitle = coverSize.showsTitle,
-        supportingText = entry.supportingText.takeIf { coverSize.showsTitle },
-        trailingText = entry.trailingText,
-        coverImageUrlProvider = coverImageUrlProvider,
-        imageVariant = imageVariant,
-        isDownloaded = itemActionContext.isDownloaded(entry.item),
-        isRead = entry.isRead,
-        onClick = onItemSelected,
-        titleStyle = if (coverSize <= LibraryCoverSize.Medium) {
-            MaterialTheme.typography.labelMedium
-        } else {
-            MaterialTheme.typography.titleSmall
-        },
-        supportingStyle = MaterialTheme.typography.bodySmall,
-        metadataTopPadding = 8.dp,
-        menuContent = {
-            LibraryItemPageButton(
-                item = entry.item,
-                actionContext = itemActionContext,
-                buttonStyle = LibraryItemMenuButtonStyle.CompactInline,
-            )
-        },
-        modifier = modifier.fillMaxWidth(),
-        coverModifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(2f / 3f),
-        coverOverlay = {
-            entry.progressFraction?.let { fraction ->
-                LibraryCoverProgressBar(
-                    fraction = fraction,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth(),
-                )
-            }
-        },
-    )
-}
-
 /** A search that matched nothing, or a shelf that emptied while See all was open. */
 @Composable
 private fun ShelfBrowserEmptyState(
@@ -512,7 +399,7 @@ private fun ShelfBrowserEmptyState(
 
 /** A tile that appears just after a tab switch slides in from 12 dp, on spatial. */
 @Composable
-private fun Modifier.shelfSwitchEntrance(switchedAtMillis: Long): Modifier {
+internal fun Modifier.shelfSwitchEntrance(switchedAtMillis: Long): Modifier {
     val slide = with(LocalDensity.current) { ShelfSwitchSlide.toPx() }
     val offset = remember {
         val justSwitched = SystemClock.uptimeMillis() - switchedAtMillis < ShelfSwitchWindowMillis
@@ -524,7 +411,7 @@ private fun Modifier.shelfSwitchEntrance(switchedAtMillis: Long): Modifier {
     return graphicsLayer { translationX = offset.value }
 }
 
-private const val ShelfBrowserHeaderKey = "shelf-browser-tabs"
+internal const val ShelfBrowserHeaderKey = "shelf-browser-tabs"
 private val ShelfSwitchSlide = 12.dp
 private const val ShelfSwitchWindowMillis = 300L
-private const val ShelfSwitchFadeOutMillis = 90
+internal const val ShelfSwitchFadeOutMillis = 90

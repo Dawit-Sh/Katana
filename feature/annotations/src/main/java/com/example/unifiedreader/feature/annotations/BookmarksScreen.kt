@@ -90,7 +90,8 @@ fun BookmarksScreen(
     library: MarkedLibrary?,
     actions: BookmarksActions,
     cover: MarkedBookCover,
-    gridCellSize: Dp,
+    // The library grid's cells for its cover size (two columns at least on a phone).
+    gridCells: GridCells,
     contentTopInset: Dp,
     modifier: Modifier = Modifier,
 ) {
@@ -105,7 +106,7 @@ fun BookmarksScreen(
     ) { page ->
         val shown = library ?: return@AppScreenHost
         when (page) {
-            BookmarksPage.Library -> MarkedBooksGrid(state, shown, cover, gridCellSize, contentTopInset)
+            BookmarksPage.Library -> MarkedBooksGrid(state, shown, cover, gridCells, contentTopInset)
             is BookmarksPage.Book -> {
                 val book = shown.book(page.itemId)
                 if (book == null) {
@@ -125,7 +126,7 @@ private fun MarkedBooksGrid(
     state: BookmarksState,
     library: MarkedLibrary,
     cover: MarkedBookCover,
-    gridCellSize: Dp,
+    gridCells: GridCells,
     contentTopInset: Dp,
     modifier: Modifier = Modifier,
 ) {
@@ -137,7 +138,7 @@ private fun MarkedBooksGrid(
     }
     val gutter = appGutter()
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(gridCellSize),
+        columns = gridCells,
         state = gridState,
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(

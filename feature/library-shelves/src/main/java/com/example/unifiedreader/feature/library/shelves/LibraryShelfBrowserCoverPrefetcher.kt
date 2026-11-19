@@ -10,8 +10,8 @@ import androidx.compose.runtime.snapshotFlow
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.feature.library.LibraryCoverImageVariant
+import com.example.unifiedreader.feature.library.LibraryGridMetrics
 import com.example.unifiedreader.feature.library.LocalLibraryCoverGeneration
-import com.example.unifiedreader.feature.library.libraryGridCoverImageVariant
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -158,13 +158,15 @@ private fun shelfBrowserCoverPrefetchTargets(
         }
     }
 
+/** The image See all's covers ask for: the grid's for its cover size in this window ([compactWindow]: under 600 dp). */
 internal fun shelfBrowserCoverImageVariant(
     showListView: Boolean,
     gridCellSizeDp: Int,
+    compactWindow: Boolean = false,
 ): LibraryCoverImageVariant = if (showListView) {
     LibraryCoverImageVariant.ShelfRow
 } else {
-    libraryGridCoverImageVariant(gridCellSizeDp)
+    LibraryGridMetrics(cellSizeDp = gridCellSizeDp, compactWindow = compactWindow).coverImageVariant
 }
 
 private data class ShelfBrowserCoverPrefetchTarget(

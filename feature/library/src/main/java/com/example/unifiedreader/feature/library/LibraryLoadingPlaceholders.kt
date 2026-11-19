@@ -8,48 +8,43 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
-import kotlin.math.max
 
 internal const val LibraryGridLoadingTag = "library-grid-loading"
 
 @Composable
 internal fun LoadingLibraryState(
-    gridCellSizeDp: Int,
+    gridMetrics: LibraryGridMetrics,
     modifier: Modifier = Modifier,
 ) {
     GridLoadingLibraryState(
-        gridCellSizeDp = gridCellSizeDp,
+        gridMetrics = gridMetrics,
         modifier = modifier,
     )
 }
 
+/** The grid's stand-in while it loads: two rows in the columns the grid will lay out. */
 @Composable
 private fun GridLoadingLibraryState(
-    gridCellSizeDp: Int,
+    gridMetrics: LibraryGridMetrics,
     modifier: Modifier = Modifier,
 ) {
-    val cellSize = sanitizeLibraryGridCellSizeDp(gridCellSizeDp).dp
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .testTag(LibraryGridLoadingTag),
     ) {
-        val columns = max(
-            1,
-            ((maxWidth + LibraryLoadingItemSpacing) / (cellSize + LibraryLoadingItemSpacing)).toInt(),
-        )
-        val cardWidth = (maxWidth - (LibraryLoadingItemSpacing * (columns - 1))) / columns
-        Column(verticalArrangement = Arrangement.spacedBy(LibraryLoadingItemSpacing)) {
+        val columns = with(LocalDensity.current) { libraryGridColumns(availableWidth = maxWidth, metrics = gridMetrics) }
+        Column(verticalArrangement = Arrangement.spacedBy(gridMetrics.spacing)) {
             repeat(GridLoadingRowCount) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(LibraryLoadingItemSpacing),
+                    horizontalArrangement = Arrangement.spacedBy(gridMetrics.spacing),
                 ) {
-                    repeat(columns) {
+                    repeat(columns.count) {
                         LibraryGridPlaceholderCard(
-                            modifier = Modifier.width(cardWidth),
+                            modifier = Modifier.width(columns.cellWidth),
                         )
                     }
                 }
@@ -58,5 +53,4 @@ private fun GridLoadingLibraryState(
     }
 }
 
-private val LibraryLoadingItemSpacing = 16.dp
 private const val GridLoadingRowCount = 2

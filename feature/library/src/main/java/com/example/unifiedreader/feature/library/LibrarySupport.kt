@@ -1,7 +1,5 @@
 package com.example.unifiedreader.feature.library
 
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import com.example.unifiedreader.core.model.LibraryFileLocation
 import com.example.unifiedreader.core.model.LibraryReadingStatus
 import com.example.unifiedreader.core.model.LibrarySortMode
@@ -74,16 +72,7 @@ data class ItemProgressSummary(
 }
 
 enum class LibraryViewMode {
-    Grid;
-
-    fun gridCells(
-        maxWidth: Dp,
-        maxHeight: Dp,
-        gridCellSizeDp: Int = defaultLibraryGridCellSizeDp,
-    ): androidx.compose.foundation.lazy.grid.GridCells =
-        androidx.compose.foundation.lazy.grid.GridCells.Adaptive(
-            minSize = sanitizeLibraryGridCellSizeDp(gridCellSizeDp).dp,
-        )
+    Grid,
 }
 
 internal val LibraryViewMode.label: String

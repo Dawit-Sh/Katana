@@ -53,6 +53,9 @@ fun LibraryCoverActionCard(
     titleColor: Color = MaterialTheme.colorScheme.onSurface,
     // Tiny covers: no title line, the cover names the book to TalkBack instead.
     showTitle: Boolean = true,
+    // Two on narrow covers, both kept (an empty second line under a short title) so a row's tiles line up.
+    // One line scrolls once when the title is long.
+    titleLines: Int = 1,
     supportingText: String? = null,
     supportingStyle: TextStyle = MaterialTheme.typography.bodySmall,
     supportingColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -117,11 +120,12 @@ fun LibraryCoverActionCard(
                             interactionSource = null,
                             onClick = onClick,
                             onLongClick = onLongClick,
-                        ).then(title.marqueeModifier()),
+                        ).then(if (titleLines == 1) title.marqueeModifier() else Modifier),
                         // The book's own title, in the book face; a comic's in the app's.
                         style = AppBookType.title(titleStyle, comic = item.isComic),
                         color = titleColor,
-                        maxLines = 1,
+                        maxLines = titleLines,
+                        minLines = titleLines,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
