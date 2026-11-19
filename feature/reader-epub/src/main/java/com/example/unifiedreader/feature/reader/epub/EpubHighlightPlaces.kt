@@ -4,12 +4,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
+import android.util.Log
 import com.example.unifiedreader.core.model.runSuspendCatching
 import com.example.unifiedreader.feature.annotations.AnnotationPlace
 import com.example.unifiedreader.feature.annotations.HighlightPlacementStore
 import com.example.unifiedreader.feature.annotations.HighlightToPlace
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.withContext
 import org.json.JSONException
 import org.json.JSONObject
@@ -30,6 +32,17 @@ internal sealed interface EpubServerPlace {
 
     /** The chapter couldn't be read now; another time may do. */
     data object Unreadable : EpubServerPlace
+}
+
+/** Where a highlight from the server is in this device's copy of the book. */
+internal sealed interface EpubLocalPlace {
+    data class Found(val locator: Locator) : EpubLocalPlace
+
+    /** Its place isn't in this copy (another edition, say): trying again won't find it. */
+    data object NotFound : EpubLocalPlace
+
+    /** Its chapter couldn't be read now; another time may do. */
+    data object Unreadable : EpubLocalPlace
 }
 
 /**
@@ -60,16 +73,23 @@ internal class EpubHighlightPlaces(private val publication: Publication) {
     }
 
     /**
-     * Where the CFI [cfi] of the highlighted [words] is in this copy of the book, or null when it
-     * isn't (another edition, say). A CFI whose characters are counted a little differently (the
-     * KOReader plugin counts some the file's way) still finds its words: the nearest place they are.
+     * Where the CFI [cfi] of the highlighted [words] is in this copy of the book. A CFI whose characters
+     * are counted a little differently (the KOReader plugin counts some the file's way) still finds its
+     * words: the nearest place they are. NotFound when the place isn't in this copy (another edition,
+     * say: no use trying again); Unreadable when its chapter couldn't be read just now (a big chapter
+     * read while the page itself loads on a small device can fail once and read fine a moment later).
      */
-    suspend fun locatorOf(cfi: String, words: String): Locator? {
+    suspend fun localPlaceOf(cfi: String, words: String): EpubLocalPlace {
         val range = EpubCfi.parse(cfi)
         val item = range?.let { spine().items.getOrNull(it.spineIndex) }
-        if (range == null || item == null) return null
-        return chapterAt(item.path)?.let { (link, chapter) ->
-            chapter.wordsAt(range, words)?.let { span -> locatorFor(link, item.path, chapter.quote(span)) }
+        val link = item?.let { chapterLink(it.path) }
+        val chapter = if (item != null && link != null) chapterAt(item.path)?.second else null
+        val span = if (chapter != null && range != null) chapter.wordsAt(range, words) else null
+        return when {
+            item == null || link == null -> EpubLocalPlace.NotFound
+            chapter == null -> EpubLocalPlace.Unreadable
+            span == null -> EpubLocalPlace.NotFound
+            else -> EpubLocalPlace.Found(locatorFor(link, item.path, chapter.quote(span)))
         }
     }
 
@@ -101,8 +121,11 @@ internal class EpubHighlightPlaces(private val publication: Publication) {
         },
     )
 
+    private fun chapterLink(path: String): Link? =
+        (publication.readingOrder + publication.resources).firstOrNull { it.url().bookPath() == path }
+
     private suspend fun chapterAt(path: String): Pair<Link, EpubChapterText>? {
-        val link = (publication.readingOrder + publication.resources).firstOrNull { it.url().bookPath() == path } ?: return null
+        val link = chapterLink(path) ?: return null
         val chapter = chapters[path] ?: readChapter(link, path)?.also { chapters[path] = it }
         return chapter?.let { link to it }
     }
@@ -164,55 +187,77 @@ internal fun EpubHighlightPlacementEffect(
         if (store == null || store == HighlightPlacementStore.None) return@LaunchedEffect
         delay(PLACEMENT_START_DELAY_MILLIS)
         val places = EpubHighlightPlaces(publication)
-        // Ones not found this time (another edition's place, a chapter that wouldn't read): not tried again until the book reopens.
-        val skipped = mutableSetOf<String>()
-        store.highlightsToPlace(itemId).collect { waiting ->
-            waiting.filterNot { it.id in skipped }.forEach { highlight ->
-                val placed = withContext(Dispatchers.IO) {
-                    val serverPlace = highlight.serverPlace
-                    if (serverPlace == null) {
-                        places.placeServerSide(highlight, store)
-                    } else {
-                        places.placeHere(highlight, serverPlace, store, latestChapterTitleOf)
+        // Ones whose place isn't in this copy (another edition's): not tried again until the book reopens.
+        val notHere = mutableSetOf<String>()
+        // Each new list starts over: a placed highlight leaves the list, so the rest come round again.
+        store.highlightsToPlace(itemId).collectLatest { waiting ->
+            var pending = waiting.filterNot { it.id in notHere }
+            var pause = PLACEMENT_RETRY_START_MILLIS
+            for (attempt in 1..PLACEMENT_TRIES) {
+                val unreadable = mutableListOf<HighlightToPlace>()
+                pending.forEach { highlight ->
+                    val outcome = withContext(Dispatchers.IO) {
+                        val serverPlace = highlight.serverPlace
+                        if (serverPlace == null) {
+                            places.placeServerSide(highlight, store)
+                        } else {
+                            places.placeHere(highlight, serverPlace, store, latestChapterTitleOf)
+                        }
+                    }
+                    when (outcome) {
+                        PlacementOutcome.Done -> Unit
+                        PlacementOutcome.NotHere -> notHere += highlight.id
+                        PlacementOutcome.Unreadable -> unreadable += highlight
                     }
                 }
-                if (!placed) skipped += highlight.id
+                if (unreadable.isEmpty()) return@collectLatest
+                // A highlight that came down while the book was still opening: its chapter is read again
+                // in a moment, instead of the highlight waiting for the book to be reopened.
+                Log.i(LOG_TAG, "${unreadable.size} highlight(s) couldn't be placed yet (try $attempt of $PLACEMENT_TRIES)")
+                pending = unreadable
+                if (attempt < PLACEMENT_TRIES) {
+                    delay(pause)
+                    pause *= 2
+                }
             }
         }
     }
 }
 
-// A highlight made here gets its place the server's way (or stays on this device). False when its chapter wouldn't read.
-private suspend fun EpubHighlightPlaces.placeServerSide(highlight: HighlightToPlace, store: HighlightPlacementStore): Boolean {
+private enum class PlacementOutcome { Done, NotHere, Unreadable }
+
+// A highlight made here gets its place the server's way (or stays on this device).
+private suspend fun EpubHighlightPlaces.placeServerSide(highlight: HighlightToPlace, store: HighlightPlacementStore): PlacementOutcome {
     val found = highlight.locatorJson.toLocatorOrNull()?.let { serverPlaceOf(it) } ?: EpubServerPlace.NotFound
-    when (found) {
-        is EpubServerPlace.Found -> store.setServerPlace(highlight.id, found.cfi)
-        EpubServerPlace.NotFound -> store.keepOnDevice(highlight.id)
-        EpubServerPlace.Unreadable -> Unit
+    return when (found) {
+        is EpubServerPlace.Found -> PlacementOutcome.Done.also { store.setServerPlace(highlight.id, found.cfi) }
+        EpubServerPlace.NotFound -> PlacementOutcome.Done.also { store.keepOnDevice(highlight.id) }
+        EpubServerPlace.Unreadable -> PlacementOutcome.Unreadable
     }
-    return found != EpubServerPlace.Unreadable
 }
 
-// A highlight from the server gets its place in this copy of the book. False when it isn't found here.
+// A highlight from the server gets its place in this copy of the book.
 private suspend fun EpubHighlightPlaces.placeHere(
     highlight: HighlightToPlace,
     serverPlace: String,
     store: HighlightPlacementStore,
     chapterTitleOf: (Locator) -> String?,
-): Boolean {
-    val locator = locatorOf(serverPlace, highlight.text)
-    locator?.let {
+): PlacementOutcome = when (val found = localPlaceOf(serverPlace, highlight.text)) {
+    is EpubLocalPlace.Found -> {
+        val locator = found.locator
         store.place(
             highlight.id,
             AnnotationPlace(
-                href = it.href.toString(),
-                locatorJson = it.toJSON().toString(),
-                chapterTitle = highlight.chapterTitle ?: chapterTitleOf(it),
-                progression = it.locations.totalProgression,
+                href = locator.href.toString(),
+                locatorJson = locator.toJSON().toString(),
+                chapterTitle = highlight.chapterTitle ?: chapterTitleOf(locator),
+                progression = locator.locations.totalProgression,
             ),
         )
+        PlacementOutcome.Done
     }
-    return locator != null
+    EpubLocalPlace.NotFound -> PlacementOutcome.NotHere
+    EpubLocalPlace.Unreadable -> PlacementOutcome.Unreadable
 }
 
 private fun String.toLocatorOrNull(): Locator? = try {
@@ -222,3 +267,6 @@ private fun String.toLocatorOrNull(): Locator? = try {
 }
 
 private const val PLACEMENT_START_DELAY_MILLIS = 1_500L
+private const val PLACEMENT_TRIES = 5
+private const val PLACEMENT_RETRY_START_MILLIS = 2_000L
+private const val LOG_TAG = "HighlightPlaces"
