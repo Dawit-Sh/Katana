@@ -143,10 +143,17 @@ notes (which APK is for what). The in-app updater only sees published releases (
 
 ## In-app updater (`feature:updates`)
 
-- Checks `Dawit-Sh/Katana`'s latest GitHub release (once a day after the library
-  appears, or from Settings › About › Version), downloads the release's `.apk`, checks GitHub's SHA-256, the package
-  name, the signing certificate and a higher `versionCode`, then installs through Android's
-  `PackageInstaller`. So a release must keep the release key and raise `versionCode`.
+- Checks for the newest release once a day after the library appears, or from Settings › About › Version. It reads
+  the download site's `https://dawitsh.dev/Katana/latest.json` first (`SiteReleaseSource.LATEST_RELEASE_URL`, the
+  one place the URL lives): a plain GitHub Pages file, so no API limit. The Website workflow
+  (`.github/workflows/pages.yml`) writes it on every published release: version, tag, page, the release notes, and
+  per APK its name, url, size and GitHub's `digest` (`sha256:...`). Only when that file can't be read or isn't whole
+  (no version or APKs, an APK without its SHA-256 or not on https) does it ask
+  `api.github.com/repos/Dawit-Sh/Katana/releases/latest` (unauthenticated: 60 an hour per address)
+  (`FallbackReleaseSource`). Then it downloads the `.apk` for the device, checks its SHA-256, the package name, the
+  signing certificate and a higher `versionCode`, and installs through Android's `PackageInstaller`. So a release
+  must keep the release key and raise `versionCode`, and the Website run must finish for the site to offer it
+  (`gh workflow run pages.yml --ref fire7` writes `latest.json` again by hand).
 - Debug builds never check by themselves, and their button stops at "This copy can't update
   itself" (debug key). Testing the install step needs release-signed builds on both sides.
 

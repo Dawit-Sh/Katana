@@ -74,7 +74,10 @@ import com.example.unifiedreader.feature.library.menu.LibraryItemMenuButtonStyle
 import com.example.unifiedreader.feature.reader.preferences.ComicReaderMode
 import com.example.unifiedreader.feature.reader.preferences.ComicReadingDirection
 import com.example.unifiedreader.ui.components.AppLayout
+import com.example.unifiedreader.ui.components.AppPullToRefreshIndicator
 import com.example.unifiedreader.ui.components.AppWindowWidth
+import com.example.unifiedreader.ui.components.appPullToRefresh
+import com.example.unifiedreader.ui.components.rememberAppPullToRefreshState
 import com.example.unifiedreader.ui.components.currentAppWindowWidth
 import com.example.unifiedreader.ui.components.appGutter
 import com.example.unifiedreader.ui.theme.AppMotion
@@ -547,7 +550,7 @@ fun LibraryScreen(
         }
         // A paged window can lack selectable roots while picks remain elsewhere; the host ends the
         // mode once the whole view has none.
-        if (selectableDownloadItemIds.isEmpty() && isDownloadSelectionMode && !isPaged) {
+        if (!isPaged && librarySelectionRunsOut(selectableDownloadItemIds.size, isDownloadSelectionMode, selectAnyItem)) {
             onDownloadSelectionModeChanged(false)
         }
     }
@@ -590,8 +593,23 @@ fun LibraryScreen(
     }
 
     val gutter = appGutter()
+    // Pulling the grid down syncs the library with its server (LocalLibraryPullToRefresh): on the grid
+    // only, not the docked filters beside it, and not while picking covers.
+    val pullToRefresh = LocalLibraryPullToRefresh.current
+    val pullRefreshing = pullToRefresh?.refreshing == true
+    val pullState = rememberAppPullToRefreshState()
     Row(modifier = Modifier.fillMaxSize()) {
-        BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxHeight()) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .appPullToRefresh(
+                    state = pullState,
+                    isRefreshing = pullRefreshing,
+                    enabled = pullToRefresh != null && !isDownloadSelectionMode,
+                    onRefresh = { pullToRefresh?.onPull?.invoke() },
+                ),
+        ) {
             val gridEndPadding = if (alphabetRailVisible) {
                 libraryGridNavigationEndPaddingDp
             } else {
@@ -906,6 +924,7 @@ fun LibraryScreen(
                     },
                 )
             }
+            AppPullToRefreshIndicator(state = pullState, isRefreshing = pullRefreshing, top = contentTopInset)
         }
 
         AnimatedVisibility(

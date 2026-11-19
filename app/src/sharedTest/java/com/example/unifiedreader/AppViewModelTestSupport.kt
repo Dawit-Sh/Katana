@@ -850,6 +850,7 @@ class FakeGrimmoryCatalogSyncer(
     ): GrimmoryCatalogSyncResult {
         lastRequest = request
         refreshCount += 1
+        syncGate?.await()
         failure?.let { throw it }
         return result
     }

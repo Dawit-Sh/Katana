@@ -893,6 +893,14 @@ class AppViewModel @Inject constructor(
         )
     }
 
+    /** The library pulled down: its server's Sync now, checked first when it's offline. */
+    internal val libraryPullRefresh = AppLibraryPullRefresh(
+        state = { uiState },
+        checkServer = remoteSourceConnectivityStartupCoordinator::retrySource,
+        sync = ::refreshSelectedRemoteLibrary,
+        scope = viewModelScope,
+    )
+
     /** The library is on screen: it refreshes by itself when its server last synced a while ago. */
     fun onLibraryShown() {
         libraryAutoRefreshCoordinator.refreshIfDue(uiState, ::refreshSelectedRemoteLibrary)

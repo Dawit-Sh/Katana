@@ -43,8 +43,11 @@ import com.example.unifiedreader.feature.downloads.DownloadsSheet
 import com.example.unifiedreader.feature.journal.JournalReadingCard
 import com.example.unifiedreader.feature.journal.JournalScreen
 import com.example.unifiedreader.feature.library.LocalLibraryCoverAsPrinted
+import com.example.unifiedreader.feature.library.LibraryPullToRefresh
 import com.example.unifiedreader.feature.library.LibraryViewMode
+import com.example.unifiedreader.feature.library.LocalLibraryPullToRefresh
 import com.example.unifiedreader.feature.library.libraryDownloadSelectableItems
+import com.example.unifiedreader.feature.library.librarySelectionRunsOut
 import com.example.unifiedreader.feature.library.rememberLibrarySelectionTip
 import com.example.unifiedreader.feature.library.shelves.LibraryShelfBrowserKind
 import com.example.unifiedreader.feature.library.shelves.LibraryShelfBrowserOptionsButton
@@ -205,15 +208,22 @@ fun UnifiedReaderScaffold(
         null
     }
     // The whole view's downloadable roots, once the recompute has landed: the fallback before the
-    // screen reports, and the rest of a paged view beyond its loaded window.
+    // screen reports, and the rest of a paged view beyond its loaded window. Picking books for a list,
+    // every book in view can be picked.
+    val addingToList = listMode is ListLibraryMode.AddBooks
     val visibleDownloadableItems = remember(
         uiState.visibleItems,
         uiState.remoteDownloadActionAvailability.downloadableItemIds,
         uiState.remoteDownloadActionAvailability.activeDownloadingItemIds,
+        addingToList,
     ) {
-        uiState.visibleItems.filter { item ->
-            item.id in uiState.remoteDownloadActionAvailability.downloadableItemIds &&
-                item.id !in uiState.remoteDownloadActionAvailability.activeDownloadingItemIds
+        if (addingToList) {
+            uiState.visibleItems
+        } else {
+            uiState.visibleItems.filter { item ->
+                item.id in uiState.remoteDownloadActionAvailability.downloadableItemIds &&
+                    item.id !in uiState.remoteDownloadActionAvailability.activeDownloadingItemIds
+            }
         }
     }
     val isPagedLibrary = LibraryPagingFeature.isPageable(uiState)
@@ -246,7 +256,9 @@ fun UnifiedReaderScaffold(
         if (sanitizedSelection != selectedDownloadItemIds) {
             selectedDownloadItemIds = sanitizedSelection
         }
-        if (effectiveSelectableDownloadItemIds.isEmpty() && isLibraryDownloadSelectionMode) {
+        // Not while picking books for a list: the library opens before its covers are reported, and
+        // ending the selection then left the list's mode on with no selection bar and no way back.
+        if (librarySelectionRunsOut(effectiveSelectableDownloadItemIds.size, isLibraryDownloadSelectionMode, addingToList)) {
             isLibraryDownloadSelectionMode = false
             selectedDownloadItemIds = emptyList()
         }
@@ -263,6 +275,17 @@ fun UnifiedReaderScaffold(
     // Selection starts with a long-press and has no button of its own, so the tip in the "•••"
     // menu explains it until the first time.
     val librarySelectionTip = rememberLibrarySelectionTip()
+    // Pull down on a server's library: Sync now. Once its indicator is back up, the pull is over.
+    val libraryPullRefresh = viewModel.libraryPullRefresh
+    val libraryPullRefreshing = libraryPullRefresh.isRefreshing
+    LaunchedEffect(libraryPullRefreshing) {
+        if (!libraryPullRefreshing) libraryPullRefresh.settle()
+    }
+    val libraryPullToRefresh = if (libraryPullRefresh.canPull) {
+        remember(libraryPullRefreshing) { LibraryPullToRefresh(refreshing = libraryPullRefreshing, onPull = libraryPullRefresh::pull) }
+    } else {
+        null
+    }
 
     fun updateLibraryDownloadSelectionMode(enabled: Boolean) {
         // Closing the selection while picking books for a list goes back to the list, adding nothing.
@@ -275,7 +298,8 @@ fun UnifiedReaderScaffold(
             selectedDownloadItemIds = emptyList()
         }
     }
-    BackHandler(enabled = isLibraryDownloadSelectionMode) {
+    // Back ends the selection; picking books for a list, it goes back to the list, adding nothing.
+    BackHandler(enabled = isLibraryDownloadSelectionMode || (addingToList && uiState.topLevel == TopLevelDestination.Library)) {
         updateLibraryDownloadSelectionMode(false)
     }
 
@@ -462,101 +486,105 @@ fun UnifiedReaderScaffold(
                         modifier = Modifier.fillMaxSize(),
                     ) { topLevel ->
                         when (topLevel) {
-                            TopLevelDestination.Library -> LibraryRoute(
-                                uiState = uiState,
-                                viewMode = libraryViewMode,
-                                pagedGridFlow = if (LibraryPagingFeature.isPageable(uiState)) {
-                                    remember(
-                                        uiState.selectedSource,
-                                        uiState.selectedLibrarySortMode,
-                                        uiState.selectedLibraryFilters,
-                                    ) {
-                                        viewModel.libraryGridPagingData(
-                                            source = uiState.selectedSource,
-                                            sortMode = uiState.selectedLibrarySortMode,
-                                            filters = uiState.selectedLibraryFilters,
+                            TopLevelDestination.Library -> CompositionLocalProvider(
+                                LocalLibraryPullToRefresh provides libraryPullToRefresh,
+                            ) {
+                                LibraryRoute(
+                                    uiState = uiState,
+                                    viewMode = libraryViewMode,
+                                    pagedGridFlow = if (LibraryPagingFeature.isPageable(uiState)) {
+                                        remember(
+                                            uiState.selectedSource,
+                                            uiState.selectedLibrarySortMode,
+                                            uiState.selectedLibraryFilters,
+                                        ) {
+                                            viewModel.libraryGridPagingData(
+                                                source = uiState.selectedSource,
+                                                sortMode = uiState.selectedLibrarySortMode,
+                                                filters = uiState.selectedLibraryFilters,
+                                            )
+                                        }
+                                    } else {
+                                        null
+                                    },
+                                    pagedWindowBadgeResolver = viewModel::resolvePagedWindowBadges,
+                                    pagedAlphabetSectionsProvider = viewModel::pagedAlphabetSections,
+                                    browseContextKey = uiState.libraryBrowseContextKey,
+                                    initialScrollPosition = viewModel.libraryScrollPositionFor(uiState.libraryBrowseContextKey),
+                                    scrollToTopRequest = uiState.libraryScrollToTopRequest,
+                                    coverImageUrlProvider = viewModel::coverImageUrlFor,
+                                    coverPrefetchKeyProvider = viewModel::coverPrefetchKeyFor,
+                                    onPrepareCoverSource = viewModel::prepareCoverSource,
+                                    onCoverVisible = viewModel::ensureCoverCached,
+                                    onCoverViewportScrollingChanged = viewModel::onLibraryViewportScrollingChanged,
+                                    onScrollPositionChanged = { position ->
+                                        viewModel.onLibraryScrollPositionChanged(
+                                            contextKey = uiState.libraryBrowseContextKey,
+                                            position = position,
                                         )
-                                    }
-                                } else {
-                                    null
-                                },
-                                pagedWindowBadgeResolver = viewModel::resolvePagedWindowBadges,
-                                pagedAlphabetSectionsProvider = viewModel::pagedAlphabetSections,
-                                browseContextKey = uiState.libraryBrowseContextKey,
-                                initialScrollPosition = viewModel.libraryScrollPositionFor(uiState.libraryBrowseContextKey),
-                                scrollToTopRequest = uiState.libraryScrollToTopRequest,
-                                coverImageUrlProvider = viewModel::coverImageUrlFor,
-                                coverPrefetchKeyProvider = viewModel::coverPrefetchKeyFor,
-                                onPrepareCoverSource = viewModel::prepareCoverSource,
-                                onCoverVisible = viewModel::ensureCoverCached,
-                                onCoverViewportScrollingChanged = viewModel::onLibraryViewportScrollingChanged,
-                                onScrollPositionChanged = { position ->
-                                    viewModel.onLibraryScrollPositionChanged(
-                                        contextKey = uiState.libraryBrowseContextKey,
-                                        position = position,
-                                    )
-                                },
-                                isDownloadSelectionMode = isLibraryDownloadSelectionMode,
-                                selectedDownloadItemIds = selectedDownloadItemIds,
-                                onDownloadSelectionModeChanged = ::updateLibraryDownloadSelectionMode,
-                                onSelectedDownloadItemIdsChanged = { selectedIds ->
-                                    selectedDownloadItemIds = selectedIds
-                                },
-                                onSelectableDownloadItemsChanged = { selectableItems ->
-                                    hasScreenSelectableDownloadItems = true
-                                    selectableDownloadItems = selectableItems
-                                },
-                                onItemSelected = viewModel::onItemSelected,
-                                seriesReadingDirectionFor = viewModel::seriesReadingDirectionFor,
-                                onSeriesDirectionSelected = viewModel::onSeriesDirectionSelected,
-                                seriesReaderModeFor = viewModel::seriesReaderModeFor,
-                                onSeriesReaderModeSelected = viewModel::onSeriesReaderModeSelected,
-                                onDeleteImportedItem = viewModel::onDeleteImportedItem,
-                                onDownloadRemoteItem = viewModel::onDownloadRemoteItem,
-                                onDeleteRemoteLocalFile = viewModel::onDeleteRemoteLocalFile,
-                                onSetReadStatus = viewModel::onSetReadStatus,
-                                onFilterStateChanged = { filters -> viewModel.onLibraryFiltersChanged(filters, persist = listMode == null) },
-                                onClearFilters = viewModel::clearLibraryFilters,
-                                onScrolledChanged = { contextKey, scrolled ->
-                                    if (scrolled == null) libraryScrolled.remove(contextKey) else libraryScrolled[contextKey] = scrolled
-                                },
-                                onImportLocalFile = onImportLocalFileClick,
-                                onConnectSource = { server -> onStartSource(SourceStartRequest(SourceStartMode.AddSource, server)) },
-                                onRetrySourceConnection = viewModel::retrySelectedSourceConnection,
-                                onSortModeChanged = viewModel::onLibrarySortModeChanged,
-                                onViewModeChanged = onLibraryViewModeChanged,
-                                onGridCellSizeDpChanged = viewModel::onLibraryGridCellSizeChanged,
-                                onFadeReadItemsChanged = viewModel::onLibraryFadeReadItemsChanged,
-                                onCoverAsPrintedChanged = viewModel::onLibraryCoverAsPrintedChanged,
-                                showSortControl = !uiState.isSeriesBrowseActive,
-                                activeShelfBrowserKind = activeLibraryShelfBrowserKind,
-                                onActiveShelfBrowserKindChanged = { activeLibraryShelfBrowserKind = it },
-                                shelfSearchQuery = activeLibraryShelfSearchQuery,
-                                onShelfSearchQueryChanged = { query -> activeLibraryShelfSearchQuery = query },
-                                shelfBrowserViewState = libraryShelfBrowserViewState,
-                                onAddToList = listsViewModel?.let {
-                                    { item ->
-                                        addToListFromBookPage = true
-                                        addToListItems = listOf(item)
-                                    }
-                                },
-                                listsContaining = listsViewModel?.let { rememberBookListMemberships(it, uiState) } ?: { emptyList() },
-                                onOpenList = openListOnLists,
-                                readingOrderCard = listsViewModel?.let {
-                                    rememberHomeReadingOrderCard(it, viewModel, uiState, onOpenList = openListOnLists)
-                                },
-                                onSaveFiltersAsList = listsViewModel?.let { { filters -> filtersToSave = filters } },
-                                filterListMode = listsViewModel?.let {
-                                    listFilterMode(listMode, uiState, listsState, viewModel, it, onSaveAsList = { filters -> filtersToSave = filters }, onFailure = onListFailure)
-                                },
-                                filterPanelRequest = listFilterRequest,
-                                selectAnyItem = listMode is ListLibraryMode.AddBooks,
-                                onLibrarySearchQueryChanged = viewModel::onLibrarySearchQueryChanged,
-                                bookPageRequest = pendingBookPageItemId,
-                                onBookPageRequestHandled = { pendingBookPageItemId = null },
-                                contentTopInset = AppTopBarDefaults.contentInset,
-                                modifier = Modifier.fillMaxSize(),
-                            )
+                                    },
+                                    isDownloadSelectionMode = isLibraryDownloadSelectionMode,
+                                    selectedDownloadItemIds = selectedDownloadItemIds,
+                                    onDownloadSelectionModeChanged = ::updateLibraryDownloadSelectionMode,
+                                    onSelectedDownloadItemIdsChanged = { selectedIds ->
+                                        selectedDownloadItemIds = selectedIds
+                                    },
+                                    onSelectableDownloadItemsChanged = { selectableItems ->
+                                        hasScreenSelectableDownloadItems = true
+                                        selectableDownloadItems = selectableItems
+                                    },
+                                    onItemSelected = viewModel::onItemSelected,
+                                    seriesReadingDirectionFor = viewModel::seriesReadingDirectionFor,
+                                    onSeriesDirectionSelected = viewModel::onSeriesDirectionSelected,
+                                    seriesReaderModeFor = viewModel::seriesReaderModeFor,
+                                    onSeriesReaderModeSelected = viewModel::onSeriesReaderModeSelected,
+                                    onDeleteImportedItem = viewModel::onDeleteImportedItem,
+                                    onDownloadRemoteItem = viewModel::onDownloadRemoteItem,
+                                    onDeleteRemoteLocalFile = viewModel::onDeleteRemoteLocalFile,
+                                    onSetReadStatus = viewModel::onSetReadStatus,
+                                    onFilterStateChanged = { filters -> viewModel.onLibraryFiltersChanged(filters, persist = listMode == null) },
+                                    onClearFilters = viewModel::clearLibraryFilters,
+                                    onScrolledChanged = { contextKey, scrolled ->
+                                        if (scrolled == null) libraryScrolled.remove(contextKey) else libraryScrolled[contextKey] = scrolled
+                                    },
+                                    onImportLocalFile = onImportLocalFileClick,
+                                    onConnectSource = { server -> onStartSource(SourceStartRequest(SourceStartMode.AddSource, server)) },
+                                    onRetrySourceConnection = viewModel::retrySelectedSourceConnection,
+                                    onSortModeChanged = viewModel::onLibrarySortModeChanged,
+                                    onViewModeChanged = onLibraryViewModeChanged,
+                                    onGridCellSizeDpChanged = viewModel::onLibraryGridCellSizeChanged,
+                                    onFadeReadItemsChanged = viewModel::onLibraryFadeReadItemsChanged,
+                                    onCoverAsPrintedChanged = viewModel::onLibraryCoverAsPrintedChanged,
+                                    showSortControl = !uiState.isSeriesBrowseActive,
+                                    activeShelfBrowserKind = activeLibraryShelfBrowserKind,
+                                    onActiveShelfBrowserKindChanged = { activeLibraryShelfBrowserKind = it },
+                                    shelfSearchQuery = activeLibraryShelfSearchQuery,
+                                    onShelfSearchQueryChanged = { query -> activeLibraryShelfSearchQuery = query },
+                                    shelfBrowserViewState = libraryShelfBrowserViewState,
+                                    onAddToList = listsViewModel?.let {
+                                        { item ->
+                                            addToListFromBookPage = true
+                                            addToListItems = listOf(item)
+                                        }
+                                    },
+                                    listsContaining = listsViewModel?.let { rememberBookListMemberships(it, uiState) } ?: { emptyList() },
+                                    onOpenList = openListOnLists,
+                                    readingOrderCard = listsViewModel?.let {
+                                        rememberHomeReadingOrderCard(it, viewModel, uiState, onOpenList = openListOnLists)
+                                    },
+                                    onSaveFiltersAsList = listsViewModel?.let { { filters -> filtersToSave = filters } },
+                                    filterListMode = listsViewModel?.let {
+                                        listFilterMode(listMode, uiState, listsState, viewModel, it, onSaveAsList = { filters -> filtersToSave = filters }, onFailure = onListFailure)
+                                    },
+                                    filterPanelRequest = listFilterRequest,
+                                    selectAnyItem = listMode is ListLibraryMode.AddBooks,
+                                    onLibrarySearchQueryChanged = viewModel::onLibrarySearchQueryChanged,
+                                    bookPageRequest = pendingBookPageItemId,
+                                    onBookPageRequestHandled = { pendingBookPageItemId = null },
+                                    contentTopInset = AppTopBarDefaults.contentInset,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
 
                             TopLevelDestination.Lists -> if (listsViewModel != null) AppBackground(modifier = Modifier.fillMaxSize()) {
                                 ListsRoute(
