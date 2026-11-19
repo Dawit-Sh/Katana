@@ -1,9 +1,8 @@
 package com.example.unifiedreader.feature.library
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalWindowInfo
 import com.example.unifiedreader.ui.components.appGutter
 
 /**
@@ -23,7 +22,10 @@ fun libraryWindowGridMetrics(gridCellSizeDp: Int): LibraryGridMetrics =
 @Composable
 fun libraryWindowGridTitleLines(metrics: LibraryGridMetrics): Int {
     if (!metrics.compactWindow) return 1
-    val gridWidth = LocalConfiguration.current.screenWidthDp.dp - appGutter() * 2
-    val columns = with(LocalDensity.current) { libraryGridColumns(availableWidth = gridWidth, metrics = metrics) }
+    val windowWidthPx = LocalWindowInfo.current.containerSize.width
+    val gutter = appGutter()
+    val columns = with(LocalDensity.current) {
+        libraryGridColumns(availableWidth = windowWidthPx.toDp() - gutter * 2, metrics = metrics)
+    }
     return libraryCoverTitleLines(columns.cellWidth)
 }
