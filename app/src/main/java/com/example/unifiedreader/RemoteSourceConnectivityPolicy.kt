@@ -3,6 +3,7 @@ package com.example.unifiedreader
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.core.model.SourceConnectivityState
 import com.example.unifiedreader.core.model.displayName
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,10 +11,46 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
+/**
+ * Checks a server once more after one of its requests found no connection, before the app shows it offline:
+ * on patchy Wi-Fi one slow reply shouldn't stop covers, books and downloads.
+ */
+fun interface RemoteSourceOfflineCheck {
+    /** Checks [sourceType] again without showing it; [onResult] gets true when it still can't be reached. */
+    fun recheck(
+        sourceType: SourceType,
+        onResult: (stillUnreachable: Boolean) -> Unit,
+    )
+
+    companion object {
+        /** No second check: the first failure marks the server offline, as the app did before. */
+        val None = RemoteSourceOfflineCheck { _, onResult -> onResult(true) }
+    }
+}
+
+/**
+ * Whether each server can be reached now, for the whole app: the library bar's Offline, covers, opening books
+ * that aren't downloaded, downloads and syncing all follow it. Kept in memory only, so every server is Unknown
+ * after a start until something reaches it.
+ *
+ * A request that finds no connection marks a server offline only after [offlineCheck] agrees, with nothing
+ * reaching the server in between ([markFromFailure]); a server already offline stays so.
+ */
 @Singleton
-class RemoteSourceConnectivityPolicy @Inject constructor() {
+class RemoteSourceConnectivityPolicy @Inject constructor(
+    private val offlineCheck: RemoteSourceOfflineCheck,
+) {
+    /** A policy that marks a server offline on its first failed request (tests, stand-ins). */
+    constructor() : this(RemoteSourceOfflineCheck.None)
+
     private val reachabilityBySource = MutableStateFlow<Map<SourceType, SourceConnectivityState>>(emptyMap())
     val reachabilityFlow: StateFlow<Map<SourceType, SourceConnectivityState>> = reachabilityBySource.asStateFlow()
+
+    // The servers being checked again now, so failures meanwhile don't start more checks.
+    private val recheckingSources: MutableSet<SourceType> = ConcurrentHashMap.newKeySet()
+
+    // How often each server was reached, to see whether a request succeeded while a check ran.
+    private val reachedCounts = ConcurrentHashMap<SourceType, Long>()
 
     fun reachabilityFor(
         sourceType: SourceType,
@@ -86,6 +123,7 @@ class RemoteSourceConnectivityPolicy @Inject constructor() {
     fun markReachable(
         sourceType: SourceType,
     ) {
+        reachedCounts.merge(sourceType, 1L, Long::plus)
         reachabilityBySource.update { current ->
             if (current[sourceType] == SourceConnectivityState.Online) {
                 current
@@ -132,9 +170,28 @@ class RemoteSourceConnectivityPolicy @Inject constructor() {
         throwable: Throwable,
     ) {
         if (throwable.isRemoteServerAddressRetryableFailure()) {
-            markUnavailable(sourceType)
+            markUnreachable(sourceType)
         } else {
             markReachable(sourceType)
+        }
+    }
+
+    /**
+     * A request to [sourceType] found no connection. A server already offline stays so; any other is checked
+     * once more, and shown offline when that check fails too and no request reached it meanwhile. One check
+     * at a time per server: failures while it runs wait for its answer.
+     */
+    fun markUnreachable(
+        sourceType: SourceType,
+    ) {
+        if (reachabilityFor(sourceType) == SourceConnectivityState.Offline) return
+        if (!recheckingSources.add(sourceType)) return
+        val reachedBefore = reachedCounts[sourceType] ?: 0L
+        offlineCheck.recheck(sourceType) { stillUnreachable ->
+            recheckingSources.remove(sourceType)
+            if (stillUnreachable && (reachedCounts[sourceType] ?: 0L) == reachedBefore) {
+                markUnavailable(sourceType)
+            }
         }
     }
 
@@ -174,7 +231,7 @@ class RemoteSourceConnectivityPolicy @Inject constructor() {
             .toSet()
         attemptedSourceTypes.forEach { sourceType ->
             if (sourceType in networkFailureSourceTypes) {
-                markUnavailable(sourceType)
+                markUnreachable(sourceType)
             } else {
                 markReachable(sourceType)
             }

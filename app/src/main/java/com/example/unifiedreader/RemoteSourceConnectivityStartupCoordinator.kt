@@ -12,6 +12,7 @@ import kotlin.jvm.JvmSuppressWildcards
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -73,11 +74,10 @@ class RemoteSourceConnectivityStartupCoordinator @Inject constructor(
     private suspend fun checkSource(
         healthCheck: RemoteSourceHealthCheck,
     ): RemoteSourceConnectivityProbeResult {
+        val wasOffline = remoteSourceConnectivityPolicy.isUnavailable(healthCheck.sourceType)
         remoteSourceConnectivityPolicy.markChecking(healthCheck.sourceType)
         sourceErrors.update { current -> current - healthCheck.sourceType }
-        return runSuspendCatching {
-            healthCheck.check()
-        }.fold(
+        return runCheck(healthCheck, confirmLostConnection = !wasOffline).fold(
             onSuccess = { checked ->
                 when (checked) {
                     RemoteSourceHealthCheckResult.NotConfigured -> {
@@ -101,6 +101,25 @@ class RemoteSourceConnectivityStartupCoordinator @Inject constructor(
                 }
             },
         )
+    }
+
+    /**
+     * Runs [healthCheck]; when it finds no connection to a server that wasn't offline, once more a moment later,
+     * so one slow reply on patchy Wi-Fi doesn't show the server offline. A server already offline isn't checked
+     * twice: the user waiting on Retry hears at once.
+     */
+    private suspend fun runCheck(
+        healthCheck: RemoteSourceHealthCheck,
+        confirmLostConnection: Boolean,
+    ): Result<RemoteSourceHealthCheckResult> {
+        val first = runSuspendCatching { healthCheck.check() }
+        val lostConnection = first.exceptionOrNull()?.isRemoteServerAddressRetryableFailure() == true
+        return if (confirmLostConnection && lostConnection) {
+            delay(OFFLINE_RECHECK_DELAY_MILLIS)
+            runSuspendCatching { healthCheck.check() }
+        } else {
+            first
+        }
     }
 
     fun currentStates(): Map<SourceType, SourceConnectivityState> =
