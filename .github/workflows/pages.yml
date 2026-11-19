@@ -1,5 +1,6 @@
 # Publishes site/ (the one-page download site) to GitHub Pages: https://dawitsh.dev/Katana/
-# Every published release runs it again: it writes site/latest.json (the version and the three APKs' links)
+# Every published release runs it again: it writes site/latest.json (the version, the notes and the three APKs'
+# links, sizes and SHA-256 digests, which the in-app updater reads instead of GitHub's API)
 # and bakes them into index.html, so the Download button says the newest version from its first frame.
 name: Website
 
@@ -42,12 +43,13 @@ jobs:
             tag: .tag_name,
             published: .published_at,
             page: .html_url,
+            notes: .body,
             apks: ([.assets[] | select(.name | endswith(".apk")) | {
               key: (if (.name | test("universal")) then "universal"
                     elif (.name | test("arm64-v8a")) then "arm64"
                     elif (.name | test("armeabi-v7a")) then "fire7"
                     else .name end),
-              value: {name, url: .browser_download_url, size}
+              value: {name, url: .browser_download_url, size, digest}
             }] | from_entries)
           }' > site/latest.json
           cat site/latest.json

@@ -17,7 +17,11 @@ object AppUpdates {
     ): AppUpdateController {
         val appContext = context.applicationContext
         return AppUpdateController(
-            releaseSource = GitHubReleaseSource(httpClient, supportedAbis = Build.SUPPORTED_ABIS.toList()),
+            // The download site's latest.json first (no API limit); GitHub's API when it can't be read.
+            releaseSource = FallbackReleaseSource(
+                primary = SiteReleaseSource(httpClient, supportedAbis = Build.SUPPORTED_ABIS.toList()),
+                fallback = GitHubReleaseSource(httpClient, supportedAbis = Build.SUPPORTED_ABIS.toList()),
+            ),
             downloader = KtorAppUpdateDownloader(httpClient),
             packageInspector = PackageManagerAppPackageInspector(appContext),
             installer = PackageInstallerAppUpdateInstaller(appContext),
