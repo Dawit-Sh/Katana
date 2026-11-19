@@ -21,7 +21,10 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.plus
 
-/** The readers' shared page settings (page number, page colour, light and keys, PDF pages); kept out of [AppModule], which should not grow. */
+/**
+ * The readers' shared page settings (page number, page colour, light and keys, PDF pages); kept out of
+ * [AppModule], which should not grow.
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 object ReaderDisplayPreferencesModule {
