@@ -1,6 +1,7 @@
 package com.example.unifiedreader.feature.annotations
 
 import androidx.compose.runtime.Stable
+import com.example.unifiedreader.ui.components.AppScreenTransition
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -66,3 +67,24 @@ class BookmarksState {
         scrolled = false
     }
 }
+
+/** Where Back goes from [page]: the page [BookmarksState.back] steps to, or null on the books. */
+internal fun bookmarksBackTarget(page: BookmarksPage): BookmarksPage? = when (page) {
+    BookmarksPage.Library -> null
+    is BookmarksPage.Book -> BookmarksPage.Library
+    is BookmarksPage.Review -> page.from
+}
+
+/** A deeper page (a book's marks, the review) slides in; back out slides the other way. */
+internal fun bookmarksPageTransition(from: BookmarksPage, to: BookmarksPage): AppScreenTransition = when {
+    to.depth > from.depth -> AppScreenTransition.Forward
+    to.depth < from.depth -> AppScreenTransition.Backward
+    else -> AppScreenTransition.Fade
+}
+
+private val BookmarksPage.depth: Int
+    get() = when (this) {
+        BookmarksPage.Library -> 0
+        is BookmarksPage.Book -> 1
+        is BookmarksPage.Review -> from.depth + 1
+    }

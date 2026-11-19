@@ -1,6 +1,5 @@
 package com.example.unifiedreader.feature.annotations
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -46,6 +45,8 @@ import com.example.unifiedreader.ui.components.AppChip
 import com.example.unifiedreader.ui.components.AppEmptyState
 import com.example.unifiedreader.ui.components.AppIcons
 import com.example.unifiedreader.ui.components.AppLayout
+import com.example.unifiedreader.ui.components.AppScreenBack
+import com.example.unifiedreader.ui.components.AppScreenHost
 import com.example.unifiedreader.ui.components.AppSearchField
 import com.example.unifiedreader.ui.components.AppTextButton
 import com.example.unifiedreader.ui.components.appGutter
@@ -93,20 +94,29 @@ fun BookmarksScreen(
     contentTopInset: Dp,
     modifier: Modifier = Modifier,
 ) {
-    BackHandler(enabled = state.page != BookmarksPage.Library) { state.back() }
-    val shown = library ?: return
-    when (val page = state.page) {
-        BookmarksPage.Library -> MarkedBooksGrid(state, shown, cover, gridCellSize, contentTopInset, modifier)
-        is BookmarksPage.Book -> {
-            val book = shown.book(page.itemId)
-            if (book == null) {
-                // Its last mark was removed: nothing is left to show.
-                LaunchedEffect(page.itemId) { state.home() }
-            } else {
-                MarkedBookPage(state, book, actions, cover, contentTopInset, modifier)
+    // A book's marks and the review slide in over the books and back out, Back (and the
+    // predictive gesture) stepping back a page.
+    AppScreenHost(
+        screen = state.page,
+        modifier = modifier,
+        back = bookmarksBackTarget(state.page)?.let { target -> AppScreenBack(target) { state.back() } },
+        transitionFor = ::bookmarksPageTransition,
+        ground = true,
+    ) { page ->
+        val shown = library ?: return@AppScreenHost
+        when (page) {
+            BookmarksPage.Library -> MarkedBooksGrid(state, shown, cover, gridCellSize, contentTopInset)
+            is BookmarksPage.Book -> {
+                val book = shown.book(page.itemId)
+                if (book == null) {
+                    // Its last mark was removed: nothing is left to show.
+                    LaunchedEffect(page.itemId) { state.home() }
+                } else {
+                    MarkedBookPage(state, book, actions, cover, contentTopInset)
+                }
             }
+            is BookmarksPage.Review -> WordReviewPage(state, shown, actions, contentTopInset)
         }
-        is BookmarksPage.Review -> WordReviewPage(state, shown, actions, contentTopInset, modifier)
     }
 }
 

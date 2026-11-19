@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import com.example.unifiedreader.ui.components.AppBarSwitch
 import com.example.unifiedreader.ui.components.AppButton
 import com.example.unifiedreader.ui.components.AppIconButton
 import com.example.unifiedreader.ui.components.AppIcons
@@ -45,12 +46,14 @@ fun BookmarksBar(
             },
         )
     }
+    // The bar changes with the page under it, in step with its slide.
+    AppBarSwitch(targetState = state.page, modifier = modifier.fillMaxWidth(), label = "bookmarksBar") { page ->
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        when (val page = state.page) {
+        when (page) {
             BookmarksPage.Library -> {
                 menuButton?.invoke()
                 Spacer(Modifier.weight(1f))
@@ -84,6 +87,7 @@ fun BookmarksBar(
                 )
             }
         }
+    }
     }
 }
 
