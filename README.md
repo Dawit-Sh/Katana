@@ -38,6 +38,14 @@ Katana isn't trying to be a reader with every feature piled in. It does what I n
 breaks. If you like it but want something it doesn't do, fork it and make it yours, with whatever AI agent you like
 to work with. That's pretty much how Katana started.
 
+## Things to implement
+
+- **Bookmark sync.** Bookmarks stay on the device for now; they should sync both ways with Grimmory, like
+  highlights do.
+- **Update checks without GitHub's limit.** The in-app updater asks GitHub's API, which allows 60 checks an hour per
+  connection; it could read the website's version file instead.
+- **"Add books" on an empty list** opens the Local library and drops the selection. Worth a look.
+
 ## Build it yourself
 
 You need JDK 21 and the Android SDK (Android Studio brings both). Run `./gradlew :app:assembleRelease`
