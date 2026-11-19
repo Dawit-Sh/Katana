@@ -1,6 +1,6 @@
 # Publishes site/ (the one-page download site) to GitHub Pages: https://dawitsh.dev/Katana/
-# Every published release runs it again and writes site/latest.json (the version and the three APKs'
-# links), which the page reads, so its Download button follows new releases with no edits.
+# Every published release runs it again: it writes site/latest.json (the version and the three APKs' links)
+# and bakes them into index.html, so the Download button says the newest version from its first frame.
 name: Website
 
 on:
@@ -51,6 +51,8 @@ jobs:
             }] | from_entries)
           }' > site/latest.json
           cat site/latest.json
+      - name: Write the version and links into the page
+        run: python3 .github/scripts/bake_site.py site/latest.json site/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

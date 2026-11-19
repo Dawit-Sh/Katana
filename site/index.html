@@ -116,6 +116,25 @@
         and an update keeps your books and highlights.
       </p>
     </section>
+    <script>
+      // The Website workflow writes the newest release in here and the version into the button above, when it
+      // builds the site after each release, so the page shows them from its first frame with nothing to load.
+      // This only points the links at the APKs, picking this device's for the big button; a link's target isn't
+      // drawn, so nothing on the page changes. Without the data, the links go to the latest release page.
+      (function () {
+        var latest = /*KATANA_LATEST*/null;
+        if (!latest || !latest.apks) return;
+        var apks = latest.apks;
+        var ua = navigator.userAgent || "";
+        var pick = /Silk|\bKF[A-Z]{2,4}\b/.test(ua) ? "fire7" : (/Android/i.test(ua) ? "arm64" : "universal");
+        ["arm64", "fire7", "universal"].forEach(function (kind) {
+          var link = document.getElementById("link-" + kind);
+          if (link && apks[kind] && apks[kind].url) link.href = apks[kind].url;
+        });
+        var chosen = apks[pick] || apks.universal;
+        if (chosen && chosen.url) document.getElementById("download").href = chosen.url;
+      })();
+    </script>
 
     <h2>What it does</h2>
     <ul class="features">
@@ -143,41 +162,5 @@
     </footer>
   </main>
 
-  <script>
-    // Points the buttons at the newest release's APKs and shows its version, so this page never
-    // needs editing for a new release: latest.json is written by the Website workflow whenever a
-    // release is published (read from the same site, so GitHub's API limits never get in the way).
-    // Without it, the links still go to the latest release page.
-    (function () {
-      var ua = navigator.userAgent || "";
-      var isAndroid = /Android/i.test(ua);
-      var isFire = /Silk|\bKF[A-Z]{2,4}\b/.test(ua);
-      var pick = isFire ? "fire7" : (isAndroid ? "arm64" : "universal");
-
-      function sizeLabel(bytes) {
-        return Math.round(bytes / 1048576) + " MB";
-      }
-
-      fetch("latest.json", { cache: "no-store" })
-        .then(function (response) { return response.ok ? response.json() : Promise.reject(response.status); })
-        .then(function (latest) {
-          var version = String(latest.version || "");
-          var apks = latest.apks || {};
-          ["arm64", "fire7", "universal"].forEach(function (kind) {
-            var asset = apks[kind];
-            var link = document.getElementById("link-" + kind);
-            if (asset && asset.url && link) link.href = asset.url;
-          });
-          var chosen = apks[pick] || apks.universal;
-          if (!chosen || !chosen.url || !version) return;
-          document.getElementById("download").href = chosen.url;
-          document.getElementById("download-label").textContent = "Download v" + version;
-          var forText = isFire ? "For Fire tablets" : (isAndroid ? "For this phone" : "Universal APK");
-          document.getElementById("download-for").textContent =
-            forText + " · " + sizeLabel(chosen.size) + " · Android 9 or newer";
-        })
-        .catch(function () { /* the links already go to the latest release page */ });
-    })();
-  </script>
 </body>
 </html>
