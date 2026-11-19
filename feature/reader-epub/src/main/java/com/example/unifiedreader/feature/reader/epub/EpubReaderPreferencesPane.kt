@@ -303,11 +303,20 @@ private fun EpubLayoutSection(
     onUseOrientationLayoutDefault: () -> Unit,
     onPageTurnStyleChanged: (PageTurnStyle) -> Unit,
 ) {
+    // Readium needs a page area 960 dp wide for a spread: a phone is narrower even in landscape, so it isn't offered.
+    val deviceFitsSpread = epubShowsSpread(currentEpubWidestPageAreaDp())
+    val pagesChoice = epubPagesChoice(useOrientationLayoutDefault, layoutMode)
     AppChoiceRow(
         label = "Pages",
-        supportingText = "Auto: page in portrait, spread in landscape",
-        options = EpubPagesChoice.entries,
-        selected = epubPagesChoice(useOrientationLayoutDefault, layoutMode),
+        supportingText = if (deviceFitsSpread) {
+            "Auto: page in portrait, spread in landscape"
+        } else {
+            "Auto: one page at a time on this device"
+        },
+        options = EpubPagesChoice.entries.filter { choice ->
+            choice != EpubPagesChoice.Spread || deviceFitsSpread || choice == pagesChoice
+        },
+        selected = pagesChoice,
         onSelected = { choice ->
             val mode = choice.layoutMode
             if (mode == null) onUseOrientationLayoutDefault() else onLayoutModeChanged(mode)

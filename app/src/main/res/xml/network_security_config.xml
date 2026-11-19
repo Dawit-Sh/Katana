@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Book servers are often plain HTTP on the home network (Grimmory at http://192.168.x.x:6060) or over
+  Tailscale, at any address a user types, so plain HTTP stays allowed by default. The updater's hosts
+  (GitHub) are HTTPS only. This replaces android:usesCleartextTraffic, which Android 17 deprecates and
+  ignores for apps that target it.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">github.com</domain>
+        <domain includeSubdomains="true">githubusercontent.com</domain>
+    </domain-config>
+</network-security-config>

@@ -27,7 +27,7 @@
 2 feature/library/src/main/java/com/example/unifiedreader/feature/library/LibraryReadingCardText.kt
 3 feature/library/src/main/java/com/example/unifiedreader/feature/library/LibraryScreen.kt
 5 feature/library/src/main/java/com/example/unifiedreader/feature/library/LibraryTopBarControls.kt
-10 feature/navigation/src/main/java/com/example/unifiedreader/feature/navigation/SourceNavigationDrawer.kt
+9 feature/navigation/src/main/java/com/example/unifiedreader/feature/navigation/SourceNavigationDrawer.kt
 2 feature/reader-comics/src/main/java/com/example/unifiedreader/feature/reader/comics/ComicPagePreviewStrip.kt
 5 feature/reader-comics/src/main/java/com/example/unifiedreader/feature/reader/comics/ComicPagesPanel.kt
 2 feature/reader-comics/src/main/java/com/example/unifiedreader/feature/reader/comics/ComicsContinuousReaderSurface.kt

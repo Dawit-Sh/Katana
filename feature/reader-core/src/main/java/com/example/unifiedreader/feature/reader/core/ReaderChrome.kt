@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeGestures
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
@@ -62,8 +61,10 @@ import com.example.unifiedreader.ui.components.AppFloatingPanelScrim
 import com.example.unifiedreader.ui.components.AppGlassDefaults
 import com.example.unifiedreader.ui.components.AppIconButton
 import com.example.unifiedreader.ui.components.AppIcons
+import com.example.unifiedreader.ui.components.AppWindowHeight
 import com.example.unifiedreader.ui.components.AppWindowWidth
 import com.example.unifiedreader.ui.components.appGlass
+import com.example.unifiedreader.ui.components.currentAppWindowHeight
 import com.example.unifiedreader.ui.components.currentAppWindowWidth
 
 /*
@@ -220,6 +221,9 @@ fun ReaderChromeFrame(
     panels: @Composable BoxScope.(ReaderPanelSlot) -> Unit,
 ) {
     val compact = currentAppWindowWidth() == AppWindowWidth.Compact
+    // A phone on its side (under 480 dp tall) has no room for a panel between the bars: there the dock steps
+    // aside for a panel too, and the panel runs from under the top bar to the bottom.
+    val dockStepsAside = compact || currentAppWindowHeight() == AppWindowHeight.Compact
     val inset = if (compact) ReaderChromeDefaults.compactInset else ReaderChromeDefaults.inset
     val density = LocalDensity.current
     // The bars' edges in root pixels, measured as they are placed.
@@ -250,21 +254,21 @@ fun ReaderChromeFrame(
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .windowInsetsPadding(WindowInsets.safeGestures.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top))
+                .windowInsetsPadding(WindowInsets.readerChromeSafe.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top))
                 .padding(start = inset, end = inset, top = inset)
                 .onGloballyPositioned { coordinates -> topBarBottom = coordinates.boundsInRoot().bottom },
         ) {
             topBar()
         }
         AnimatedVisibility(
-            visible = !(compact && panelOpen),
+            visible = !(dockStepsAside && panelOpen),
             enter = slideInVertically(AppMotion.spatial(IntOffset.VisibilityThreshold)) { height -> height } + fadeIn(AppMotion.effects()),
             exit = slideOutVertically(AppMotion.spatial(IntOffset.VisibilityThreshold)) { height -> height } + fadeOut(AppMotion.effects()),
             modifier = Modifier.align(Alignment.BottomCenter),
         ) {
             Box(
                 modifier = Modifier
-                    .windowInsetsPadding(WindowInsets.safeGestures.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
+                    .windowInsetsPadding(WindowInsets.readerChromeSafe.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
                     .padding(start = inset, end = inset, bottom = inset)
                     .onGloballyPositioned { coordinates -> dockTop = coordinates.boundsInRoot().top },
             ) {
@@ -274,11 +278,12 @@ fun ReaderChromeFrame(
         val sheetMaxHeight = if (compact) maxHeight * ReaderChromeDefaults.sheetHeightFraction else Dp.Unspecified
         val gap = ReaderChromeDefaults.panelGap
         val top = with(density) { (topBarBottom - frameTop).coerceAtLeast(0f).toDp() } + gap
-        val bottom = if (compact || dockTop.isNaN()) {
-            0.dp
-        } else {
-            with(density) { (frameBottom - dockTop).coerceAtLeast(0f).toDp() } + gap
-        }
+        val bottom = readerPanelSlotBottom(
+            compact = compact,
+            dockStepsAside = dockStepsAside,
+            dockReach = with(density) { (frameBottom - dockTop).coerceAtLeast(0f).toDp() },
+            inset = inset,
+        )
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -288,7 +293,7 @@ fun ReaderChromeFrame(
                         Modifier
                     } else {
                         Modifier
-                            .windowInsetsPadding(WindowInsets.safeGestures.only(WindowInsetsSides.Horizontal))
+                            .windowInsetsPadding(WindowInsets.readerChromeSafe.only(WindowInsetsSides.Horizontal))
                             .padding(horizontal = inset)
                     },
                 ),
@@ -296,6 +301,22 @@ fun ReaderChromeFrame(
             panels(ReaderPanelSlot(sheetMaxHeight = sheetMaxHeight))
         }
     }
+}
+
+/**
+ * The space a reader panel leaves at the bottom: none for a phone's bottom sheet, [inset] where the dock
+ * steps aside for it (a phone on its side), else the dock's reach ([dockReach], NaN before it is placed) and
+ * the gap above it.
+ */
+private fun readerPanelSlotBottom(
+    compact: Boolean,
+    dockStepsAside: Boolean,
+    dockReach: Dp,
+    inset: Dp,
+): Dp = when {
+    compact || dockReach.value.isNaN() -> 0.dp
+    dockStepsAside -> inset
+    else -> dockReach + ReaderChromeDefaults.panelGap
 }
 
 /**

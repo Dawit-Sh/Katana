@@ -102,6 +102,7 @@ internal fun ReadiumEpubNavigatorHost(
     }
     val spreadSideStrip = publication.epubSpreadSideStrip(preferences)
     val sideStripPx = with(LocalDensity.current) { spreadSideStrip.roundToPx() }
+    val cutout = currentEpubCutoutInsets()
     val latestSideStripPx = rememberUpdatedState(sideStripPx)
     // Readium's own gutter is fixed when the navigator is made, so a spread gains or loses its margins with a new one.
     val usesSpreadMargins = spreadSideStrip > 0.dp
@@ -174,7 +175,7 @@ internal fun ReadiumEpubNavigatorHost(
                             id = containerId
                             setBackgroundColor(surfaceBackground.toArgb())
                         },
-                        epubNavigatorContainerLayoutParams(viewportVerticalInsetPx, sideStripPx),
+                        epubNavigatorContainerLayoutParams(viewportVerticalInsetPx, sideStripPx, cutout),
                     )
                 }
             },
@@ -184,6 +185,7 @@ internal fun ReadiumEpubNavigatorHost(
                     verticalInsetPx = viewportVerticalInsetPx,
                     sideInsetPx = sideStripPx,
                     backgroundColor = surfaceBackground.toArgb(),
+                    cutout = cutout,
                 )
                 container.updateEpubStripTapListener(onTap = pageTaps::onTap)
             },

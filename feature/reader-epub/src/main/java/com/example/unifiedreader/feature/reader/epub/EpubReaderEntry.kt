@@ -92,6 +92,9 @@ fun EpubReaderScreen(
     }
     val appBackgroundIsLight = MaterialTheme.colorScheme.background.luminance() >= 0.5f
     val viewportSpacing = currentEpubViewportSpacing(isLandscape)
+    // Readium shows a spread only on a page area 960 dp wide or more: a phone gets one page even in landscape.
+    val spreadFits = epubShowsSpread(currentEpubPageAreaWidthDp())
+    val landscapeSpread = isLandscape && spreadFits
     if (activity == null) {
         ReportReaderOpening(ReaderOpenStatus.Failed(ReaderOpenFailure.Unknown))
         return
@@ -152,7 +155,7 @@ fun EpubReaderScreen(
             if (restoredPreferences.layoutModeOverride) {
                 restoredPreferences.layoutMode
             } else {
-                defaultEpubLayoutMode(isLandscape)
+                defaultEpubLayoutMode(landscapeSpread)
             },
         )
     }
@@ -217,6 +220,9 @@ fun EpubReaderScreen(
         layoutModeOverride = !useOrientationLayoutDefault,
         pageTurnStyle = pageTurnStyle,
     )
+    // What the page shows: a spread chosen where it can't fit is laid out, and numbered, as one page. The
+    // choice itself is kept (and saved) as made.
+    val shownPreferences = readerPreferences.copy(layoutMode = layoutMode.fitting(spreadFits))
     val overlayState = rememberReaderOverlayState(
         key = "epub-overlay-${item.id}",
         initiallyVisible = true,
@@ -230,7 +236,7 @@ fun EpubReaderScreen(
     var openAttempt by remember(item.id) { mutableIntStateOf(0) }
     val documentState by rememberReaderDocument(item, documentUri, documentUriProvider, openAttempt)
 
-    LaunchedEffect(hydrated, restoredPreferences, defaultPageColor, isLandscape, useOrientationLayoutDefault) {
+    LaunchedEffect(hydrated, restoredPreferences, defaultPageColor, landscapeSpread, useOrientationLayoutDefault) {
         if (!hydrated || restoredSessionState) return@LaunchedEffect
         val restoredThemeUsesDefault = !restoredThemeSelection.isBookOwn
         val restoredLayoutUsesDefault = !restoredPreferences.layoutModeOverride
@@ -247,7 +253,7 @@ fun EpubReaderScreen(
         useOrientationLayoutDefault = restoredLayoutUsesDefault
         theme = restoredThemeSelection.color
         layoutMode = if (restoredLayoutUsesDefault) {
-            defaultEpubLayoutMode(isLandscape)
+            defaultEpubLayoutMode(landscapeSpread)
         } else {
             restoredPreferences.layoutMode
         }
@@ -257,9 +263,9 @@ fun EpubReaderScreen(
         if (!hydrated || !restoredSessionState || !pageColorFollowsDefault) return@LaunchedEffect
         theme = defaultPageColor
     }
-    LaunchedEffect(hydrated, restoredSessionState, isLandscape, useOrientationLayoutDefault) {
+    LaunchedEffect(hydrated, restoredSessionState, landscapeSpread, useOrientationLayoutDefault) {
         if (!hydrated || !restoredSessionState || !useOrientationLayoutDefault) return@LaunchedEffect
-        layoutMode = defaultEpubLayoutMode(isLandscape)
+        layoutMode = defaultEpubLayoutMode(landscapeSpread)
     }
     LaunchedEffect(overlayState.isVisible) {
         if (!overlayState.isVisible) openPanel = null
@@ -496,17 +502,26 @@ fun EpubReaderScreen(
                     .testTag(EpubReaderViewportTag),
                 pageIndicator = if (pageNumbersVisible) {
                     {
-                        EpubPageFrameLabels(
-                            publication = state.publication,
-                            bookTitle = item.title,
-                            tocEntries = bookProgress.tocEntries,
-                            resourcePositions = bookProgress.resourcePositions,
-                            location = EpubFrameLocation(currentHref, currentProgress, currentPage, pageCount, secondSpreadPage, framePage),
-                            layoutMode = layoutMode,
-                            pageColor = theme,
-                            stripHeight = viewportSpacing.containerInset,
-                            sideStrip = state.publication.epubSpreadSideStrip(readerPreferences),
-                        )
+                        EpubPageFrameCutoutSafe {
+                            EpubPageFrameLabels(
+                                publication = state.publication,
+                                bookTitle = item.title,
+                                tocEntries = bookProgress.tocEntries,
+                                resourcePositions = bookProgress.resourcePositions,
+                                location = EpubFrameLocation(
+                                    currentHref,
+                                    currentProgress,
+                                    currentPage,
+                                    pageCount,
+                                    secondSpreadPage,
+                                    framePage,
+                                ),
+                                layoutMode = shownPreferences.layoutMode,
+                                pageColor = theme,
+                                stripHeight = viewportSpacing.containerInset,
+                                sideStrip = state.publication.epubSpreadSideStrip(shownPreferences),
+                            )
+                        }
                     }
                 } else {
                     null
@@ -539,7 +554,7 @@ fun EpubReaderScreen(
                         item = item,
                         publication = state.publication,
                         initialLocator = resolvedInitialLocator,
-                        preferences = readerPreferences,
+                        preferences = shownPreferences,
                         onLocationChanged = { reportedLocator, resourcePage, isAtBookEnd ->
                             comfort.touched()
                             val locator = reportedLocator.withReadingOrderIndex(
@@ -748,7 +763,7 @@ fun EpubReaderScreen(
                                 },
                                 onUseOrientationLayoutDefault = {
                                     useOrientationLayoutDefault = true
-                                    layoutMode = defaultEpubLayoutMode(isLandscape)
+                                    layoutMode = defaultEpubLayoutMode(landscapeSpread)
                                 },
                                 onPageTurnStyleChanged = {
                                     pageTurnStyle = it
@@ -846,9 +861,10 @@ private fun buildCurrentReaderLocator(
     percent = percent.coerceIn(0.0, 1.0),
 )
 
+/** Auto: a spread in landscape where it fits ([landscapeSpread]), else one page. */
 private fun defaultEpubLayoutMode(
-    isLandscape: Boolean,
-): EpubReaderLayoutMode = if (isLandscape) {
+    landscapeSpread: Boolean,
+): EpubReaderLayoutMode = if (landscapeSpread) {
     EpubReaderLayoutMode.DoublePage
 } else {
     EpubReaderLayoutMode.SinglePage

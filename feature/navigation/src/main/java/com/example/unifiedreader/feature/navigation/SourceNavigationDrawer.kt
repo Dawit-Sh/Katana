@@ -26,6 +26,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.core.model.displayName
@@ -85,9 +87,15 @@ fun SourceNavigationDrawer(
                     .windowInsetsPadding(
                         WindowInsets.systemBars.only(WindowInsetsSides.Vertical + WindowInsetsSides.Start),
                     )
-                    .padding(start = 12.dp, top = 12.dp, bottom = 12.dp)
-                    // A little wider with the reading card, so its fifteen weeks keep a usable size.
-                    .widthIn(max = if (readingCard != null) DrawerWithCardMaxWidth else DrawerMaxWidth)
+                    .padding(start = DrawerStartMargin, top = 12.dp, bottom = 12.dp)
+                    // A little wider with the reading card, so its fifteen weeks keep a usable size; on a narrow
+                    // phone it leaves 24 dp of the page showing, where a tap closes it.
+                    .widthIn(
+                        max = drawerPanelMaxWidth(
+                            hasReadingCard = readingCard != null,
+                            windowWidth = LocalConfiguration.current.screenWidthDp.dp,
+                        ),
+                    )
                     .appGlass(shape = drawerShape),
                 drawerShape = drawerShape,
                 drawerContainerColor = Color.Transparent,
@@ -220,6 +228,19 @@ private fun DrawerTopSection(
 
 private val DrawerMaxWidth = 320.dp
 private val DrawerWithCardMaxWidth = 360.dp
+
+/** The page left showing beside the drawer on a narrow phone, enough to see it is a panel and to tap beside it. */
+private val DrawerPagePeek = 24.dp
+
+/** The panel's start margin from the window. */
+private val DrawerStartMargin = 12.dp
+
+/** The drawer panel's widest: 360 dp with the reading card, 320 without, and never closer than 24 dp to the far edge. */
+internal fun drawerPanelMaxWidth(hasReadingCard: Boolean, windowWidth: Dp): Dp =
+    minOf(
+        if (hasReadingCard) DrawerWithCardMaxWidth else DrawerMaxWidth,
+        windowWidth - DrawerStartMargin - DrawerPagePeek,
+    )
 
 @Composable
 private fun SourceNavigationItem(

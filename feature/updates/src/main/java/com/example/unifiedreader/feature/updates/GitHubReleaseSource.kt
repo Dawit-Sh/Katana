@@ -25,6 +25,8 @@ fun interface AppReleaseSource {
  */
 class GitHubReleaseSource(
     private val httpClient: HttpClient,
+    /** `Build.SUPPORTED_ABIS`, best first: picks the release's APK for this device. */
+    private val supportedAbis: List<String> = emptyList(),
     private val repository: String = DEFAULT_REPOSITORY,
     private val apiBaseUrl: String = "https://api.github.com",
 ) : AppReleaseSource {
@@ -38,7 +40,7 @@ class GitHubReleaseSource(
         if (!response.status.isSuccess()) {
             throw IOException("GitHub answered ${response.status.value} for the latest release")
         }
-        return parseGitHubRelease(response.bodyAsText())
+        return parseGitHubRelease(response.bodyAsText(), supportedAbis)
     }
 
     companion object {
@@ -48,13 +50,22 @@ class GitHubReleaseSource(
 
 private val gitHubJson = Json { ignoreUnknownKeys = true }
 
-/** Null when the release has no usable version or no APK attached. */
-internal fun parseGitHubRelease(body: String): AppRelease? {
+/**
+ * Null when the release has no usable version or no APK that installs on a device with
+ * [supportedAbis] (empty: any APK, the universal one first).
+ */
+internal fun parseGitHubRelease(
+    body: String,
+    supportedAbis: List<String> = emptyList(),
+): AppRelease? {
     val release = gitHubJson.decodeFromString<GitHubReleaseDto>(body)
-    if (release.draft || release.prerelease) return null
-    val version = AppVersion.parse(release.tagName) ?: return null
+    val version = AppVersion.parse(release.tagName)
     val apks = release.assets.filter { asset -> asset.name.endsWith(".apk", ignoreCase = true) }
-    val apk = apks.firstOrNull { asset -> asset.name.startsWith("Katana-") } ?: apks.firstOrNull() ?: return null
+    val apkName = chooseReleaseApk(apks.map { asset -> asset.name }, supportedAbis)
+    // Drafts and pre-releases are never offered.
+    val published = !release.draft && !release.prerelease
+    if (!published || version == null || apkName == null) return null
+    val apk = apks.first { asset -> asset.name == apkName }
     return AppRelease(
         version = version,
         tagName = release.tagName,

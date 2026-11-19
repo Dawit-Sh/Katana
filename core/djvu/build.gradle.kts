@@ -9,7 +9,8 @@ android {
     defaultConfig {
         consumerProguardFiles("consumer-rules.pro")
         ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+            // x86_64 for the universal APK (Chromebooks, emulators); the app leaves x86 out of release builds.
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
         }
         externalNativeBuild {
             cmake {

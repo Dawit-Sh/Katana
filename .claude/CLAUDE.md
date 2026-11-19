@@ -111,9 +111,18 @@ repo supplies them without printing them:
 ~/.config/yabai/release-signing.sh check         # re-verify the saved passwords
 ```
 
+One `:app:assembleRelease` makes three APKs (ABI splits plus a universal APK, all versionCode-equal), copied
+under their release names to `app/build/outputs/katana-apks/` by the `katanaReleaseApks` task:
+`katana-<version>-fire7-armeabi-v7a.apk` (the Fire 7), `katana-<version>-arm64-v8a.apk` (modern phones) and
+`katana-<version>-universal.apk` (armeabi-v7a, arm64-v8a, x86_64; 32-bit x86 is left out of release builds).
+The in-app updater picks among them by those names (`feature:updates`, `ReleaseApkChoice.kt`). Splits are on
+for any build that asks for a non-debug task; `assembleDebug` alone still makes one `app-debug.apk`. Check 16 KB
+page support after a native-library change: `zipalign -c -P 16 -v 4 <apk>` (build-tools) and
+`llvm-readelf -lW <lib>.so` (NDK) must show LOAD alignment 0x4000 for every arm64-v8a and x86_64 library.
+
 Keystore `~/yabai.jks`, alias `key0`. The release cert SHA-256 must be
 `b26aaf3bed6351e72b8bc6e6d7d4655848902e22eedc7d512bbb6680597a5baa`; check with
-`apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk`
+`apksigner verify --print-certs app/build/outputs/katana-apks/katana-<version>-universal.apk`
 (`~/Library/Android/sdk_new/build-tools/36.1.0/apksigner`).
 
 ## GitHub Actions
