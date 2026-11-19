@@ -5,6 +5,8 @@ import com.example.unifiedreader.feature.annotations.ReaderHighlight
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.readium.r2.navigator.DecorableNavigator
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.Selection
@@ -27,11 +29,16 @@ internal class EpubSelectionAnnotations(
  * Draws the book's highlights on whichever navigator is showing it. The host rebuilds the
  * navigator when the layout changes, so [attach] gives each new one the highlights again; Readium
  * keeps them and puts them back on every page it loads.
+ *
+ * Each change of the highlights is handed to Readium whole and in turn, never cut short by the
+ * next: Readium takes the new list as drawn before it works out and draws the difference, so a
+ * change stopped halfway (highlights arriving from the server while the book opens) was never drawn.
  */
 internal class EpubHighlightLayer(private val scope: CoroutineScope) {
     private var navigator: EpubNavigatorFragment? = null
     private var highlights: List<ReaderHighlight> = emptyList()
     private var applyJob: Job? = null
+    private val applying = Mutex()
     private var onActivated: ((String, Rect?) -> Unit)? = null
 
     private val listener = object : DecorableNavigator.Listener {
@@ -72,8 +79,11 @@ internal class EpubHighlightLayer(private val scope: CoroutineScope) {
     private fun apply() {
         val fragment = navigator ?: return
         val decorations = highlights.mapNotNull(ReaderHighlight::toEpubDecoration)
-        applyJob?.cancel()
-        applyJob = scope.launch { fragment.applyDecorations(decorations, EpubHighlightGroup) }
+        applyJob = scope.launch {
+            applying.withLock {
+                if (navigator === fragment) fragment.applyDecorations(decorations, EpubHighlightGroup)
+            }
+        }
     }
 }
 

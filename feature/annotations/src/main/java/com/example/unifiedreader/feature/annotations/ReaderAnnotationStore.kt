@@ -3,6 +3,7 @@ package com.example.unifiedreader.feature.annotations
 import com.example.unifiedreader.core.database.dao.ReaderAnnotationDao
 import com.example.unifiedreader.core.database.dao.ReaderBookmarkDao
 import com.example.unifiedreader.core.database.dao.SavedWordStudyDao
+import com.example.unifiedreader.core.database.entity.HIGHLIGHT_WAITING
 import com.example.unifiedreader.core.database.entity.ReaderHighlightEntity
 import com.example.unifiedreader.core.database.entity.SavedWordEntity
 import java.util.UUID
@@ -56,6 +57,13 @@ interface ReaderAnnotationStore : ReaderBookmarkStore, SavedWordStudyStore {
     ): SavedWord
 
     suspend fun deleteWord(id: String)
+
+    /**
+     * Where the reader works out the places of a book's highlights for their server sync; nothing
+     * for a store that doesn't sync.
+     */
+    val placement: HighlightPlacementStore
+        get() = HighlightPlacementStore.None
 }
 
 class RoomReaderAnnotationStore(
@@ -68,6 +76,7 @@ class RoomReaderAnnotationStore(
 ) : ReaderAnnotationStore,
     ReaderBookmarkStore by RoomReaderBookmarkStore(bookmarkDao, ioDispatcher, now, newId),
     SavedWordStudyStore by RoomSavedWordStudyStore(studyDao, ioDispatcher, now) {
+
     override fun highlights(itemId: String): Flow<List<ReaderHighlight>> =
         dao.observeHighlights(itemId).map { rows -> rows.map(ReaderHighlightEntity::toModel) }.flowOn(ioDispatcher)
 
@@ -168,8 +177,8 @@ class RoomReaderAnnotationStore(
     private suspend fun <T> io(block: () -> T): T = withContext(ioDispatcher) { block() }
 
     private companion object {
-        /** A change no server has yet; the Grimmory sync (later) sends these. */
-        const val SYNC_DIRTY = "DIRTY"
+        /** A change no server has yet; the Grimmory sync sends these. */
+        const val SYNC_DIRTY = HIGHLIGHT_WAITING
     }
 }
 

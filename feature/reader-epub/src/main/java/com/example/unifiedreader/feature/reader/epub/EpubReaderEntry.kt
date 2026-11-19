@@ -446,6 +446,17 @@ fun EpubReaderScreen(
                     },
                 )
             }
+            EpubHighlightPlacementEffect(
+                publication = state.publication,
+                itemId = item.id,
+                store = annotationStore?.placement,
+                chapterTitleOf = { locator ->
+                    bookProgress.tocEntries.currentEpubChapterTitle(
+                        currentProgress = locator.locations.totalProgression ?: 0.0,
+                        currentHref = locator.href.toString(),
+                    )
+                },
+            )
             val pageBookmarks = rememberPageBookmarks(bookBookmarks, currentLocator, framePage, currentPage)
             // A bookmark or highlight opened from the Bookmarks page: go there once the book shows.
             EpubPendingJumpEffect(annotationJumps, item.id, ready = initialRestoreLocked) { locator ->

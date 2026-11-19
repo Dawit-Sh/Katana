@@ -858,7 +858,12 @@ object AppModule {
                     ?: remoteDocumentReadCache.documentUriForReading(item)
             },
             displayPreferences = readerDisplay,
-            extras = EpubReaderExtras(translation = translationService, annotations = annotationStore, jumps = annotationJumps),
+            extras = EpubReaderExtras(
+                translation = translationService,
+                annotations = annotationStore,
+                jumps = annotationJumps,
+                syncsHighlights = ReadableItem::syncsHighlightsWithGrimmory,
+            ),
         ),
         pdfReaderFactory(
             sessionStore = JournalRecordingReaderSessionStore(

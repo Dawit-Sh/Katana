@@ -5,6 +5,7 @@ import com.example.unifiedreader.core.model.EpubReaderFormats
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.feature.annotations.AnnotationJumps
 import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
+import com.example.unifiedreader.feature.annotations.withoutPlacing
 import com.example.unifiedreader.feature.reader.core.ReaderChrome
 import com.example.unifiedreader.feature.reader.core.ReaderScreenFactory
 import com.example.unifiedreader.feature.reader.core.ReaderSessionStore
@@ -33,17 +34,21 @@ fun epubReaderFactory(
             onBack = onBack,
             onCompletionRequested = navigationActions.onRequestCompletion,
             translation = extras.translation,
-            annotationStore = extras.annotations,
+            // A book whose highlights don't sync has none to place for its server.
+            annotationStore = extras.annotations?.let { store -> if (extras.syncsHighlights(item)) store else store.withoutPlacing() },
             annotationJumps = extras.jumps,
         )
 }
 
 /**
  * What the EPUB reader can add when the app has it: translation of a selection; highlights,
- * bookmarks and saved words; and places to open a book at, handed over by the Bookmarks page.
+ * bookmarks and saved words; places to open a book at, handed over by the Bookmarks page; and
+ * which books share their highlights with their server ([syncsHighlights]), whose highlights the
+ * reader then places the server's way too.
  */
 data class EpubReaderExtras(
     val translation: TranslationService? = null,
     val annotations: ReaderAnnotationStore? = null,
     val jumps: AnnotationJumps? = null,
+    val syncsHighlights: (ReadableItem) -> Boolean = { false },
 )

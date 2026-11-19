@@ -34,6 +34,8 @@ dependencies {
     implementation(libs.readium.shared)
     implementation(libs.readium.streamer)
     implementation(libs.readium.navigator)
+    // Already in the app through Readium; reads chapters to turn highlight places into EPUB CFIs.
+    implementation(libs.jsoup)
     coreLibraryDesugaring(libs.android.desugar.jdk.libs)
 
     testImplementation(libs.junit4)

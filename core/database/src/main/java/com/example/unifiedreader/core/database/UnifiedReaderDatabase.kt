@@ -7,6 +7,8 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.unifiedreader.core.database.dao.ImportedComicArchiveDao
+import com.example.unifiedreader.core.database.dao.ReaderHighlightPlacementDao
+import com.example.unifiedreader.core.database.dao.ReaderHighlightSyncDao
 import com.example.unifiedreader.core.database.dao.DownloadQueueDao
 import com.example.unifiedreader.core.database.dao.ItemDetailsDao
 import com.example.unifiedreader.core.database.dao.JournalDao
@@ -92,6 +94,8 @@ abstract class UnifiedReaderDatabase : RoomDatabase() {
     abstract fun libraryTagChoiceDao(): LibraryTagChoiceDao
     abstract fun listPreferenceDao(): ListPreferenceDao
     abstract fun readerAnnotationDao(): ReaderAnnotationDao
+    abstract fun readerHighlightSyncDao(): ReaderHighlightSyncDao
+    abstract fun readerHighlightPlacementDao(): ReaderHighlightPlacementDao
     abstract fun readerBookmarkDao(): ReaderBookmarkDao
     abstract fun savedWordStudyDao(): SavedWordStudyDao
 }
