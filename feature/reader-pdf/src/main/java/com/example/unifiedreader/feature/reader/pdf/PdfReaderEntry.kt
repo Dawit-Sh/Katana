@@ -173,16 +173,21 @@ private fun PdfTurnPages(
     var renderLongEdgePx by remember(item.id, documentState.cacheKey, currentPageIndex) {
         mutableIntStateOf(PDF_RENDER_LONG_EDGE_PX)
     }
+    // Nothing is drawn until the saved page is known: drawing page 1 first would hold PDFium while the saved
+    // page waits, so a book reopened mid-way showed its page later than it needed to.
+    val restored = place.restored
     val pageState by produceState<PdfPageRenderState>(
         initialValue = PdfPageRenderState.Loading,
         documentState.cacheKey,
         currentPageIndex,
         pageCount,
         renderLongEdgePx,
+        restored,
     ) {
         val uri = (documentState as? ReaderDocumentState.Ready)?.uri
         val targetPageIndex = currentPageIndex.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
         val renderedState = when {
+            !restored && pageCount > 0 -> return@produceState
             uri == null || pageCount <= 0 -> PdfPageRenderState.Empty
             else -> withContext(Dispatchers.IO) { pageRenderer(uri, targetPageIndex, renderLongEdgePx) }
         }
