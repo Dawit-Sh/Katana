@@ -1,16 +1,21 @@
 package com.example.unifiedreader
 
+import android.net.Uri
 import android.os.Looper
 import com.example.unifiedreader.core.model.ComicMetadata
 import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.LibraryFileLocation
 import com.example.unifiedreader.core.model.LibraryFilterState
+import com.example.unifiedreader.core.model.ReadableItem
+import com.example.unifiedreader.core.model.SourceConnectivityState
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.core.model.isKavitaSeriesContainer
 import com.example.unifiedreader.core.model.isStumpSeriesContainer
 import com.example.unifiedreader.core.model.remoteLibraryId
 import com.example.unifiedreader.feature.downloads.DownloadEntry
 import com.example.unifiedreader.feature.downloads.DownloadEntryStatus
+import com.example.unifiedreader.feature.downloads.RemoteItemDownloadDataSource
+import java.net.SocketTimeoutException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -699,6 +704,50 @@ class AppViewModelRemoteDownloadsTest {
         )
     }
 
+    @Test
+    fun `a lost connection leaves the download waiting and it goes on when the server is back`() {
+        val remoteBook = grimmoryBook()
+        val dataSource = ScriptedRemoteDownloadDataSource(
+            sourceType = SourceType.GRIMMORY,
+            failures = mutableListOf(SocketTimeoutException("timeout")),
+        )
+        val policy = RemoteSourceConnectivityPolicy().apply { markReachable(SourceType.GRIMMORY) }
+        val viewModel = createViewModel(
+            sampleItems = listOf(remoteBook),
+            remoteDownloadDataSources = listOf(dataSource),
+            remoteSourceConnectivityPolicy = policy,
+        )
+        viewModel.onSourceSelected(SourceType.GRIMMORY)
+
+        viewModel.onDownloadRemoteItem(remoteBook)
+        waitForUiState {
+            viewModel.downloadsSnapshot.entries.map(DownloadEntry::status) == listOf(DownloadEntryStatus.PausedConnectivity)
+        }
+
+        // Waiting, not "Couldn't download"; the server is marked offline (this policy has no second look).
+        assertTrue(viewModel.downloadsSnapshot.failedEntries.isEmpty())
+        assertEquals(SourceConnectivityState.Offline, policy.reachabilityFor(SourceType.GRIMMORY))
+
+        // The retry timer finds Grimmory again.
+        policy.markReachable(SourceType.GRIMMORY)
+        waitForUiState {
+            viewModel.downloadsSnapshot.entries.map(DownloadEntry::status) == listOf(DownloadEntryStatus.Completed)
+        }
+
+        assertEquals(2, dataSource.downloadCalls)
+        assertTrue(remoteBook.id in viewModel.uiState.downloadedRemoteItemIds)
+    }
+
+    private fun grimmoryBook() = sampleItem(
+        id = "grimmory-epub",
+        title = "Remote Book",
+        format = FormatType.EPUB,
+    ).copy(
+        sourceType = SourceType.GRIMMORY,
+        libraryId = SourceType.GRIMMORY.remoteLibraryId("grimmory-books"),
+        remoteId = "grimmory-epub",
+    )
+
     // The downloaded-books refresh runs on a background dispatcher, so one looper idle doesn't wait for it.
     private fun waitForUiState(
         condition: () -> Boolean,
@@ -724,4 +773,29 @@ private class CountingOnlineHealthCheck(
         callCount += 1
         return RemoteSourceHealthCheckResult.Online
     }
+}
+
+/** Fails each download with the next of [failures], then succeeds. */
+private class ScriptedRemoteDownloadDataSource(
+    override val sourceType: SourceType,
+    private val failures: MutableList<Throwable>,
+) : RemoteItemDownloadDataSource {
+    private val storedItemIds = mutableSetOf<String>()
+    var downloadCalls = 0
+        private set
+
+    override fun storedDocumentUri(item: ReadableItem): Uri? =
+        if (item.id in storedItemIds) Uri.parse("file:///downloads/${item.id}.epub") else null
+
+    override suspend fun downloadToLocalStorage(item: ReadableItem): Uri? {
+        downloadCalls += 1
+        failures.removeFirstOrNull()?.let { failure -> throw failure }
+        storedItemIds += item.id
+        return storedDocumentUri(item)
+    }
+
+    override suspend fun storedDocumentItemIds(items: List<ReadableItem>): Set<String> =
+        items.mapNotNullTo(mutableSetOf()) { item -> item.id.takeIf(storedItemIds::contains) }
+
+    override suspend fun deleteStoredDocument(item: ReadableItem): Boolean = storedItemIds.remove(item.id)
 }

@@ -1,6 +1,7 @@
 package com.example.unifiedreader
 
 import android.os.Build
+import androidx.work.BackoffPolicy
 import androidx.work.NetworkType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -26,5 +27,15 @@ class RemoteDownloadWorkRequestTest {
 
         assertEquals(NetworkType.CONNECTED, request.workSpec.constraints.requiredNetworkType)
         assertEquals("entry-7", request.workSpec.input.getString(RemoteDownloadWorker.EntryIdKey))
+    }
+
+    @Test
+    fun `a download that lost its connection is tried again every half minute more, not doubling`() {
+        listOf(Build.VERSION_CODES.P, Build.VERSION_CODES.BAKLAVA).forEach { sdkInt ->
+            val workSpec = remoteDownloadWorkRequest("entry", sdkInt).workSpec
+
+            assertEquals(BackoffPolicy.LINEAR, workSpec.backoffPolicy)
+            assertEquals(30_000L, workSpec.backoffDelayDuration)
+        }
     }
 }

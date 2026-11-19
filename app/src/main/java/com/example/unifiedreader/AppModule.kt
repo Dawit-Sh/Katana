@@ -339,6 +339,7 @@ object AppModule {
         remoteDownloadDataSources = remoteDownloadDataSources,
         completionSideEffects = completionSideEffects,
         canRunSource = remoteSourceConnectivityPolicy::canScheduleDownload,
+        onConnectionLost = remoteSourceConnectivityPolicy::markFromFailure,
     )
 
     @Provides

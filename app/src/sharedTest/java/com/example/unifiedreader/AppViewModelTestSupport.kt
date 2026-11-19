@@ -172,6 +172,7 @@ internal fun createViewModel(
         remoteDownloadDataSources = remoteDownloadDataSources,
         completionSideEffects = completionSideEffects,
         canRunSource = remoteSourceConnectivityPolicy::canScheduleDownload,
+        onConnectionLost = remoteSourceConnectivityPolicy::markFromFailure,
     )
     downloadScheduler.runner = remoteDownloadWorkerRunner
     val remoteDownloadQueueController = RemoteDownloadQueueController(

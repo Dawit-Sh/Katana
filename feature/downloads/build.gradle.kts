@@ -11,6 +11,7 @@ dependencies {
     implementation(project(":core:ui-theme"))
     implementation(project(":core:ui-components"))
     implementation(project(":core:model"))
+    implementation(project(":core:network"))
     implementation(project(":core:database"))
     implementation(project(":data:repository"))
     implementation(project(":feature:library"))
@@ -23,5 +24,7 @@ dependencies {
     testImplementation(libs.junit4)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Ktor's own ConnectTimeoutException, as the Pixel saw it.
+    testImplementation(libs.ktor.client.core)
     testImplementation(libs.robolectric)
 }

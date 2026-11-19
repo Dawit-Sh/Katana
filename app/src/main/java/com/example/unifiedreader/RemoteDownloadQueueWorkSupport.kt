@@ -2,6 +2,7 @@ package com.example.unifiedreader
 
 import android.content.Context
 import android.os.Build
+import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
@@ -20,6 +21,7 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
+import java.util.concurrent.TimeUnit
 
 class WorkManagerDownloadScheduler(
     private val workManager: WorkManager,
@@ -74,7 +76,12 @@ class RemoteDownloadWorker(
 
             // WorkManager ignores the result of work it stopped and reruns it itself; retry covers
             // a cancellation that didn't come from a stop.
-            RemoteDownloadWorkerOutcome.Stopped -> Result.retry()
+            RemoteDownloadWorkerOutcome.Stopped,
+
+            // The connection was lost: try again after the backoff, once a network is there. If the server
+            // is marked offline by then, the rerun leaves the entry waiting and ends; the server coming back
+            // schedules it again.
+            RemoteDownloadWorkerOutcome.Paused -> Result.retry()
         }
     }
 
@@ -105,10 +112,15 @@ internal fun remoteDownloadWorkRequest(
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build(),
     )
+    // After a lost connection: 30 s, 1 min, 1.5 min... rather than doubling to hours, since each try goes
+    // on from the bytes it has.
+    .setBackoffCriteria(BackoffPolicy.LINEAR, DOWNLOAD_RETRY_BACKOFF_SECONDS, TimeUnit.SECONDS)
     .apply {
         if (sdkInt >= Build.VERSION_CODES.S) setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
     }
     .build()
+
+private const val DOWNLOAD_RETRY_BACKOFF_SECONDS = 30L
 
 private fun uniqueWorkName(
     entryId: String,

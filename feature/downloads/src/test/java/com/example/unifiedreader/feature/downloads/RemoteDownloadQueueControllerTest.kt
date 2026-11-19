@@ -3,6 +3,7 @@ package com.example.unifiedreader.feature.downloads
 import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
+import io.ktor.client.network.sockets.ConnectTimeoutException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -1013,6 +1014,171 @@ class RemoteDownloadWorkerRunnerTest {
     }
 }
 
+/** Downloads on a connection that drops: they wait for the server and go on, real failures still fail. */
+@RunWith(RobolectricTestRunner::class)
+class RemoteDownloadLostConnectionTest {
+    @Test
+    fun `a connect timeout pauses the download as waiting for its server instead of failing it`() = runTest {
+        val lost = mutableListOf<Pair<SourceType, Throwable>>()
+        val timeout = ConnectTimeoutException(
+            "Connect timeout has expired [url=http://192.168.100.100:6060/api/v1/books/70/content, connect_timeout=10000 ms]",
+        )
+        val store = InMemoryDownloadQueueStore(initialEntries = listOf(threeBookEntry(status = DownloadEntryStatus.Queued)))
+        val runner = RemoteDownloadWorkerRunner(
+            store = store,
+            remoteDownloadDataSources = listOf(TestRemoteItemDownloadDataSource(onDownload = { throw timeout })),
+            completionSideEffects = emptyList(),
+            onConnectionLost = { sourceType, failure -> lost += sourceType to failure },
+        )
+
+        val outcome = runner.runEntry("entry-1")
+        val entry = store.entries.single()
+
+        assertEquals(RemoteDownloadWorkerOutcome.Paused, outcome)
+        assertEquals(DownloadEntryStatus.PausedConnectivity, entry.status)
+        assertNull(entry.errorMessage)
+        assertEquals("book-1", entry.currentItemId)
+        assertEquals(listOf(SourceType.KAVITA to timeout), lost)
+        assertEquals("Waiting for Kavita", entry.waitingLabel(item = null))
+    }
+
+    @Test
+    fun `a body cut part way keeps the files already done and the rerun goes on from there`() = runTest {
+        var cutDuringItemId: String? = "book-2"
+        val dataSource = TestRemoteItemDownloadDataSource(
+            onDownload = { item ->
+                if (item.id == cutDuringItemId) {
+                    cutDuringItemId = null
+                    throw java.io.IOException("Unable to download", java.net.ProtocolException("unexpected end of stream"))
+                }
+            },
+        )
+        val store = InMemoryDownloadQueueStore(initialEntries = listOf(threeBookEntry(status = DownloadEntryStatus.Queued)))
+        val runner = RemoteDownloadWorkerRunner(
+            store = store,
+            remoteDownloadDataSources = listOf(dataSource),
+            completionSideEffects = emptyList(),
+        )
+
+        assertEquals(RemoteDownloadWorkerOutcome.Paused, runner.runEntry("entry-1"))
+        assertEquals(setOf("book-1"), store.entries.single().completedItemIds)
+        assertTrue("A paused download keeps its bytes.", dataSource.forgottenPartialItemIds.isEmpty())
+
+        // The server is back: WorkManager's rerun (or the reachability change) runs the entry again.
+        assertEquals(RemoteDownloadWorkerOutcome.Success, runner.runEntry("entry-1"))
+
+        val finished = store.entries.single()
+        assertEquals(DownloadEntryStatus.Completed, finished.status)
+        assertEquals(setOf("book-1", "book-2", "book-3"), finished.completedItemIds)
+        assertEquals(listOf("book-1", "book-2", "book-2", "book-3"), dataSource.downloadedItemIds)
+    }
+
+    @Test
+    fun `a rerun while the server is still offline leaves the download waiting`() = runTest {
+        val store = InMemoryDownloadQueueStore(
+            initialEntries = listOf(threeBookEntry(status = DownloadEntryStatus.PausedConnectivity)),
+        )
+        val dataSource = TestRemoteItemDownloadDataSource()
+        val runner = RemoteDownloadWorkerRunner(
+            store = store,
+            remoteDownloadDataSources = listOf(dataSource),
+            completionSideEffects = emptyList(),
+            canRunSource = { false },
+        )
+
+        assertEquals(RemoteDownloadWorkerOutcome.Success, runner.runEntry("entry-1"))
+        assertEquals(DownloadEntryStatus.PausedConnectivity, store.entries.single().status)
+        assertTrue(dataSource.downloadedItemIds.isEmpty())
+    }
+
+    @Test
+    fun `real failures still fail with their message and leave the server alone`() = runTest {
+        listOf(
+            IllegalStateException("No file of type EPUB found for book"),
+            IllegalStateException("Unauthorized"),
+            java.io.IOException("write failed: ENOSPC (No space left on device)"),
+        ).forEach { failure ->
+            val lost = mutableListOf<Throwable>()
+            val store = InMemoryDownloadQueueStore(initialEntries = listOf(threeBookEntry(status = DownloadEntryStatus.Queued)))
+            val runner = RemoteDownloadWorkerRunner(
+                store = store,
+                remoteDownloadDataSources = listOf(TestRemoteItemDownloadDataSource(onDownload = { throw failure })),
+                completionSideEffects = emptyList(),
+                onConnectionLost = { _, error -> lost += error },
+            )
+
+            assertEquals(RemoteDownloadWorkerOutcome.Failure, runner.runEntry("entry-1"))
+            assertEquals(DownloadEntryStatus.Failed, store.entries.single().status)
+            assertEquals(failure.message, store.entries.single().errorMessage)
+            assertTrue(lost.isEmpty())
+        }
+    }
+
+    @Test
+    fun `canceling a waiting download forgets the bytes its unfinished files kept`() = runTest {
+        val dataSource = TestRemoteItemDownloadDataSource()
+        val store = InMemoryDownloadQueueStore(
+            initialEntries = listOf(
+                threeBookEntry(status = DownloadEntryStatus.PausedConnectivity).copy(completedItemIds = setOf("book-1")),
+            ),
+        )
+        val controller = RemoteDownloadQueueController(
+            store = store,
+            scheduler = RecordingDownloadWorkScheduler(),
+            remoteDownloadDataSources = listOf(dataSource),
+        )
+
+        controller.cancel("entry-1")
+
+        assertEquals(DownloadEntryStatus.Canceled, store.entries.single().status)
+        assertEquals(listOf("book-2", "book-3"), dataSource.forgottenPartialItemIds)
+    }
+
+    @Test
+    fun `canceling a running download forgets its bytes once the work stops`() = runTest {
+        lateinit var controller: RemoteDownloadQueueController
+        val dataSource = TestRemoteItemDownloadDataSource(
+            onDownload = { item ->
+                if (item.id == "book-2") {
+                    controller.cancel("entry-1")
+                    throw kotlinx.coroutines.CancellationException("work canceled")
+                }
+            },
+        )
+        val store = InMemoryDownloadQueueStore(initialEntries = listOf(threeBookEntry(status = DownloadEntryStatus.Queued)))
+        controller = RemoteDownloadQueueController(
+            store = store,
+            scheduler = RecordingDownloadWorkScheduler(),
+            remoteDownloadDataSources = listOf(dataSource),
+        )
+        val runner = RemoteDownloadWorkerRunner(
+            store = store,
+            remoteDownloadDataSources = listOf(dataSource),
+            completionSideEffects = emptyList(),
+        )
+
+        assertEquals(RemoteDownloadWorkerOutcome.Canceled, runner.runEntry("entry-1"))
+        // book-2 was where the work stopped; book-1 had finished.
+        assertEquals(listOf("book-2", "book-3"), dataSource.forgottenPartialItemIds)
+    }
+
+    @Test
+    fun `removing a failed download forgets its partial bytes too`() = runTest {
+        val dataSource = TestRemoteItemDownloadDataSource()
+        val store = InMemoryDownloadQueueStore(
+            initialEntries = listOf(threeBookEntry(status = DownloadEntryStatus.Failed)),
+        )
+        val controller = RemoteDownloadQueueController(
+            store = store,
+            scheduler = RecordingDownloadWorkScheduler(),
+            remoteDownloadDataSources = listOf(dataSource),
+        )
+
+        assertTrue(controller.remove("entry-1"))
+        assertEquals(listOf("book-1", "book-2", "book-3"), dataSource.forgottenPartialItemIds)
+    }
+}
+
 private class InMemoryDownloadQueueStore(
     initialEntries: List<DownloadEntry> = emptyList(),
     private val onGetEntry: (suspend (entryId: String, callCount: Int, store: InMemoryDownloadQueueStore) -> Unit)? = null,
@@ -1201,6 +1367,12 @@ private class TestRemoteItemDownloadDataSource : RemoteItemDownloadDataSource {
     override suspend fun deleteStoredDocument(item: ReadableItem): Boolean {
         if (item.id in undeletableItemIds) return false
         return storedItemIds.remove(item.id)
+    }
+
+    val forgottenPartialItemIds = mutableListOf<String>()
+
+    override suspend fun deletePartialDownload(item: ReadableItem) {
+        forgottenPartialItemIds += item.id
     }
 }
 

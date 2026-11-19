@@ -167,7 +167,10 @@ class RemoteDownloadQueueController(
             status = DownloadEntryStatus.Canceled,
             completedAtEpochMillis = timeProvider(),
         )
-        if (!canceledQueued) {
+        if (canceledQueued) {
+            // Nothing runs it now: the bytes a broken-off file kept go here. A running entry's go when its work stops.
+            store.getEntry(entryId)?.let { entry -> remoteDownloadDataSources.forgetPartialDownloads(entry) }
+        } else {
             store.updateStatusIfCurrentStatusIn(
                 entryId = entryId,
                 expectedStatuses = setOf(DownloadEntryStatus.Running),
@@ -228,6 +231,7 @@ class RemoteDownloadQueueController(
             }
             remainingCompletedItemIds -= item.id
         }
+        remoteDownloadDataSources.forgetPartialDownloads(entry)
         return store.deleteEntry(entryId) > 0
     }
 

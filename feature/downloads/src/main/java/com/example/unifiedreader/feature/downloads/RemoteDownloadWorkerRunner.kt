@@ -1,6 +1,8 @@
 package com.example.unifiedreader.feature.downloads
 
 import android.util.Log
+import com.example.unifiedreader.core.model.SourceType
+import com.example.unifiedreader.core.network.isConnectionFailure
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -12,13 +14,27 @@ enum class RemoteDownloadWorkerOutcome {
 
     /** Stopped by the system, not the user; the entry is queued again for WorkManager's rerun. */
     Stopped,
+
+    /**
+     * The connection to the server was lost part way (a timeout, a reset, no route): the entry waits for the
+     * server, keeping the files and bytes it has, and WorkManager tries again after a while.
+     */
+    Paused,
 }
 
+/**
+ * Runs one download entry: each of its files in turn, skipping those already done. A lost connection
+ * ([isConnectionFailure]) pauses the entry as waiting for its server instead of failing it, and tells
+ * [onConnectionLost], which marks the server offline once a check agrees; the server coming back starts the
+ * entry again, and the file it was on goes on from the bytes it had. Any other error (an error answer, a
+ * broken or unsupported file, a full disk) fails the entry with its message.
+ */
 class RemoteDownloadWorkerRunner(
     private val store: DownloadQueueStore,
     private val remoteDownloadDataSources: List<RemoteItemDownloadDataSource>,
     private val completionSideEffects: List<DownloadCompletionSideEffect>,
-    private val canRunSource: (com.example.unifiedreader.core.model.SourceType) -> Boolean = { true },
+    private val canRunSource: (SourceType) -> Boolean = { true },
+    private val onConnectionLost: (SourceType, Throwable) -> Unit = { _, _ -> },
     private val timeProvider: () -> Long = System::currentTimeMillis,
 ) {
     suspend fun runEntry(
@@ -111,13 +127,35 @@ class RemoteDownloadWorkerRunner(
                 finalizeStopped(entryId)
             }
         } catch (throwable: Throwable) {
-            store.updateStatus(
-                entryId = entryId,
-                status = DownloadEntryStatus.Failed,
-                errorMessage = throwable.message?.takeIf(String::isNotBlank) ?: "Unknown error",
-            )
-            RemoteDownloadWorkerOutcome.Failure
+            if (throwable.isConnectionFailure()) {
+                pauseForLostConnection(entryId, entry.sourceType, throwable)
+            } else {
+                store.updateStatus(
+                    entryId = entryId,
+                    status = DownloadEntryStatus.Failed,
+                    errorMessage = throwable.message?.takeIf(String::isNotBlank) ?: "Unknown error",
+                )
+                RemoteDownloadWorkerOutcome.Failure
+            }
         }
+    }
+
+    private suspend fun pauseForLostConnection(
+        entryId: String,
+        sourceType: SourceType,
+        failure: Throwable,
+    ): RemoteDownloadWorkerOutcome {
+        Log.i(LOG_TAG, "Connection to ${sourceType.name} lost while downloading; waiting for it.", failure)
+        val current = store.getEntry(entryId)
+        val paused = store.updateStatusIfCurrentStatusIn(
+            entryId = entryId,
+            expectedStatuses = setOf(DownloadEntryStatus.Running),
+            status = DownloadEntryStatus.PausedConnectivity,
+            currentItemId = current?.currentItemId,
+            currentItemTitle = current?.currentItemTitle,
+        )
+        onConnectionLost(sourceType, failure)
+        return if (paused) RemoteDownloadWorkerOutcome.Paused else resolveStoppedOutcome(entryId)
     }
 
     private suspend fun resolveStoppedOutcome(
@@ -150,7 +188,10 @@ class RemoteDownloadWorkerRunner(
     private suspend fun finalizeCanceled(
         entryId: String,
     ): RemoteDownloadWorkerOutcome {
-        val currentStatus = store.getEntry(entryId)?.status
+        val entry = store.getEntry(entryId)
+        // A canceled download won't go on: the bytes its unfinished files kept go too.
+        entry?.let { canceled -> remoteDownloadDataSources.forgetPartialDownloads(canceled) }
+        val currentStatus = entry?.status
         if (currentStatus != DownloadEntryStatus.Canceled) {
             store.updateStatusIfCurrentStatusIn(
                 entryId = entryId,
