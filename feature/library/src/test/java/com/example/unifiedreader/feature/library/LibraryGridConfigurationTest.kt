@@ -87,7 +87,9 @@ class LibraryGridConfigurationTest {
                 LibraryCoverImageVariant.Grid,
                 LibraryCoverImageVariant.GridLarge,
             ),
-            LibraryCoverSize.entries.map { size -> LibraryGridMetrics(cellSizeDp = size.cellSizeDp, compactWindow = true).coverImageVariant },
+            LibraryCoverSize.entries.map { size ->
+                LibraryGridMetrics(cellSizeDp = size.cellSizeDp, compactWindow = true).coverImageVariant
+            },
         )
         assertEquals(
             listOf(
@@ -104,11 +106,11 @@ class LibraryGridConfigurationTest {
     @Test
     fun `the default size on a phone asks for the grid thumbnail, not the tablet's larger images`() {
         listOf(360, 384, 411).forEach { width ->
-            val presentation = libraryGridPresentation(width.dp, 16.dp, 16.dp, defaultLibraryGridCellSizeDp, compactWindow = true)
+            val presentation = libraryGridPresentation(width.dp, 16.dp, 16.dp, phoneMetrics(defaultLibraryGridCellSizeDp))
             assertEquals("at $width dp", LibraryCoverImageVariant.Grid, presentation.coverImageVariant)
         }
         // The Fire 7 keeps what it had: Large lays out like Huge at 600 dp and takes Huge's image.
-        val fire = libraryGridPresentation(600.dp, 24.dp, 24.dp, defaultLibraryGridCellSizeDp)
+        val fire = libraryGridPresentation(600.dp, 24.dp, 24.dp, LibraryGridMetrics(defaultLibraryGridCellSizeDp))
         assertEquals(LibraryCoverImageVariant.GridExtraLarge, fire.coverImageVariant)
     }
 
@@ -119,7 +121,7 @@ class LibraryGridConfigurationTest {
         phones.forEach { (scale, widest) ->
             (320..widest).forEach { width ->
                 LibraryCoverSize.entries.forEach { size ->
-                    val presentation = libraryGridPresentation(width.dp, 16.dp, 16.dp, size.cellSizeDp, compactWindow = true)
+                    val presentation = libraryGridPresentation(width.dp, 16.dp, 16.dp, phoneMetrics(size.cellSizeDp))
                     val cellPx = presentation.selectedGridSize.cellWidthDp * scale
                     val imagePx = libraryCoverImageRequestSize(presentation.coverImageVariant, scale).width
                     assertTrue("${size.label} at $width dp, ${scale}x: $imagePx px for $cellPx", imagePx >= cellPx * 0.95f)
@@ -130,26 +132,26 @@ class LibraryGridConfigurationTest {
 
     @Test
     fun `the grid cells lay out the columns the shelves count`() {
-        listOf(1f, 1.875f, 2.625f, 3f).forEach { scale ->
-            val density = Density(density = scale)
-            listOf(true, false).forEach { compact ->
-                (300..1300 step 13).forEach { width ->
-                    LibraryCoverSize.entries.forEach { size ->
-                        val metrics = LibraryGridMetrics(cellSizeDp = size.cellSizeDp, compactWindow = compact)
-                        val available = width.dp
-                        val counted = with(density) { libraryGridColumns(availableWidth = available, metrics = metrics) }
-                        val cells = with(metrics.gridCells) {
-                            density.calculateCrossAxisCellSizes(
-                                availableSize = with(density) { available.roundToPx() },
-                                spacing = with(density) { metrics.spacing.roundToPx() },
-                            )
-                        }
-                        assertEquals(cells.size, counted.count)
-                        assertEquals(cells.min(), with(density) { counted.cellWidth.roundToPx() })
-                        assertTrue(cells.size >= metrics.minColumns)
+        val cases = listOf(1f, 1.875f, 2.625f, 3f).flatMap { scale ->
+            listOf(true, false).flatMap { compact ->
+                (300..1300 step 13).flatMap { width ->
+                    LibraryCoverSize.entries.map { size ->
+                        Triple(Density(density = scale), width.dp, LibraryGridMetrics(size.cellSizeDp, compact))
                     }
                 }
             }
+        }
+        cases.forEach { (density, available, metrics) ->
+            val counted = with(density) { libraryGridColumns(availableWidth = available, metrics = metrics) }
+            val cells = with(metrics.gridCells) {
+                density.calculateCrossAxisCellSizes(
+                    availableSize = with(density) { available.roundToPx() },
+                    spacing = with(density) { metrics.spacing.roundToPx() },
+                )
+            }
+            assertEquals(cells.size, counted.count)
+            assertEquals(cells.min(), with(density) { counted.cellWidth.roundToPx() })
+            assertTrue(cells.size >= metrics.minColumns)
         }
     }
 
@@ -166,8 +168,7 @@ class LibraryGridConfigurationTest {
                     maxWidth = width.dp,
                     startPadding = gutter.dp,
                     endPadding = gutter.dp,
-                    requestedGridCellSizeDp = size.cellSizeDp,
-                    compactWindow = compact,
+                    requested = LibraryGridMetrics(size.cellSizeDp, compactWindow = compact),
                 )
                 val metrics = LibraryGridMetrics(presentation.selectedGridSize.cellSizeDp, compact)
                 val counted = with(density) { libraryGridColumns(availableWidth = (width - gutter * 2).dp, metrics = metrics) }
@@ -183,25 +184,26 @@ class LibraryGridConfigurationTest {
         assertEquals(1, libraryCoverTitleLines(160.dp))
         assertEquals(1, libraryCoverTitleLines(268.dp))
         // Large on a 411 dp phone (3 columns) and on the Fire 7 (2 columns of 268 dp).
-        val phone = libraryGridPresentation(411.dp, 16.dp, 16.dp, defaultLibraryGridCellSizeDp, compactWindow = true)
+        val phone = libraryGridPresentation(411.dp, 16.dp, 16.dp, phoneMetrics(defaultLibraryGridCellSizeDp))
         assertEquals(2, libraryCoverTitleLines(phone.selectedGridSize.cellWidthDp.dp))
-        val fire = libraryGridPresentation(600.dp, 24.dp, 24.dp, defaultLibraryGridCellSizeDp)
+        val fire = libraryGridPresentation(600.dp, 24.dp, 24.dp, LibraryGridMetrics(defaultLibraryGridCellSizeDp))
         assertEquals(1, libraryCoverTitleLines(fire.selectedGridSize.cellWidthDp.dp))
     }
+
+    private fun phoneMetrics(cellSizeDp: Int) = LibraryGridMetrics(cellSizeDp = cellSizeDp, compactWindow = true)
 
     private fun phoneColumns(size: LibraryCoverSize, width: Int): Int = libraryGridPresentation(
         maxWidth = width.dp,
         startPadding = 16.dp,
         endPadding = 16.dp,
-        requestedGridCellSizeDp = size.cellSizeDp,
-        compactWindow = true,
+        requested = LibraryGridMetrics(size.cellSizeDp, compactWindow = true),
     ).selectedGridSize.columnCount
 
     private fun tabletColumns(size: LibraryCoverSize, width: Int): Int = libraryGridPresentation(
         maxWidth = width.dp,
         startPadding = 24.dp,
         endPadding = 24.dp,
-        requestedGridCellSizeDp = size.cellSizeDp,
+        requested = LibraryGridMetrics(size.cellSizeDp),
     ).selectedGridSize.columnCount
 
     @Test
@@ -221,7 +223,7 @@ class LibraryGridConfigurationTest {
             maxWidth = if (docked) dockedWidth else undockedWidth,
             startPadding = 24.dp,
             endPadding = 24.dp,
-            requestedGridCellSizeDp = size.cellSizeDp,
+            requested = LibraryGridMetrics(size.cellSizeDp),
             undockedMaxWidth = undockedWidth,
         )
 
@@ -258,7 +260,7 @@ class LibraryGridConfigurationTest {
             maxWidth = width.dp,
             startPadding = gutter.dp,
             endPadding = gutter.dp,
-            requestedGridCellSizeDp = defaultLibraryGridCellSizeDp,
+            requested = LibraryGridMetrics(defaultLibraryGridCellSizeDp),
         ).selectedGridSize.columnCount
 
         // 800 dp portrait, the tablet's 914 dp portrait, then beside the 88 dp rail: 1280 dp and the tablet's 1292 dp landscape.
@@ -274,7 +276,7 @@ class LibraryGridConfigurationTest {
             maxWidth = 660.dp,
             startPadding = 16.dp,
             endPadding = 16.dp,
-            requestedGridCellSizeDp = 140,
+            requested = LibraryGridMetrics(140),
         )
 
         assertEquals(140, presentation.selectedGridSize.cellSizeDp)
@@ -297,7 +299,7 @@ class LibraryGridConfigurationTest {
             maxWidth = 900.dp,
             startPadding = 16.dp,
             endPadding = 16.dp,
-            requestedGridCellSizeDp = 200,
+            requested = LibraryGridMetrics(200),
         )
 
         assertEquals(176, presentation.selectedGridSize.cellSizeDp)

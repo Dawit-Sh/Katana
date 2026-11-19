@@ -41,6 +41,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -78,6 +79,7 @@ import com.example.unifiedreader.feature.library.ItemProgressSummary
 import com.example.unifiedreader.feature.library.libraryBookTitle
 import com.example.unifiedreader.feature.library.libraryWindowGridMetrics
 import com.example.unifiedreader.feature.library.libraryWindowGridTitleLines
+import com.example.unifiedreader.feature.library.LocalLibraryCoverTitleLines
 import com.example.unifiedreader.ui.components.AppButton
 import com.example.unifiedreader.ui.components.AppChip
 import com.example.unifiedreader.ui.components.AppIcons
@@ -304,28 +306,29 @@ fun UserListPage(
         }
         itemsIndexed(items = shown, key = { index, _ -> shownKeys[index] }) { _, (position, book) ->
             val itemId = book.entry.itemId
-            UserListBookTile(
-                modifier = Modifier.animateItem(
-                    fadeInSpec = AppMotion.effects(),
-                    placementSpec = AppMotion.spatial(IntOffset.VisibilityThreshold),
-                    fadeOutSpec = AppMotion.effects(),
-                ),
-                book = book,
-                number = if (numbered) position + 1 else null,
-                isNext = book == next && numbered,
-                showSource = mixesSources,
-                cover = cover,
-                isSeries = book.item?.isKavitaSeriesContainer() == true,
-                titleLines = titleLines,
-                selected = selection?.contains(itemId),
-                onClick = {
-                    when {
-                        selection != null -> onSelectionChange(if (itemId in selection) selection - itemId else selection + itemId)
-                        !book.isMissing -> onOpenBook(book)
-                    }
-                },
-                onLongClick = if (canSelect && selection == null) ({ onSelectionChange(setOf(itemId)) }) else null,
-            )
+            CompositionLocalProvider(LocalLibraryCoverTitleLines provides titleLines) {
+                UserListBookTile(
+                    modifier = Modifier.animateItem(
+                        fadeInSpec = AppMotion.effects(),
+                        placementSpec = AppMotion.spatial(IntOffset.VisibilityThreshold),
+                        fadeOutSpec = AppMotion.effects(),
+                    ),
+                    book = book,
+                    number = if (numbered) position + 1 else null,
+                    isNext = book == next && numbered,
+                    showSource = mixesSources,
+                    cover = cover,
+                    isSeries = book.item?.isKavitaSeriesContainer() == true,
+                    selected = selection?.contains(itemId),
+                    onClick = {
+                        when {
+                            selection != null -> onSelectionChange(if (itemId in selection) selection - itemId else selection + itemId)
+                            !book.isMissing -> onOpenBook(book)
+                        }
+                    },
+                    onLongClick = if (canSelect && selection == null) ({ onSelectionChange(setOf(itemId)) }) else null,
+                )
+            }
         }
     }
 }
@@ -493,7 +496,6 @@ private fun UserListBookTile(
     showSource: Boolean,
     cover: ListCover,
     isSeries: Boolean,
-    titleLines: Int,
     selected: Boolean?,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)?,
@@ -556,8 +558,8 @@ private fun UserListBookTile(
         Text(
             text = title,
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-            maxLines = titleLines,
-            minLines = titleLines,
+            maxLines = LocalLibraryCoverTitleLines.current,
+            minLines = LocalLibraryCoverTitleLines.current,
             overflow = TextOverflow.Ellipsis,
         )
         Text(

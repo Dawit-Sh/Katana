@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +30,7 @@ import com.example.unifiedreader.feature.library.LibraryCoverActionCard
 import com.example.unifiedreader.feature.library.LibraryCoverAspectRatio
 import com.example.unifiedreader.feature.library.LibraryCoverImageVariant
 import com.example.unifiedreader.feature.library.LibraryCoverProgressBar
+import com.example.unifiedreader.feature.library.LocalLibraryCoverTitleLines
 import com.example.unifiedreader.feature.library.ResolvedLibraryCover
 import com.example.unifiedreader.ui.theme.UnifiedReaderThemeTokens
 
@@ -62,42 +64,43 @@ internal fun ShelfPreviewCard(
 ) {
     // Same tile as the grid: a bare cover with its metadata below, no box around it.
     Box(modifier = Modifier.width(covers.width)) {
-        LibraryCoverActionCard(
-            item = item,
-            title = title,
-            titleLines = covers.titleLines,
-            supportingText = supportingText?.takeIf { covers.showSupportingText },
-            trailingText = trailingText,
-            coverImageUrlProvider = { coverItem, coverVariant ->
-                if (coverLoadingEnabled) {
-                    coverImageUrlProvider(coverItem, coverVariant)
-                } else {
-                    null
-                }
-            },
-            imageVariant = covers.imageVariant,
-            isDownloaded = isDownloaded,
-            isRead = isRead,
-            onClick = onClick,
-            coverModifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(LibraryCoverAspectRatio),
-            titleStyle = MaterialTheme.typography.titleSmall,
-            supportingStyle = MaterialTheme.typography.bodySmall,
-            trailingColor = accentColor,
-            metadataTopPadding = 8.dp,
-            menuContent = menuContent,
-            coverOverlay = {
-                progressFraction?.let { fraction ->
-                    LibraryCoverProgressBar(
-                        fraction = fraction,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth(),
-                    )
-                }
-            },
-        )
+        CompositionLocalProvider(LocalLibraryCoverTitleLines provides covers.titleLines) {
+            LibraryCoverActionCard(
+                item = item,
+                title = title,
+                supportingText = supportingText?.takeIf { covers.showSupportingText },
+                trailingText = trailingText,
+                coverImageUrlProvider = { coverItem, coverVariant ->
+                    if (coverLoadingEnabled) {
+                        coverImageUrlProvider(coverItem, coverVariant)
+                    } else {
+                        null
+                    }
+                },
+                imageVariant = covers.imageVariant,
+                isDownloaded = isDownloaded,
+                isRead = isRead,
+                onClick = onClick,
+                coverModifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(LibraryCoverAspectRatio),
+                titleStyle = MaterialTheme.typography.titleSmall,
+                supportingStyle = MaterialTheme.typography.bodySmall,
+                trailingColor = accentColor,
+                metadataTopPadding = 8.dp,
+                menuContent = menuContent,
+                coverOverlay = {
+                    progressFraction?.let { fraction ->
+                        LibraryCoverProgressBar(
+                            fraction = fraction,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth(),
+                        )
+                    }
+                },
+            )
+        }
     }
 }
 

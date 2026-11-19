@@ -33,6 +33,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.layout.NestedPrefetchScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -605,9 +606,8 @@ fun LibraryScreen(
                     maxWidth = maxWidth,
                     startPadding = gutter,
                     endPadding = gridEndPadding,
-                    requestedGridCellSizeDp = gridCellSizeDp,
+                    requested = LibraryGridMetrics(gridCellSizeDp, compactWindow),
                     undockedMaxWidth = undockedMaxWidth,
-                    compactWindow = compactWindow,
                 )
             }
             val gridMetrics = LibraryGridMetrics(gridPresentation.selectedGridSize.cellSizeDp, compactWindow)
@@ -627,7 +627,7 @@ fun LibraryScreen(
             )
 
             // Sort and filter changes move covers to their new places instead of cutting.
-            val gridCard: @Composable LazyGridItemScope.(ReadableItem) -> Unit = { item ->
+            val gridCoverCard: @Composable LazyGridItemScope.(ReadableItem) -> Unit = { item ->
                 GridCoverCard(
                     item = item,
                     progress = effectiveProgressByItemId[item.id],
@@ -649,7 +649,6 @@ fun LibraryScreen(
                         else -> itemPrimaryText(item)
                     },
                     showTitle = showGridTitles,
-                    titleLines = gridTitleLines,
                     isSelectionMode = isDownloadSelectionMode,
                     isSelected = item.id in selectedDownloadItemIdSet,
                     onClick = { onItemSelected(item) },
@@ -672,6 +671,10 @@ fun LibraryScreen(
                         fadeOutSpec = null,
                     ),
                 )
+            }
+            // Titles take two lines under narrow covers (a phone's), both kept so a row's tiles line up.
+            val gridCard: @Composable LazyGridItemScope.(ReadableItem) -> Unit = { item ->
+                CompositionLocalProvider(LocalLibraryCoverTitleLines provides gridTitleLines) { gridCoverCard(item) }
             }
 
             LazyVerticalGrid(

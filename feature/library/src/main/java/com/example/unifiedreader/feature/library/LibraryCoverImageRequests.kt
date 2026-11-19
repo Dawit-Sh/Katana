@@ -74,8 +74,7 @@ private fun libraryCoverImageMinimumRequestSize(
 private fun libraryCoverImageLogicalSize(
     variant: LibraryCoverImageVariant,
 ): IntSize = when (variant) {
-    // The widest a Tiny or Small cell gets on a phone (three columns of Small at 360 dp come to 99).
-    LibraryCoverImageVariant.GridSmall -> IntSize(104, 156)
+    LibraryCoverImageVariant.GridSmall -> GridSmallLogicalSize
     LibraryCoverImageVariant.Grid -> IntSize(160, 240)
     LibraryCoverImageVariant.GridLarge -> IntSize(180, 270)
     LibraryCoverImageVariant.GridExtraLarge -> IntSize(240, 360)
@@ -119,3 +118,7 @@ internal fun libraryCoverImageDecodePolicy(
         bitmapConfig = null,
     )
 }
+
+// The widest a Tiny or Small cell gets on a phone (three columns of Small at 327 dp come to 88, and three at 360 dp,
+// which lay out like Medium there, to 99), so the image is never narrower than the cell draws.
+private val GridSmallLogicalSize = IntSize(104, 156)

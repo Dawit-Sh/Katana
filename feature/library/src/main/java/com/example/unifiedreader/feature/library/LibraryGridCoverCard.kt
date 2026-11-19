@@ -40,8 +40,6 @@ internal fun GridCoverCard(
     lengthLabel: String? = null,
     title: String = itemPrimaryText(item),
     showTitle: Boolean = true,
-    // Two on narrow covers (libraryCoverTitleLines), both kept so the lines under the titles share a row.
-    titleLines: Int = 1,
     isSelectionMode: Boolean = false,
     isSelected: Boolean = false,
     onClick: () -> Unit,
@@ -78,7 +76,6 @@ internal fun GridCoverCard(
         item = item,
         title = title,
         showTitle = showTitle,
-        titleLines = titleLines,
         coverImageUrlProvider = coverImageUrlProvider,
         imageVariant = imageVariant,
         isDownloaded = isDownloaded,

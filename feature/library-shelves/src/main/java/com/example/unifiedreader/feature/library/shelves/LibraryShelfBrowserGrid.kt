@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -27,6 +28,7 @@ import com.example.unifiedreader.feature.library.LibraryCoverSize
 import com.example.unifiedreader.feature.library.LibraryGridMetrics
 import com.example.unifiedreader.feature.library.LibraryItemActionContext
 import com.example.unifiedreader.feature.library.LibraryItemPageButton
+import com.example.unifiedreader.feature.library.LocalLibraryCoverTitleLines
 import com.example.unifiedreader.feature.library.isDownloaded
 import com.example.unifiedreader.feature.library.isLibraryCompactWindow
 import com.example.unifiedreader.feature.library.libraryCoverTitleLines
@@ -60,42 +62,42 @@ internal fun ShelfBrowserGrid(
     val gutter = appGutter()
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val columns = with(LocalDensity.current) { libraryGridColumns(availableWidth = maxWidth - gutter * 2, metrics = metrics) }
-        val titleLines = libraryCoverTitleLines(columns.cellWidth)
-        LazyVerticalGrid(
-            columns = metrics.gridCells,
-            state = gridState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = gutter,
-                end = gutter,
-                top = contentTopInset + AppLayout.contentTop,
-                bottom = AppLayout.contentBottom,
-            ),
-            verticalArrangement = Arrangement.spacedBy(if (compactGrid) 12.dp else AppLayout.gridGap),
-            horizontalArrangement = Arrangement.spacedBy(AppLayout.gridGap),
-        ) {
-            item(key = ShelfBrowserHeaderKey, span = { GridItemSpan(maxLineSpan) }) { header() }
-            items(
-                items = entries,
-                // Per shelf, so switching tabs replaces the tiles (they fade) instead of moving them.
-                key = { entry -> "${kind.name}:${entry.item.id}" },
-            ) { entry ->
-                ShelfBrowserGridCard(
-                    entry = entry,
-                    coverSize = coverSize,
-                    titleLines = titleLines,
-                    imageVariant = metrics.coverImageVariant,
-                    itemActionContext = itemActionContext,
-                    coverImageUrlProvider = coverImageUrlProvider,
-                    onItemSelected = { onItemSelected(entry.item) },
-                    modifier = Modifier
-                        .animateItem(
-                            fadeInSpec = AppMotion.effects(),
-                            placementSpec = null,
-                            fadeOutSpec = tween(durationMillis = ShelfSwitchFadeOutMillis),
-                        )
-                        .shelfSwitchEntrance(switchedAtMillis),
-                )
+        CompositionLocalProvider(LocalLibraryCoverTitleLines provides libraryCoverTitleLines(columns.cellWidth)) {
+            LazyVerticalGrid(
+                columns = metrics.gridCells,
+                state = gridState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = gutter,
+                    end = gutter,
+                    top = contentTopInset + AppLayout.contentTop,
+                    bottom = AppLayout.contentBottom,
+                ),
+                verticalArrangement = Arrangement.spacedBy(if (compactGrid) 12.dp else AppLayout.gridGap),
+                horizontalArrangement = Arrangement.spacedBy(AppLayout.gridGap),
+            ) {
+                item(key = ShelfBrowserHeaderKey, span = { GridItemSpan(maxLineSpan) }) { header() }
+                items(
+                    items = entries,
+                    // Per shelf, so switching tabs replaces the tiles (they fade) instead of moving them.
+                    key = { entry -> "${kind.name}:${entry.item.id}" },
+                ) { entry ->
+                    ShelfBrowserGridCard(
+                        entry = entry,
+                        coverSize = coverSize,
+                        imageVariant = metrics.coverImageVariant,
+                        itemActionContext = itemActionContext,
+                        coverImageUrlProvider = coverImageUrlProvider,
+                        onItemSelected = { onItemSelected(entry.item) },
+                        modifier = Modifier
+                            .animateItem(
+                                fadeInSpec = AppMotion.effects(),
+                                placementSpec = null,
+                                fadeOutSpec = tween(durationMillis = ShelfSwitchFadeOutMillis),
+                            )
+                            .shelfSwitchEntrance(switchedAtMillis),
+                    )
+                }
             }
         }
     }
@@ -106,7 +108,6 @@ internal fun ShelfBrowserGrid(
 private fun ShelfBrowserGridCard(
     entry: LibraryShelfBrowserEntry,
     coverSize: LibraryCoverSize,
-    titleLines: Int,
     imageVariant: LibraryCoverImageVariant,
     itemActionContext: LibraryItemActionContext,
     coverImageUrlProvider: (ReadableItem, LibraryCoverImageVariant) -> String?,
@@ -117,7 +118,6 @@ private fun ShelfBrowserGridCard(
         item = entry.item,
         title = entry.title,
         showTitle = coverSize.showsTitle,
-        titleLines = titleLines,
         supportingText = entry.supportingText.takeIf { coverSize.showsTitle },
         trailingText = entry.trailingText,
         coverImageUrlProvider = coverImageUrlProvider,

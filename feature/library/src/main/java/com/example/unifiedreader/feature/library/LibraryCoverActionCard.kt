@@ -53,9 +53,6 @@ fun LibraryCoverActionCard(
     titleColor: Color = MaterialTheme.colorScheme.onSurface,
     // Tiny covers: no title line, the cover names the book to TalkBack instead.
     showTitle: Boolean = true,
-    // Two on narrow covers, both kept (an empty second line under a short title) so a row's tiles line up.
-    // One line scrolls once when the title is long.
-    titleLines: Int = 1,
     supportingText: String? = null,
     supportingStyle: TextStyle = MaterialTheme.typography.bodySmall,
     supportingColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -74,6 +71,9 @@ fun LibraryCoverActionCard(
 ) {
     // Pressing the cover shrinks it a little.
     val coverInteractionSource = remember { MutableInteractionSource() }
+    // Two lines on a grid's narrow covers, both kept (an empty second line under a short title) so a row's tiles
+    // line up; one line, scrolling once when the title is long, elsewhere.
+    val titleLines = LocalLibraryCoverTitleLines.current
     Column(modifier = modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier
