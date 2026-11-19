@@ -2,6 +2,8 @@ package com.example.unifiedreader.data.kavita
 
 import com.example.unifiedreader.core.model.Library
 import com.example.unifiedreader.core.network.LenientJson
+import com.example.unifiedreader.core.network.PartialDownloadFile
+import com.example.unifiedreader.core.network.downloadResumably
 import com.example.unifiedreader.core.network.resolveSameOriginUrl
 import com.example.unifiedreader.core.network.writeBodyTo
 import io.ktor.client.HttpClient
@@ -10,6 +12,7 @@ import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.delete
 import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.prepareGet
@@ -165,6 +168,22 @@ interface KavitaApi {
         apiKey: String?,
         destination: File,
     )
+
+    /**
+     * Downloads the chapter's file into [target], going on after the bytes it already holds when the server
+     * can send the rest (Kavita serves the file with range processing on). A test double without a server
+     * gets a whole download through [downloadChapter].
+     */
+    suspend fun downloadChapterResumably(
+        accessToken: String,
+        chapterId: String,
+        apiKey: String?,
+        target: PartialDownloadFile,
+    ) {
+        target.delete()
+        target.dataFile.parentFile?.mkdirs()
+        downloadChapter(accessToken = accessToken, chapterId = chapterId, apiKey = apiKey, destination = target.dataFile)
+    }
 }
 
 data class KavitaSession(
@@ -241,8 +260,10 @@ class KtorKavitaApi(
     private companion object {
         const val MaxSupplementalChapterInfoRequestsPerSeries = 50
         const val ReaderMetadataRequestTimeoutMillis = 30_000L
-        const val ReaderImageRequestTimeoutMillis = 45_000L
-        const val ReaderDownloadRequestTimeoutMillis = 120_000L
+        // Pages and downloads have no total time limit, only this much silence: a slow link that keeps
+        // sending finishes them. A chapter of several files is zipped before its first byte, hence 120 s.
+        const val ReaderImageIdleTimeoutMillis = 45_000L
+        const val ReaderDownloadIdleTimeoutMillis = 120_000L
     }
 
     private val normalizedBaseUrl = baseUrl.trimEnd('/')
@@ -602,8 +623,7 @@ class KtorKavitaApi(
         val response = httpClient.get("$normalizedBaseUrl/api/Reader/image") {
             bearerAuth(accessToken)
             timeout {
-                requestTimeoutMillis = ReaderImageRequestTimeoutMillis
-                socketTimeoutMillis = ReaderImageRequestTimeoutMillis
+                socketTimeoutMillis = ReaderImageIdleTimeoutMillis
             }
             apiKey?.takeIf(String::isNotBlank)?.let { key ->
                 header("x-api-key", key)
@@ -629,8 +649,7 @@ class KtorKavitaApi(
         val response = httpClient.get("$normalizedBaseUrl/api/Reader/thumbnail") {
             bearerAuth(accessToken)
             timeout {
-                requestTimeoutMillis = ReaderImageRequestTimeoutMillis
-                socketTimeoutMillis = ReaderImageRequestTimeoutMillis
+                socketTimeoutMillis = ReaderImageIdleTimeoutMillis
             }
             apiKey?.takeIf(String::isNotBlank)?.let { key ->
                 header("x-api-key", key)
@@ -672,24 +691,46 @@ class KtorKavitaApi(
     ) {
         authenticatedRequest {
             httpClient.prepareGet {
-                url.takeFrom("$normalizedBaseUrl/api/Download/chapter")
-                bearerAuth(accessToken)
-                timeout {
-                    requestTimeoutMillis = ReaderDownloadRequestTimeoutMillis
-                    socketTimeoutMillis = ReaderDownloadRequestTimeoutMillis
-                }
-                apiKey?.takeIf(String::isNotBlank)?.let { key ->
-                    header("x-api-key", key)
-                }
-                url {
-                    parameters.append("chapterId", chapterId)
-                    apiKey?.takeIf(String::isNotBlank)?.let { key ->
-                        parameters.append("apiKey", key)
-                    }
-                }
+                chapterDownload(accessToken = accessToken, chapterId = chapterId, apiKey = apiKey)
             }.execute { response ->
                 response.throwIfKavitaError()
                 response.writeBodyTo(destination)
+            }
+        }
+    }
+
+    override suspend fun downloadChapterResumably(
+        accessToken: String,
+        chapterId: String,
+        apiKey: String?,
+        target: PartialDownloadFile,
+    ) {
+        authenticatedRequest {
+            httpClient.downloadResumably(
+                target = target,
+                request = { chapterDownload(accessToken = accessToken, chapterId = chapterId, apiKey = apiKey) },
+                throwIfError = { response -> response.throwIfKavitaError() },
+            )
+        }
+    }
+
+    private fun HttpRequestBuilder.chapterDownload(
+        accessToken: String,
+        chapterId: String,
+        apiKey: String?,
+    ) {
+        url.takeFrom("$normalizedBaseUrl/api/Download/chapter")
+        bearerAuth(accessToken)
+        timeout {
+            socketTimeoutMillis = ReaderDownloadIdleTimeoutMillis
+        }
+        apiKey?.takeIf(String::isNotBlank)?.let { key ->
+            header("x-api-key", key)
+        }
+        url {
+            parameters.append("chapterId", chapterId)
+            apiKey?.takeIf(String::isNotBlank)?.let { key ->
+                parameters.append("apiKey", key)
             }
         }
     }

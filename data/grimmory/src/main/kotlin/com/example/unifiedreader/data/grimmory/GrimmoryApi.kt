@@ -3,6 +3,8 @@ package com.example.unifiedreader.data.grimmory
 import com.example.unifiedreader.core.model.Library
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.network.LenientJson
+import com.example.unifiedreader.core.network.PartialDownloadFile
+import com.example.unifiedreader.core.network.downloadResumably
 import com.example.unifiedreader.core.network.writeBodyTo
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -170,6 +172,22 @@ interface GrimmoryApi {
         destination: File,
         bookType: String? = null,
     ): Unit = error("Downloading Grimmory book content is not implemented.")
+
+    /**
+     * Downloads the book's file into [target], going on after the bytes it already holds: Grimmory's content
+     * endpoint returns the file as a Spring `Resource`, which answers a Range request with 206 and sends
+     * Last-Modified. A test double without a server gets a whole download through [downloadBookContent].
+     */
+    suspend fun downloadBookContentResumably(
+        accessToken: String,
+        bookId: String,
+        target: PartialDownloadFile,
+        bookType: String? = null,
+    ) {
+        target.delete()
+        target.dataFile.parentFile?.mkdirs()
+        downloadBookContent(accessToken = accessToken, bookId = bookId, destination = target.dataFile, bookType = bookType)
+    }
 
     /** Grimmory's plain shelves, at the same server and session. */
     val shelves: GrimmoryShelvesApi
@@ -614,6 +632,24 @@ class KtorGrimmoryApi(
                 response.throwIfGrimmoryError()
                 response.writeBodyTo(destination)
             }
+        }
+    }
+
+    override suspend fun downloadBookContentResumably(
+        accessToken: String,
+        bookId: String,
+        target: PartialDownloadFile,
+        bookType: String?,
+    ) {
+        authenticatedRequest {
+            httpClient.downloadResumably(
+                target = target,
+                request = {
+                    url.takeFrom(bookContentUrl(bookId = bookId, bookType = bookType))
+                    bearerAuth(accessToken)
+                },
+                throwIfError = { response -> response.throwIfGrimmoryError() },
+            )
         }
     }
 

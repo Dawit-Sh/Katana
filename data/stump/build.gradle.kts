@@ -5,7 +5,8 @@ plugins {
 
 dependencies {
     implementation(project(":core:model"))
-    implementation(project(":core:network"))
+    // Its API hands out core:network types (PartialDownloadFile).
+    api(project(":core:network"))
     implementation(libs.ktor.client.core)
     implementation(libs.kotlinx.serialization.json)
 

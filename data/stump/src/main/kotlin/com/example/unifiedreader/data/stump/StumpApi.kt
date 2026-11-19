@@ -2,6 +2,8 @@ package com.example.unifiedreader.data.stump
 
 import com.example.unifiedreader.core.model.Library
 import com.example.unifiedreader.core.network.LenientJson
+import com.example.unifiedreader.core.network.PartialDownloadFile
+import com.example.unifiedreader.core.network.downloadResumably
 import com.example.unifiedreader.core.network.resolveSameOriginUrl
 import com.example.unifiedreader.core.network.writeBodyTo
 import io.ktor.client.HttpClient
@@ -107,6 +109,21 @@ interface StumpApi {
         mediaId: String,
         destination: File,
     )
+
+    /**
+     * Downloads the book's file into [target], going on after the bytes it already holds when the server can
+     * send the rest (Stump serves it with tower-http's ServeFile, which answers Range requests). A test double
+     * without a server gets a whole download through [downloadMediaFile].
+     */
+    suspend fun downloadMediaFileResumably(
+        accessToken: String,
+        mediaId: String,
+        target: PartialDownloadFile,
+    ) {
+        target.delete()
+        target.dataFile.parentFile?.mkdirs()
+        downloadMediaFile(accessToken = accessToken, mediaId = mediaId, destination = target.dataFile)
+    }
 }
 
 data class StumpSession(
@@ -462,6 +479,21 @@ class KtorStumpApi(
             response.throwIfStumpError()
             response.writeBodyTo(destination)
         }
+    }
+
+    override suspend fun downloadMediaFileResumably(
+        accessToken: String,
+        mediaId: String,
+        target: PartialDownloadFile,
+    ) {
+        httpClient.downloadResumably(
+            target = target,
+            request = {
+                url.takeFrom("$restBaseUrl/media/$mediaId/file")
+                bearerAuth(accessToken)
+            },
+            throwIfError = { response -> response.throwIfStumpError() },
+        )
     }
 
     private suspend fun graphQlRequest(
