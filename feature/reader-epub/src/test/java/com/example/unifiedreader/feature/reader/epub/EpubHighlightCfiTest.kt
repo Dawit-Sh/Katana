@@ -45,7 +45,7 @@ class EpubHighlightCfiTest {
 
     @Test
     fun `the body's text is what a browser's textContent is, entities and CDATA read, comments left out`() {
-        assertTrue(chapter.text.contains("summer of the hole."))
+        assertTrue(chapter.text.contains("summer\u00A0of the hole."))
         assertTrue(chapter.text.contains("She walked to the river and back."))
     }
 
@@ -103,7 +103,7 @@ class EpubHighlightCfiTest {
     @Test
     fun `a selection's quote is found though its line breaks and spaces differ from the document's`() {
         // As Readium quotes a selection: the words as selected, the body's text before and after.
-        val span = checkNotNull(chapter.find(highlight = "hole.\n\nShe walked", before = "summer of the ", after = " to the river"))
+        val span = checkNotNull(chapter.find(highlight = "hole.\n\nShe walked", before = "summer\u00A0of the ", after = " to the river"))
 
         assertEquals("hole.\nShe walked", chapter.text.substring(span.start, span.end))
     }
@@ -144,7 +144,7 @@ class EpubHighlightCfiTest {
 
         assertEquals("first summer", quote.highlight)
         assertTrue(quote.before.endsWith("It was the "))
-        assertTrue(quote.after.startsWith(" of the hole."))
+        assertTrue(quote.after.startsWith("\u00A0of the hole."))
         assertTrue(quote.progression > 0.0 && quote.progression < 1.0)
     }
 
@@ -165,7 +165,11 @@ class EpubHighlightCfiTest {
         assertEquals(CfiStep(1, offset = 0), range.start.last())
         assertEquals(
             "epubcfi(/6/4!/4[a^,b^]c],/1:0,/1:4)",
-            EpubCfi.formatRange(listOf(CfiStep(6), CfiStep(4)), listOf(CfiStep(4, "a,b]c"), CfiStep(1, offset = 0)), listOf(CfiStep(4, "a,b]c"), CfiStep(1, offset = 4))),
+            EpubCfi.formatRange(
+                listOf(CfiStep(6), CfiStep(4)),
+                listOf(CfiStep(4, "a,b]c"), CfiStep(1, offset = 0)),
+                listOf(CfiStep(4, "a,b]c"), CfiStep(1, offset = 4)),
+            ),
         )
     }
 

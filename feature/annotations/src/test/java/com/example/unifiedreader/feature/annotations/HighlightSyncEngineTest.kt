@@ -24,7 +24,7 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class HighlightSyncEngineTest {
     private lateinit var database: UnifiedReaderDatabase
-    private lateinit var annotations: RoomReaderAnnotationStore
+    private lateinit var annotations: ReaderAnnotationStore
     private lateinit var syncStore: RoomHighlightSyncStore
     private lateinit var engine: HighlightSyncEngine
     private var clock = 1_800_000_000_000L
@@ -46,7 +46,9 @@ class HighlightSyncEngineTest {
             reach("create ${upload.localId}")
             if (highlights.values.any { it.cfi == upload.cfi }) return HighlightServerAnswer.AlreadyThere
             val id = (nextId++).toString()
-            highlights[id] = RemoteHighlight(id, upload.cfi, upload.text, upload.note, upload.color, upload.style, upload.chapterTitle, 1L, 1L)
+            highlights[id] = RemoteHighlight(
+                id, upload.cfi, upload.text, upload.note, upload.color, upload.style, upload.chapterTitle, 1L, 1L,
+            )
             return HighlightServerAnswer.Saved(id)
         }
 
@@ -81,8 +83,8 @@ class HighlightSyncEngineTest {
             ioDispatcher = Dispatchers.Unconfined,
             now = { clock },
             newId = { "h${++ids}" },
-        )
-        syncStore = RoomHighlightSyncStore(dao, Dispatchers.Unconfined)
+        ).withPlacement(RoomHighlightPlacementStore(dao = database.readerHighlightPlacementDao(), ioDispatcher = Dispatchers.Unconfined))
+        syncStore = RoomHighlightSyncStore(database, Dispatchers.Unconfined)
         engine = HighlightSyncEngine(syncStore, now = { clock }, newId = { "s${++ids}" })
     }
 
@@ -100,11 +102,11 @@ class HighlightSyncEngineTest {
         val server = FakeServer()
         val made = annotations.addHighlight(hole, place, "Once", HighlightLook(), note = "a note")
         assertTrue("without its place it can't go yet", waiting().isEmpty())
-        assertEquals(listOf(made.id), annotations.highlightsToPlace(hole.itemId).first().map(HighlightToPlace::id))
+        assertEquals(listOf(made.id), annotations.placement.highlightsToPlace(hole.itemId).first().map(HighlightToPlace::id))
 
-        annotations.setServerPlace(made.id, cfi)
+        annotations.placement.setServerPlace(made.id, cfi)
         assertEquals(listOf(made.id), waiting().map { it.id })
-        assertTrue(annotations.highlightsToPlace(hole.itemId).first().isEmpty())
+        assertTrue(annotations.placement.highlightsToPlace(hole.itemId).first().isEmpty())
         sync(server)
 
         assertEquals(listOf("create ${made.id}"), server.requests)
@@ -119,7 +121,7 @@ class HighlightSyncEngineTest {
     fun `changes made offline wait, nothing lost, and go up at the next sync`() = runBlocking {
         val server = FakeServer()
         val made = annotations.addHighlight(hole, place, "Once", HighlightLook())
-        annotations.setServerPlace(made.id, cfi)
+        annotations.placement.setServerPlace(made.id, cfi)
         sync(server)
 
         server.offline = true
@@ -145,7 +147,7 @@ class HighlightSyncEngineTest {
     @Test
     fun `a change made while its upload is on the way stays waiting and goes next`() = runBlocking {
         val made = annotations.addHighlight(hole, place, "Once", HighlightLook())
-        annotations.setServerPlace(made.id, cfi)
+        annotations.placement.setServerPlace(made.id, cfi)
         val server = object : HighlightServer by FakeServer() {
             override suspend fun create(upload: HighlightUpload.Create): HighlightServerAnswer {
                 clock += 1_000
@@ -166,7 +168,7 @@ class HighlightSyncEngineTest {
     fun `a highlight removed here is removed on the server, then gone for good`() = runBlocking {
         val server = FakeServer()
         val made = annotations.addHighlight(hole, place, "Once", HighlightLook())
-        annotations.setServerPlace(made.id, cfi)
+        annotations.placement.setServerPlace(made.id, cfi)
         sync(server)
 
         annotations.deleteHighlight(made.id)
@@ -179,7 +181,8 @@ class HighlightSyncEngineTest {
     @Test
     fun `highlights from the server come down once, however often the book syncs`() = runBlocking {
         val server = FakeServer()
-        server.highlights["7"] = RemoteHighlight("7", cfi, "Once", "from the web", HighlightColor.Green, HighlightStyle.Underline, "One", 1L, 2L)
+        server.highlights["7"] =
+            RemoteHighlight("7", cfi, "Once", "from the web", HighlightColor.Green, HighlightStyle.Underline, "One", 1L, 2L)
 
         sync(server)
         sync(server)
@@ -190,11 +193,11 @@ class HighlightSyncEngineTest {
         assertEquals("from the web", row.note)
         assertTrue(server.requests.isEmpty())
         // Not yet placed in the book: the reader finds it there, and lists show it meanwhile.
-        assertEquals(cfi, annotations.highlightsToPlace(hole.itemId).first().single().serverPlace)
+        assertEquals(cfi, annotations.placement.highlightsToPlace(hole.itemId).first().single().serverPlace)
         assertEquals(1, annotations.highlights(hole.itemId).first().size)
 
-        annotations.place(row.id, place)
-        assertTrue(annotations.highlightsToPlace(hole.itemId).first().isEmpty())
+        annotations.placement.place(row.id, place)
+        assertTrue(annotations.placement.highlightsToPlace(hole.itemId).first().isEmpty())
         assertEquals(place.locatorJson, annotations.highlights(hole.itemId).first().single().place.locatorJson)
     }
 
@@ -210,7 +213,7 @@ class HighlightSyncEngineTest {
                 writes: List<com.example.unifiedreader.core.database.entity.HighlightRowWrite>,
                 purges: List<com.example.unifiedreader.core.database.entity.HighlightRowPurge>,
             ) {
-                annotations.place(id, place)
+                annotations.placement.place(id, place)
                 syncStore.apply(writes, purges)
             }
         }
@@ -227,7 +230,7 @@ class HighlightSyncEngineTest {
     fun `a highlight the server took again from someone else is matched, not doubled`() = runBlocking {
         val server = FakeServer()
         val made = annotations.addHighlight(hole, place, "Once", HighlightLook())
-        annotations.setServerPlace(made.id, cfi)
+        annotations.placement.setServerPlace(made.id, cfi)
         // Someone made one at the same place after this device read the server's list.
         val stale = server.list()
         server.highlights["50"] = RemoteHighlight("50", cfi, "Once", null, HighlightColor.Yellow, HighlightStyle.Highlight, null, 1L, 1L)
@@ -243,10 +246,10 @@ class HighlightSyncEngineTest {
     fun `a new highlight whose place can't be put the server's way stays on this device`() = runBlocking {
         val made = annotations.addHighlight(hole, place, "Once", HighlightLook())
 
-        annotations.keepOnDevice(made.id)
+        annotations.placement.keepOnDevice(made.id)
 
         assertEquals(HIGHLIGHT_ON_DEVICE, syncStore.rowsOf(hole.itemId).single().syncState)
-        assertTrue(annotations.highlightsToPlace(hole.itemId).first().isEmpty())
+        assertTrue(annotations.placement.highlightsToPlace(hole.itemId).first().isEmpty())
         assertTrue(waiting().isEmpty())
         assertNull(syncStore.rowsOf(hole.itemId).single().remoteCfi)
     }
@@ -255,7 +258,7 @@ class HighlightSyncEngineTest {
     fun `the books with highlights on the server or waiting for it are known`() = runBlocking {
         val server = FakeServer()
         val sent = annotations.addHighlight(hole, place, "Once", HighlightLook())
-        annotations.setServerPlace(sent.id, cfi)
+        annotations.placement.setServerPlace(sent.id, cfi)
         sync(server)
         annotations.addHighlight(AnnotatedBook("local:1", "A file", null), place, "Never sent", HighlightLook())
 

@@ -19,8 +19,11 @@ import com.example.unifiedreader.data.grimmory.GrimmoryUnauthorizedException
 import com.example.unifiedreader.feature.annotations.AnnotatedBook
 import com.example.unifiedreader.feature.annotations.AnnotationPlace
 import com.example.unifiedreader.feature.annotations.HighlightLook
+import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
+import com.example.unifiedreader.feature.annotations.RoomHighlightPlacementStore
 import com.example.unifiedreader.feature.annotations.RoomHighlightSyncStore
 import com.example.unifiedreader.feature.annotations.RoomReaderAnnotationStore
+import com.example.unifiedreader.feature.annotations.withPlacement
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -38,7 +41,7 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class GrimmoryHighlightSyncTest {
     private lateinit var database: UnifiedReaderDatabase
-    private lateinit var annotations: RoomReaderAnnotationStore
+    private lateinit var annotations: ReaderAnnotationStore
     private lateinit var syncStore: RoomHighlightSyncStore
     private val credentials = FakeGrimmoryCredentialStore(
         GrimmoryStoredSession(
@@ -65,8 +68,13 @@ class GrimmoryHighlightSyncTest {
             .allowMainThreadQueries()
             .build()
         val dao = database.readerAnnotationDao()
-        annotations = RoomReaderAnnotationStore(dao, database.readerBookmarkDao(), database.savedWordStudyDao(), Dispatchers.Unconfined)
-        syncStore = RoomHighlightSyncStore(dao, Dispatchers.Unconfined)
+        annotations = RoomReaderAnnotationStore(
+            dao = dao,
+            bookmarkDao = database.readerBookmarkDao(),
+            studyDao = database.savedWordStudyDao(),
+            ioDispatcher = Dispatchers.Unconfined,
+        ).withPlacement(RoomHighlightPlacementStore(dao = database.readerHighlightPlacementDao(), ioDispatcher = Dispatchers.Unconfined))
+        syncStore = RoomHighlightSyncStore(database, Dispatchers.Unconfined)
         sync = GrimmoryHighlightSync(
             grimmoryApiFactory = GrimmoryApiFactory { RenewingGrimmoryApi(api, GrimmoryTokenRenewals(credentials)) },
             credentialStore = credentials,
@@ -96,7 +104,7 @@ class GrimmoryHighlightSyncTest {
     @Test
     fun `a library sync sends what waits and asks a book's own list only when it may already hold it`() = runBlocking {
         val made = annotations.addHighlight(hole.book(), place, "Once", HighlightLook())
-        annotations.setServerPlace(made.id, cfi)
+        annotations.placement.setServerPlace(made.id, cfi)
 
         sync.syncLibrary(listOf(hole, other), syncStore.booksOnServer())
         assertEquals(listOf("all", "create 88"), server.requests)
@@ -104,7 +112,7 @@ class GrimmoryHighlightSyncTest {
         // Its answer lost: the server has it, this device doesn't know under which id.
         server.requests.clear()
         val again = annotations.addHighlight(other.book(), place, "Twice", HighlightLook())
-        annotations.setServerPlace(again.id, cfi)
+        annotations.placement.setServerPlace(again.id, cfi)
         server.add(bookId = "90", cfi = cfi)
         sync.syncLibrary(listOf(hole, other), syncStore.booksOnServer())
 
@@ -116,7 +124,7 @@ class GrimmoryHighlightSyncTest {
     fun `an opened book's highlights come down and its changes go up`() = runBlocking {
         server.add(bookId = "88", note = "web")
         val made = annotations.addHighlight(hole.book(), place, "Once", HighlightLook())
-        annotations.setServerPlace(made.id, "epubcfi(/6/10!/4,/1:0,/1:4)")
+        annotations.placement.setServerPlace(made.id, "epubcfi(/6/10!/4,/1:0,/1:4)")
 
         assertTrue(sync.syncBooks(listOf(hole)))
 
@@ -139,7 +147,7 @@ class GrimmoryHighlightSyncTest {
     @Test
     fun `without the network nothing is lost and Grimmory shows offline`() = runBlocking {
         val made = annotations.addHighlight(hole.book(), place, "Once", HighlightLook())
-        annotations.setServerPlace(made.id, cfi)
+        annotations.placement.setServerPlace(made.id, cfi)
         server.offline = true
 
         assertFalse(sync.syncBooks(listOf(hole)))

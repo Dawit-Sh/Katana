@@ -5,6 +5,7 @@ import com.example.unifiedreader.core.model.EpubReaderFormats
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.feature.annotations.AnnotationJumps
 import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
+import com.example.unifiedreader.feature.annotations.withoutPlacing
 import com.example.unifiedreader.feature.reader.core.ReaderChrome
 import com.example.unifiedreader.feature.reader.core.ReaderScreenFactory
 import com.example.unifiedreader.feature.reader.core.ReaderSessionStore
@@ -33,9 +34,9 @@ fun epubReaderFactory(
             onBack = onBack,
             onCompletionRequested = navigationActions.onRequestCompletion,
             translation = extras.translation,
-            annotationStore = extras.annotations,
+            // A book whose highlights don't sync has none to place for its server.
+            annotationStore = extras.annotations?.let { store -> if (extras.syncsHighlights(item)) store else store.withoutPlacing() },
             annotationJumps = extras.jumps,
-            syncsHighlights = extras.syncsHighlights(item),
         )
 }
 

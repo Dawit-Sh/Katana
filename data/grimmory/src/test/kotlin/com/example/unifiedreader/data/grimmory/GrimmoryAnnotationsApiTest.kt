@@ -97,7 +97,10 @@ class GrimmoryAnnotationsApiTest {
     @Test
     fun `a new highlight is posted with its book, place, words and look`() = runBlocking {
         val written = api {
-            json("""{"id": 9, "bookId": 88, "cfi": "epubcfi(/6/8!/4,/1:0,/1:4)", "text": "Once", "color": "#FACC15", "style": "highlight"}""")
+            json(
+                """{"id": 9, "bookId": 88, "cfi": "epubcfi(/6/8!/4,/1:0,/1:4)", "text": "Once",
+                   "color": "#FACC15", "style": "highlight"}""",
+            )
         }.create(
             "token",
             GrimmoryAnnotationCreate(

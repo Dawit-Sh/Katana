@@ -15,9 +15,13 @@ internal fun cfiChapterKey(cfi: String?): String? = cfiPlaceKey(cfi)?.substringB
 
 /** A highlight's words with spaces and letter case left out, to tell the same words in two copies. */
 internal fun wordsKey(text: String): String = buildString(text.length) {
-    text.forEach { char ->
-        if (!char.isWhitespace() && char != '­' && char !in '​'..'‍' && char != '﻿') append(char.lowercaseChar())
-    }
+    text.forEach { char -> if (!char.isLeftOutOfWords()) append(char.lowercaseChar()) }
+}
+
+// Spaces, soft hyphens and zero-width marks, which two copies of the same words may differ in.
+private fun Char.isLeftOutOfWords(): Boolean = when (this) {
+    '\u00AD', '\uFEFF', in '\u200B'..'\u200D' -> true
+    else -> isWhitespace()
 }
 
 // "start;end", each the full path without id or text assertions; null for what isn't a CFI.

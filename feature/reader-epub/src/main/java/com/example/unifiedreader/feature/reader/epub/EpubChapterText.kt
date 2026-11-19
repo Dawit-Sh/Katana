@@ -32,57 +32,35 @@ internal class EpubChapterText private constructor(
     private val elementSpans: IdentityHashMap<Element, EpubTextSpan>,
 ) {
     private val textNodes: List<Node> = textStarts.keys.filter { node -> node.textLength() > 0 }.sortedBy { textStarts.getValue(it) }
+    private val squeezedText: SqueezedText by lazy { squeeze(text) }
 
     /** The text the CFI [range]'s start and end paths point at, or null when they point elsewhere (not the body). */
     fun spanOf(range: EpubCfiRange): EpubTextSpan? {
-        val start = offsetOf(range.start, isEnd = false) ?: return null
-        val end = offsetOf(range.end, isEnd = true) ?: return null
-        return trimmed(start, end)
+        val start = offsetOf(range.start, isEnd = false)
+        val end = offsetOf(range.end, isEnd = true)
+        return if (start != null && end != null) text.trimmedSpan(start, end) else null
     }
 
     /** The CFI paths from the root element to the start and end of [span]. */
     fun cfiPaths(span: EpubTextSpan): Pair<List<CfiStep>, List<CfiStep>>? {
-        if (span.start >= span.end) return null
-        val startNode = textNodes.lastOrNull { node -> textStarts.getValue(node) <= span.start } ?: return null
-        val endNode = textNodes.firstOrNull { node -> textStarts.getValue(node) + node.textLength() >= span.end } ?: return null
-        val start = pathTo(startNode, span.start - textStarts.getValue(startNode)) ?: return null
-        val end = pathTo(endNode, span.end - textStarts.getValue(endNode)) ?: return null
-        return start to end
+        val startNode = textNodes.lastOrNull { node -> textStarts.getValue(node) <= span.start }
+        val endNode = textNodes.firstOrNull { node -> textStarts.getValue(node) + node.textLength() >= span.end }
+        val start = startNode?.let { node -> pathTo(node, span.start - textStarts.getValue(node)) }
+        val end = endNode?.let { node -> pathTo(node, span.end - textStarts.getValue(node)) }
+        return if (span.start < span.end && start != null && end != null) start to end else null
     }
 
     /**
-     * Where the quoted [highlight] is, the occurrence whose text before and after best matches
-     * [before] and [after] (Readium's quote), then the one nearest [near]. Spaces, line breaks and
-     * soft hyphens don't count: a selection's text breaks lines between paragraphs where the
-     * document may have none.
+     * Where the quoted [highlight] is: the occurrence whose text before and after best matches
+     * [before] and [after] (Readium's quote), then the one nearest [near] (see [bestOccurrence]).
      */
     fun find(highlight: String, before: String?, after: String?, near: Int? = null): EpubTextSpan? {
         val needle = squeeze(highlight).text
-        if (needle.isEmpty()) return null
-        val haystack = squeezedText
         val wantedBefore = before?.let { squeeze(it).text }.orEmpty()
         val wantedAfter = after?.let { squeeze(it).text }.orEmpty()
-        var best: Int? = null
-        var bestScore = -1
-        var bestDistance = Int.MAX_VALUE
-        var at = haystack.text.indexOf(needle)
-        while (at >= 0) {
-            val score = commonSuffix(haystack.text, at, wantedBefore) + commonPrefix(haystack.text, at + needle.length, wantedAfter)
-            val distance = near?.let { kotlin.math.abs(haystack.origin[at] - it) } ?: 0
-            if (score > bestScore || (score == bestScore && distance < bestDistance)) {
-                best = at
-                bestScore = score
-                bestDistance = distance
-            }
-            at = haystack.text.indexOf(needle, at + 1)
-        }
-        val found = best ?: return null
-        return EpubTextSpan(haystack.origin[found], haystack.origin[found + needle.length - 1] + 1)
+        val found = needle.takeIf(String::isNotEmpty)?.let { bestOccurrence(squeezedText, it, wantedBefore, wantedAfter, near) }
+        return found?.let { at -> EpubTextSpan(squeezedText.origin[at], squeezedText.origin[at + needle.length - 1] + 1) }
     }
-
-    /** Whether [span] holds [words], spaces and line breaks aside. */
-    fun holds(span: EpubTextSpan, words: String): Boolean =
-        squeeze(text.substring(span.start, span.end)).text == squeeze(words).text
 
     /** The words of [span] with the text before and after them, and how far into the chapter they start. */
     fun quote(span: EpubTextSpan): EpubTextQuote = EpubTextQuote(
@@ -92,82 +70,58 @@ internal class EpubChapterText private constructor(
         progression = if (text.isEmpty()) 0.0 else span.start.toDouble() / text.length,
     )
 
-    private val squeezedText: Squeezed by lazy { squeeze(text) }
-
-    // The text offset a path points at: in a text step, its offset; at an element, where it starts (or ends).
+    // The text offset a path points at: in a text step, its offset; at an element, where it starts (or
+    // ends). As foliate-js, a last step that asserts the id of an element there goes to that element.
     private fun offsetOf(steps: List<CfiStep>, isEnd: Boolean): Int? {
-        steps.last().id?.let { id ->
-            document.getElementById(id)?.let { element ->
-                val span = elementSpans[element] ?: return null
-                return if (isEnd) span.end else span.start
-            }
+        val byId = steps.last().id?.let(document::getElementById)
+        return if (byId != null) elementSpans[byId]?.edge(isEnd) else offsetFrom(root, steps, isEnd)
+    }
+
+    private fun offsetFrom(element: Element, steps: List<CfiStep>, isEnd: Boolean): Int? {
+        val step = steps.first()
+        val rest = steps.drop(1)
+        val span = spanOf(element)
+        val children = element.children()
+        return when {
+            span == null -> null
+            step.index % 2 == 1 -> if (rest.isEmpty()) chunkOffset(element, (step.index - 1) / 2, step.offset ?: 0) else null
+            step.index == 0 -> span.start
+            step.index / 2 > children.size -> span.end
+            rest.isEmpty() -> spanOf(children[step.index / 2 - 1])?.edge(isEnd)
+            else -> offsetFrom(children[step.index / 2 - 1], rest, isEnd)
         }
-        var element = root
-        steps.forEachIndexed { position, step ->
-            val isLast = position == steps.lastIndex
-            if (step.index % 2 == 1) return if (isLast) chunkOffset(element, (step.index - 1) / 2, step.offset ?: 0) else null
-            val span = spanOf(element) ?: return null
-            val children = element.children()
-            when {
-                step.index == 0 -> return span.start
-                step.index / 2 > children.size -> return span.end
-            }
-            element = children[step.index / 2 - 1]
-            if (isLast) {
-                val target = spanOf(element) ?: return null
-                return if (isEnd) target.end else target.start
-            }
-        }
-        return null
     }
 
     // The text between an element's children [chunk] - 1 and [chunk] (0: before the first), [offset] into it.
     private fun chunkOffset(element: Element, chunk: Int, offset: Int): Int? {
-        val span = spanOf(element) ?: return null
         val children = element.children()
-        if (chunk > children.size) return null
-        val start = if (chunk == 0) span.start else spanOf(children[chunk - 1])?.end ?: return null
-        val end = if (chunk < children.size) spanOf(children[chunk])?.start ?: return null else span.end
-        return (start + offset).coerceIn(start, end)
+        val start = when {
+            chunk == 0 -> spanOf(element)?.start
+            chunk <= children.size -> spanOf(children[chunk - 1])?.end
+            else -> null
+        }
+        val end = when {
+            chunk < children.size -> spanOf(children[chunk])?.start
+            chunk == children.size -> spanOf(element)?.end
+            else -> null
+        }
+        return if (start != null && end != null) (start + offset).coerceIn(start, maxOf(start, end)) else null
     }
 
     private fun spanOf(element: Element): EpubTextSpan? =
         elementSpans[element] ?: if (element === root) EpubTextSpan(0, text.length) else null
 
-    // The steps from the root to a text node, [offset] into it (counted the CFI way: the node's text
-    // and the text nodes before it since the last element sibling make one piece).
+    // The steps from the root to a text node, [offset] into it.
     private fun pathTo(textNode: Node, offset: Int): List<CfiStep>? {
         val parent = textNode.parentNode() as? Element ?: return null
-        var elementsBefore = 0
-        var pieceStart = 0
-        for (sibling in parent.childNodes()) {
-            if (sibling === textNode) break
-            when {
-                sibling is Element -> {
-                    elementsBefore += 1
-                    pieceStart = 0
-                }
-                sibling.isText() -> pieceStart += sibling.textLength()
-            }
-        }
-        val steps = ArrayDeque<CfiStep>()
-        steps.addFirst(CfiStep(index = 2 * elementsBefore + 1, offset = pieceStart + offset))
-        var element = parent
-        while (element !== root) {
-            val above = element.parentNode() as? Element ?: return null
-            steps.addFirst(CfiStep(index = 2 * (element.elementSiblingIndex() + 1), id = element.id().takeIf(String::isNotEmpty)))
-            element = above
-        }
-        return steps.toList()
+        return elementPath(parent)?.let { path -> path + textStep(parent, textNode, offset) }
     }
 
-    // [start, end) without the spaces at either end.
-    private fun trimmed(start: Int, end: Int): EpubTextSpan? {
-        var from = start.coerceIn(0, text.length)
-        var to = end.coerceIn(0, text.length)
-        while (from < to && text[from].isIgnorable()) from += 1
-        while (to > from && text[to - 1].isIgnorable()) to -= 1
-        return if (from < to) EpubTextSpan(from, to) else null
+    // The steps from the root to [element] (none for the root itself); null when it isn't under the root.
+    private fun elementPath(element: Element): List<CfiStep>? {
+        if (element === root) return emptyList()
+        val step = CfiStep(index = 2 * (element.elementSiblingIndex() + 1), id = element.id().takeIf(String::isNotEmpty))
+        return (element.parentNode() as? Element)?.let(::elementPath)?.plus(step)
     }
 
     companion object {
@@ -175,7 +129,10 @@ internal class EpubChapterText private constructor(
         fun parse(bytes: ByteArray, isHtml: Boolean = false): EpubChapterText? {
             val parser = if (isHtml) Parser.htmlParser() else Parser.xmlParser()
             val document = Jsoup.parse(ByteArrayInputStream(bytes), null, "", parser)
-            val root = document.children().firstOrNull() ?: return null
+            return document.children().firstOrNull()?.let { root -> read(document, root) }
+        }
+
+        private fun read(document: Document, root: Element): EpubChapterText {
             val body = root.children().firstOrNull { it.localName() == "body" }
             val text = StringBuilder()
             val textStarts = IdentityHashMap<Node, Int>()
@@ -208,34 +165,37 @@ internal class EpubChapterText private constructor(
     }
 }
 
-// The text a selection quote can differ in: spaces, line breaks, soft hyphens and zero-width marks.
-private fun Char.isIgnorable(): Boolean = isWhitespace() || this == ' ' || this == '­' || this in '​'..'‍' || this == '﻿'
-
-/** [text] without its ignorable characters; [origin] is where each kept character was in the original. */
-private class Squeezed(val text: String, val origin: IntArray)
-
-private fun squeeze(value: String): Squeezed {
-    val kept = StringBuilder(value.length)
-    val origin = IntArray(value.length)
-    value.forEachIndexed { index, char ->
-        if (!char.isIgnorable()) {
-            origin[kept.length] = index
-            kept.append(char)
+// The CFI step of a text node, [offset] into it: the node's text and the text nodes before it since
+// the last element sibling make one piece, counted as one.
+private fun textStep(parent: Element, textNode: Node, offset: Int): CfiStep {
+    var elementsBefore = 0
+    var pieceStart = 0
+    for (sibling in parent.childNodes()) {
+        if (sibling === textNode) break
+        when {
+            sibling is Element -> {
+                elementsBefore += 1
+                pieceStart = 0
+            }
+            sibling.isText() -> pieceStart += sibling.textLength()
         }
     }
-    return Squeezed(kept.toString(), origin.copyOf(kept.length))
+    return CfiStep(index = 2 * elementsBefore + 1, offset = pieceStart + offset)
 }
 
-private fun commonSuffix(text: String, end: Int, wanted: String): Int {
-    var count = 0
-    while (count < wanted.length && end - count - 1 >= 0 && text[end - count - 1] == wanted[wanted.length - count - 1]) count += 1
-    return count
-}
+/** Whether [span] holds [words], spaces and line breaks aside. */
+internal fun EpubChapterText.holds(span: EpubTextSpan, words: String): Boolean =
+    squeeze(text.substring(span.start, span.end)).text == squeeze(words).text
 
-private fun commonPrefix(text: String, start: Int, wanted: String): Int {
-    var count = 0
-    while (count < wanted.length && start + count < text.length && text[start + count] == wanted[count]) count += 1
-    return count
+private fun EpubTextSpan.edge(isEnd: Boolean): Int = if (isEnd) end else start
+
+// [start, end) of this text without the spaces at either end; null when nothing is left.
+private fun String.trimmedSpan(start: Int, end: Int): EpubTextSpan? {
+    var from = start.coerceIn(0, length)
+    var to = end.coerceIn(0, length)
+    while (from < to && this[from].isIgnorable()) from += 1
+    while (to > from && this[to - 1].isIgnorable()) to -= 1
+    return if (from < to) EpubTextSpan(from, to) else null
 }
 
 private fun Node.isText(): Boolean = this is TextNode || this is DataNode

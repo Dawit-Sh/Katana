@@ -1,14 +1,13 @@
 package com.example.unifiedreader.feature.reader.epub
 
-import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import com.example.unifiedreader.core.model.runSuspendCatching
 import com.example.unifiedreader.feature.annotations.AnnotationPlace
+import com.example.unifiedreader.feature.annotations.HighlightPlacementStore
 import com.example.unifiedreader.feature.annotations.HighlightToPlace
-import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -46,14 +45,18 @@ internal class EpubHighlightPlaces(private val publication: Publication) {
     }
 
     suspend fun serverPlaceOf(locator: Locator): EpubServerPlace {
-        val highlight = locator.text.highlight?.takeIf(String::isNotBlank) ?: return EpubServerPlace.NotFound
-        val path = locator.href.bookPath() ?: return EpubServerPlace.NotFound
-        val spine = spine() ?: return EpubServerPlace.Unreadable
-        val item = spine.items.getOrNull(spine.indexOf(path)) ?: return EpubServerPlace.NotFound
-        val chapter = chapter(item.path) ?: return EpubServerPlace.Unreadable
-        val span = chapter.find(highlight, locator.text.before, locator.text.after) ?: return EpubServerPlace.NotFound
-        val (start, end) = chapter.cfiPaths(span) ?: return EpubServerPlace.NotFound
-        return EpubServerPlace.Found(EpubCfi.formatRange(item.packageSteps, start, end))
+        val highlight = locator.text.highlight?.takeIf(String::isNotBlank)
+        val spine = spine()
+        val item = locator.href.bookPath()?.let { path -> spine.items.getOrNull(spine.indexOf(path)) }
+        val chapter = item?.let { chapterAt(it.path)?.second }
+        val paths = highlight
+            ?.let { chapter?.find(it, locator.text.before, locator.text.after) }
+            ?.let { span -> chapter?.cfiPaths(span) }
+        return when {
+            item != null && paths != null -> EpubServerPlace.Found(EpubCfi.formatRange(item.packageSteps, paths.first, paths.second))
+            item != null && chapter == null -> EpubServerPlace.Unreadable
+            else -> EpubServerPlace.NotFound
+        }
     }
 
     /**
@@ -62,77 +65,77 @@ internal class EpubHighlightPlaces(private val publication: Publication) {
      * KOReader plugin counts some the file's way) still finds its words: the nearest place they are.
      */
     suspend fun locatorOf(cfi: String, words: String): Locator? {
-        val range = EpubCfi.parse(cfi) ?: return null
-        val item = spine()?.items?.getOrNull(range.spineIndex) ?: return null
-        val link = linkFor(item.path) ?: return null
-        val chapter = chapter(item.path) ?: return null
-        val atPlace = chapter.spanOf(range)
-        val span = when {
-            words.isBlank() -> atPlace
-            atPlace != null && chapter.holds(atPlace, words) -> atPlace
-            else -> chapter.find(words, before = null, after = null, near = atPlace?.start) ?: atPlace
-        } ?: return null
-        val quote = chapter.quote(span)
-        return Locator(
-            href = link.url(),
-            mediaType = link.mediaType ?: MediaType.XHTML,
-            title = link.title,
-            locations = Locator.Locations(
-                progression = quote.progression,
-                totalProgression = totalProgression(item.path, quote.progression),
-            ),
-            text = Locator.Text(before = quote.before, highlight = quote.highlight, after = quote.after),
-        )
+        val range = EpubCfi.parse(cfi)
+        val item = range?.let { spine().items.getOrNull(it.spineIndex) }
+        if (range == null || item == null) return null
+        return chapterAt(item.path)?.let { (link, chapter) ->
+            chapter.wordsAt(range, words)?.let { span -> locatorFor(link, item.path, chapter.quote(span)) }
+        }
     }
 
-    private suspend fun spine(): EpubPackageSpine? {
-        spine?.let { return it }
+    private suspend fun locatorFor(link: Link, path: String, quote: EpubTextQuote): Locator = Locator(
+        href = link.url(),
+        mediaType = link.mediaType ?: MediaType.XHTML,
+        title = link.title,
+        locations = Locator.Locations(
+            progression = quote.progression,
+            totalProgression = totalProgression(path, quote.progression),
+        ),
+        text = Locator.Text(before = quote.before, highlight = quote.highlight, after = quote.after),
+    )
+
+    // The package's spine; without the package document, the reading order (as if no item were non-linear).
+    private suspend fun spine(): EpubPackageSpine {
+        val known = spine
+        if (known != null) return known
         val fromPackage = runSuspendCatching {
-            val container = read(Url("META-INF/container.xml")) ?: return@runSuspendCatching null
-            val opfPath = EpubPackageSpine.packagePath(container) ?: return@runSuspendCatching null
-            val opf = Url(opfPath.encodedPath())?.let { read(it) } ?: return@runSuspendCatching null
-            EpubPackageSpine.parse(opf, opfPath)
+            val opfPath = read(Url("META-INF/container.xml"))?.let(EpubPackageSpine::packagePath)
+            opfPath?.let { path -> read(Url(path.encodedPath()))?.let { opf -> EpubPackageSpine.parse(opf, path) } }
         }.getOrNull()?.takeIf { it.items.isNotEmpty() }
-        // Without the package document: the reading order, as if the spine had no non-linear items.
-        val found = fromPackage ?: EpubPackageSpine(
-            publication.readingOrder.mapIndexedNotNull { position, link ->
-                link.url().bookPath()?.let { path ->
-                    EpubSpineItem(path, listOf(CfiStep(SPINE_STEP), CfiStep(2 * (position + 1))))
-                }
-            },
-        )
-        spine = found
-        return found
+        return (fromPackage ?: readingOrderSpine()).also { spine = it }
     }
 
-    private suspend fun chapter(path: String): EpubChapterText? {
-        chapters[path]?.let { return it }
-        val link = linkFor(path) ?: return null
-        val bytes = runSuspendCatching { publication.get(link)?.use { resource -> resource.read().getOrNull() } }.getOrNull() ?: return null
+    private fun readingOrderSpine() = EpubPackageSpine(
+        publication.readingOrder.mapIndexedNotNull { position, link ->
+            link.url().bookPath()?.let { path -> EpubSpineItem(path, listOf(CfiStep(SPINE_STEP), CfiStep(2 * (position + 1)))) }
+        },
+    )
+
+    private suspend fun chapterAt(path: String): Pair<Link, EpubChapterText>? {
+        val link = (publication.readingOrder + publication.resources).firstOrNull { it.url().bookPath() == path } ?: return null
+        val chapter = chapters[path] ?: readChapter(link, path)?.also { chapters[path] = it }
+        return chapter?.let { link to it }
+    }
+
+    private suspend fun readChapter(link: Link, path: String): EpubChapterText? = runSuspendCatching {
         val isHtml = link.mediaType?.matches(MediaType.HTML) == true || path.endsWith(".html", true) || path.endsWith(".htm", true)
-        val parsed = runSuspendCatching { EpubChapterText.parse(bytes, isHtml) }.getOrNull() ?: return null
-        chapters[path] = parsed
-        return parsed
-    }
-
-    private fun linkFor(path: String): Link? =
-        (publication.readingOrder + publication.resources).firstOrNull { link -> link.url().bookPath() == path }
+        read(link.url())?.let { bytes -> EpubChapterText.parse(bytes, isHtml) }
+    }.getOrNull()
 
     private suspend fun read(url: Url?): ByteArray? = url?.let { publication.get(it)?.use { resource -> resource.read().getOrNull() } }
 
     // How far through the book: the chapter's share of Readium's positions, [progression] into it.
     private suspend fun totalProgression(path: String, progression: Double): Double? {
-        val index = publication.readingOrder.indexOfFirst { link -> link.url().bookPath() == path }.takeIf { it >= 0 } ?: return null
-        val positions = runSuspendCatching { publication.positionsByReadingOrder() }.getOrNull() ?: return null
-        val start = positions.getOrNull(index)?.firstOrNull()?.locations?.totalProgression ?: return null
-        val end = positions.drop(index + 1).firstNotNullOfOrNull { it.firstOrNull()?.locations?.totalProgression } ?: 1.0
-        return (start + (end - start) * progression).coerceIn(0.0, 1.0)
+        val index = publication.readingOrder.indexOfFirst { link -> link.url().bookPath() == path }
+        val positions = if (index >= 0) runSuspendCatching { publication.positionsByReadingOrder() }.getOrNull() else null
+        val start = positions?.getOrNull(index)?.firstOrNull()?.locations?.totalProgression
+        val end = positions?.drop(index + 1)?.firstNotNullOfOrNull { it.firstOrNull()?.locations?.totalProgression } ?: 1.0
+        return start?.let { (it + (end - it) * progression).coerceIn(0.0, 1.0) }
     }
 
     private companion object {
         const val CHAPTERS_KEPT = 3
         const val LOAD_FACTOR = 0.75f
         const val SPINE_STEP = 6
+    }
+}
+
+// The words at [range], or (when the CFI counts characters differently) the nearest place they are.
+private fun EpubChapterText.wordsAt(range: EpubCfiRange, words: String): EpubTextSpan? {
+    val atPlace = spanOf(range)
+    return when {
+        words.isBlank() || (atPlace != null && holds(atPlace, words)) -> atPlace
+        else -> find(words, before = null, after = null, near = atPlace?.start) ?: atPlace
     }
 }
 
@@ -143,65 +146,73 @@ private fun Url.bookPath(): String? = removeFragment().path?.removePrefix("./")?
 private fun String.encodedPath(): String = split('/').joinToString("/") { segment -> android.net.Uri.encode(segment) }
 
 /**
- * While a book from a server that keeps highlights is open: works out the server's place (an EPUB
- * CFI) of each new highlight made here, so it can be sent, and finds each highlight that came from
- * the server in this copy of the book, so it shows on its page. Waits a moment after the book
- * opens, so the first page comes first; then keeps up as highlights are made or come down.
+ * While a book from a server that keeps highlights is open ([store] places for it): works out the
+ * server's place (an EPUB CFI) of each new highlight made here, so it can be sent, and finds each
+ * highlight that came from the server in this copy of the book, so it shows on its page. Waits a
+ * moment after the book opens, so the first page comes first; then keeps up as highlights are made
+ * or come down.
  */
 @Composable
 internal fun EpubHighlightPlacementEffect(
     publication: Publication,
     itemId: String,
-    syncsHighlights: Boolean,
-    store: ReaderAnnotationStore?,
+    store: HighlightPlacementStore?,
     chapterTitleOf: (Locator) -> String?,
 ) {
     val latestChapterTitleOf by rememberUpdatedState(chapterTitleOf)
-    LaunchedEffect(publication, itemId, syncsHighlights, store) {
-        if (store == null || !syncsHighlights) return@LaunchedEffect
+    LaunchedEffect(publication, itemId, store) {
+        if (store == null || store == HighlightPlacementStore.None) return@LaunchedEffect
         delay(PLACEMENT_START_DELAY_MILLIS)
         val places = EpubHighlightPlaces(publication)
         // Ones not found this time (another edition's place, a chapter that wouldn't read): not tried again until the book reopens.
         val skipped = mutableSetOf<String>()
         store.highlightsToPlace(itemId).collect { waiting ->
             waiting.filterNot { it.id in skipped }.forEach { highlight ->
-                val placed = withContext(Dispatchers.IO) { places.place(highlight, store, latestChapterTitleOf) }
+                val placed = withContext(Dispatchers.IO) {
+                    val serverPlace = highlight.serverPlace
+                    if (serverPlace == null) {
+                        places.placeServerSide(highlight, store)
+                    } else {
+                        places.placeHere(highlight, serverPlace, store, latestChapterTitleOf)
+                    }
+                }
                 if (!placed) skipped += highlight.id
             }
         }
     }
 }
 
-// True when the highlight's place was settled one way or the other.
-private suspend fun EpubHighlightPlaces.place(
+// A highlight made here gets its place the server's way (or stays on this device). False when its chapter wouldn't read.
+private suspend fun EpubHighlightPlaces.placeServerSide(highlight: HighlightToPlace, store: HighlightPlacementStore): Boolean {
+    val found = highlight.locatorJson.toLocatorOrNull()?.let { serverPlaceOf(it) } ?: EpubServerPlace.NotFound
+    when (found) {
+        is EpubServerPlace.Found -> store.setServerPlace(highlight.id, found.cfi)
+        EpubServerPlace.NotFound -> store.keepOnDevice(highlight.id)
+        EpubServerPlace.Unreadable -> Unit
+    }
+    return found != EpubServerPlace.Unreadable
+}
+
+// A highlight from the server gets its place in this copy of the book. False when it isn't found here.
+private suspend fun EpubHighlightPlaces.placeHere(
     highlight: HighlightToPlace,
-    store: ReaderAnnotationStore,
+    serverPlace: String,
+    store: HighlightPlacementStore,
     chapterTitleOf: (Locator) -> String?,
 ): Boolean {
-    val serverPlace = highlight.serverPlace
-    if (serverPlace == null) {
-        val locator = highlight.locatorJson.toLocatorOrNull() ?: return false.also { store.keepOnDevice(highlight.id) }
-        val found = serverPlaceOf(locator)
-        Log.i(LOG_TAG, "Server place of ${highlight.id}: $found")
-        return when (found) {
-            is EpubServerPlace.Found -> true.also { store.setServerPlace(highlight.id, found.cfi) }
-            EpubServerPlace.NotFound -> true.also { store.keepOnDevice(highlight.id) }
-            EpubServerPlace.Unreadable -> false
-        }
-    }
     val locator = locatorOf(serverPlace, highlight.text)
-    Log.i(LOG_TAG, "Place of ${highlight.id} ($serverPlace): ${locator?.let { "${it.href} at ${it.locations.progression}" } ?: "not found"}")
-    if (locator == null) return false
-    store.place(
-        highlight.id,
-        AnnotationPlace(
-            href = locator.href.toString(),
-            locatorJson = locator.toJSON().toString(),
-            chapterTitle = highlight.chapterTitle ?: chapterTitleOf(locator),
-            progression = locator.locations.totalProgression,
-        ),
-    )
-    return true
+    locator?.let {
+        store.place(
+            highlight.id,
+            AnnotationPlace(
+                href = it.href.toString(),
+                locatorJson = it.toJSON().toString(),
+                chapterTitle = highlight.chapterTitle ?: chapterTitleOf(it),
+                progression = it.locations.totalProgression,
+            ),
+        )
+    }
+    return locator != null
 }
 
 private fun String.toLocatorOrNull(): Locator? = try {
@@ -211,4 +222,3 @@ private fun String.toLocatorOrNull(): Locator? = try {
 }
 
 private const val PLACEMENT_START_DELAY_MILLIS = 1_500L
-private const val LOG_TAG = "HighlightPlaces"

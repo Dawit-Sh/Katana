@@ -1,6 +1,10 @@
 package com.example.unifiedreader.feature.annotations
 
+import com.example.unifiedreader.core.database.UnifiedReaderDatabase
 import com.example.unifiedreader.core.database.dao.ReaderAnnotationDao
+import com.example.unifiedreader.core.database.dao.ReaderHighlightSyncDao
+import com.example.unifiedreader.core.database.entity.HIGHLIGHT_IN_STEP
+import com.example.unifiedreader.core.database.entity.HIGHLIGHT_ON_DEVICE
 import com.example.unifiedreader.core.database.entity.HighlightRowPurge
 import com.example.unifiedreader.core.database.entity.HighlightRowWrite
 import com.example.unifiedreader.core.database.entity.ReaderHighlightEntity
@@ -88,37 +92,43 @@ class HighlightSyncEngine(
         val plan = planHighlightSync(book, store.rowsOf(book.itemId), remote, now(), newId)
         if (plan.needsPlaces) return HighlightBookSync.NeedsPlaces
         if (plan.writes.isNotEmpty() || plan.purges.isNotEmpty()) store.apply(plan.writes, plan.purges)
-        var serverChanged = false
-        plan.uploads.forEach { upload ->
-            when (upload) {
-                is HighlightUpload.Create -> when (val answer = server.create(upload)) {
-                    is HighlightServerAnswer.Saved -> store.created(upload.localId, upload.expectedUpdatedAt, answer.remoteId)
-                    HighlightServerAnswer.AlreadyThere -> serverChanged = true
-                    HighlightServerAnswer.Refused -> store.refused(upload.localId, upload.expectedUpdatedAt)
-                    // The book left the server: its removal from the library ends this.
-                    HighlightServerAnswer.Missing -> Unit
-                }
-                is HighlightUpload.Update -> when (server.update(upload)) {
-                    is HighlightServerAnswer.Saved -> store.sent(upload.localId, upload.expectedUpdatedAt)
-                    HighlightServerAnswer.Missing -> store.lostOnServer(upload.localId)
-                    // A change the server won't take is dropped; the server's copy comes back next time.
-                    HighlightServerAnswer.Refused,
-                    HighlightServerAnswer.AlreadyThere -> store.sent(upload.localId, upload.expectedUpdatedAt)
-                }
-                is HighlightUpload.Delete -> {
-                    server.delete(upload)
-                    store.removedOnServer(upload.localId)
-                }
+        val serverChanged = plan.uploads.map { upload -> send(upload, server) }.any { alreadyThere -> alreadyThere }
+        return if (serverChanged) HighlightBookSync.ServerChangedMeanwhile else HighlightBookSync.Done
+    }
+
+    // True when the server already had a highlight at a new one's place.
+    private suspend fun send(upload: HighlightUpload, server: HighlightServer): Boolean {
+        when (upload) {
+            is HighlightUpload.Create -> when (val answer = server.create(upload)) {
+                is HighlightServerAnswer.Saved -> store.created(upload.localId, upload.expectedUpdatedAt, answer.remoteId)
+                HighlightServerAnswer.AlreadyThere -> return true
+                HighlightServerAnswer.Refused -> store.refused(upload.localId, upload.expectedUpdatedAt)
+                // The book left the server: its removal from the library ends this.
+                HighlightServerAnswer.Missing -> Unit
+            }
+            is HighlightUpload.Update -> when (server.update(upload)) {
+                HighlightServerAnswer.Missing -> store.lostOnServer(upload.localId)
+                // A change the server won't take is dropped; the server's copy comes back next time.
+                is HighlightServerAnswer.Saved,
+                HighlightServerAnswer.Refused,
+                HighlightServerAnswer.AlreadyThere -> store.sent(upload.localId, upload.expectedUpdatedAt)
+            }
+            is HighlightUpload.Delete -> {
+                server.delete(upload)
+                store.removedOnServer(upload.localId)
             }
         }
-        return if (serverChanged) HighlightBookSync.ServerChangedMeanwhile else HighlightBookSync.Done
+        return false
     }
 }
 
 class RoomHighlightSyncStore(
-    private val dao: ReaderAnnotationDao,
+    private val database: UnifiedReaderDatabase,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : HighlightSyncStore {
+    private val dao = database.readerHighlightSyncDao()
+    private val highlights = database.readerAnnotationDao()
+
     override fun observeWaiting(): Flow<List<WaitingHighlightKey>> =
         dao.observeWaitingHighlights().distinctUntilChanged().flowOn(ioDispatcher)
 
@@ -126,20 +136,53 @@ class RoomHighlightSyncStore(
 
     override suspend fun booksOnServer(): Set<String> = io { dao.getItemIdsWithServerHighlights().toSet() }
 
-    override suspend fun apply(writes: List<HighlightRowWrite>, purges: List<HighlightRowPurge>) =
-        io { dao.applyHighlightSync(writes, purges) }
+    /**
+     * Writes what a sync worked out, all at once. A write over a stored highlight happens only if it
+     * hasn't changed since the sync read it ([HighlightRowWrite.expectedUpdatedAt]); a new one only if
+     * the server's highlight isn't in the book already. The place this device worked out is kept.
+     */
+    override suspend fun apply(writes: List<HighlightRowWrite>, purges: List<HighlightRowPurge>) = io {
+        database.runInTransaction {
+            writes.forEach { write -> write.applyTo(dao, highlights) }
+            purges.forEach { purge -> dao.purgeHighlight(purge.id, purge.expectedUpdatedAt) }
+        }
+    }
 
     override suspend fun created(localId: String, expectedUpdatedAt: Long, remoteId: String) =
         io { dao.markHighlightCreated(localId, remoteId, expectedUpdatedAt) }
 
-    override suspend fun sent(localId: String, expectedUpdatedAt: Long) = io { dao.markHighlightSent(localId, expectedUpdatedAt) }
+    override suspend fun sent(localId: String, expectedUpdatedAt: Long) =
+        io { dao.setSyncStateIfUnchanged(localId, HIGHLIGHT_IN_STEP, expectedUpdatedAt) }
 
     override suspend fun removedOnServer(localId: String) = io { dao.purgeRemovedHighlight(localId) }
 
     override suspend fun lostOnServer(localId: String) = io { dao.forgetHighlightRemoteId(localId) }
 
     override suspend fun refused(localId: String, expectedUpdatedAt: Long) =
-        io { dao.markHighlightRefused(localId, expectedUpdatedAt) }
+        io { dao.setSyncStateIfUnchanged(localId, HIGHLIGHT_ON_DEVICE, expectedUpdatedAt) }
 
     private suspend fun <T> io(block: () -> T): T = withContext(ioDispatcher) { block() }
+}
+
+private fun HighlightRowWrite.applyTo(dao: ReaderHighlightSyncDao, highlights: ReaderAnnotationDao) {
+    val stored = highlights.getHighlight(row.id)
+    val expected = expectedUpdatedAt
+    when {
+        expected == null -> {
+            val known = row.remoteId?.let { remoteId -> dao.countHighlightsWithRemoteId(row.itemId, remoteId) > 0 } ?: false
+            if (stored == null && !known) highlights.upsertHighlight(row)
+        }
+        stored != null && stored.updatedAtEpochMillis == expected -> highlights.upsertHighlight(row.keepingPlaceOf(stored))
+    }
+}
+
+// The place the reader worked out (and the server place) stay when the sync's copy has none.
+private fun ReaderHighlightEntity.keepingPlaceOf(stored: ReaderHighlightEntity): ReaderHighlightEntity {
+    val keepsPlace = locatorJson.isEmpty() && stored.locatorJson.isNotEmpty()
+    return copy(
+        href = if (keepsPlace) stored.href else href,
+        locatorJson = if (keepsPlace) stored.locatorJson else locatorJson,
+        progression = if (keepsPlace) stored.progression else progression,
+        remoteCfi = remoteCfi ?: stored.remoteCfi,
+    )
 }

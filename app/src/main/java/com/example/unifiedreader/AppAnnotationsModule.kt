@@ -4,8 +4,10 @@ import com.example.unifiedreader.core.database.UnifiedReaderDatabase
 import com.example.unifiedreader.feature.annotations.AnnotationJumps
 import com.example.unifiedreader.feature.annotations.HighlightSyncStore
 import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
+import com.example.unifiedreader.feature.annotations.RoomHighlightPlacementStore
 import com.example.unifiedreader.feature.annotations.RoomHighlightSyncStore
 import com.example.unifiedreader.feature.annotations.RoomReaderAnnotationStore
+import com.example.unifiedreader.feature.annotations.withPlacement
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -24,14 +26,14 @@ object AppAnnotationsModule {
         dao = database.readerAnnotationDao(),
         bookmarkDao = database.readerBookmarkDao(),
         studyDao = database.savedWordStudyDao(),
-    )
+    ).withPlacement(RoomHighlightPlacementStore(database.readerHighlightPlacementDao()))
 
     /** The highlights as their sync with a server reads and writes them. */
     @Provides
     @Singleton
     fun provideHighlightSyncStore(
         database: UnifiedReaderDatabase,
-    ): HighlightSyncStore = RoomHighlightSyncStore(dao = database.readerAnnotationDao())
+    ): HighlightSyncStore = RoomHighlightSyncStore(database = database)
 
     /** When highlights sync with Grimmory; the app shell starts it and asks it. */
     @Provides

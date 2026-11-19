@@ -25,10 +25,6 @@ class HighlightSyncPlanTest {
         state: String = HIGHLIGHT_IN_STEP,
         remoteId: String? = "7",
         cfi: String? = "epubcfi(/6/8!/4/2,/1:0,/1:4)",
-        note: String? = null,
-        color: HighlightColor = HighlightColor.Yellow,
-        updatedAt: Long = noon,
-        deleted: Boolean = false,
     ) = ReaderHighlightEntity(
         id = id,
         itemId = hole.itemId,
@@ -40,11 +36,11 @@ class HighlightSyncPlanTest {
         chapterTitle = "One",
         progression = 0.1,
         style = HighlightStyle.Highlight.name,
-        color = color.name,
-        note = note,
+        color = HighlightColor.Yellow.name,
+        note = null,
         createdAtEpochMillis = noon - 60 * minute,
-        updatedAtEpochMillis = updatedAt,
-        deleted = deleted,
+        updatedAtEpochMillis = noon,
+        deleted = false,
         syncState = state,
         remoteId = remoteId,
         remoteCfi = cfi,
@@ -90,7 +86,10 @@ class HighlightSyncPlanTest {
 
     @Test
     fun `a highlight in step takes the server's change`() {
-        val result = plan(local = listOf(row()), remote = listOf(server(note = "added in KOReader", color = HighlightColor.Green, updatedAt = noon + minute)))
+        val result = plan(
+            local = listOf(row()),
+            remote = listOf(server(note = "added in KOReader", color = HighlightColor.Green, updatedAt = noon + minute)),
+        )
 
         val written = result.writes.single()
         assertEquals("added in KOReader", written.row.note)
@@ -114,7 +113,7 @@ class HighlightSyncPlanTest {
 
     @Test
     fun `a change made here goes up when the server's copy isn't newer`() {
-        val changed = row(state = HIGHLIGHT_WAITING, note = "my note", updatedAt = noon + 10 * minute)
+        val changed = row(state = HIGHLIGHT_WAITING).copy(note = "my note", updatedAtEpochMillis = noon + 10 * minute)
 
         val result = plan(local = listOf(changed), remote = listOf(server(updatedAt = noon)))
 
@@ -127,18 +126,24 @@ class HighlightSyncPlanTest {
     // The server stamps a change with its own clock, which may run a little ahead of this device's.
     @Test
     fun `a change made here wins over a server copy newer by less than the margin`() {
-        val changed = row(state = HIGHLIGHT_WAITING, note = "mine", updatedAt = noon)
+        val changed = row(state = HIGHLIGHT_WAITING).copy(note = "mine", updatedAtEpochMillis = noon)
 
-        val result = plan(local = listOf(changed), remote = listOf(server(note = "theirs", updatedAt = noon + HIGHLIGHT_CLOCK_MARGIN_MILLIS)))
+        val result = plan(
+            local = listOf(changed),
+            remote = listOf(server(note = "theirs", updatedAt = noon + HIGHLIGHT_CLOCK_MARGIN_MILLIS)),
+        )
 
         assertTrue(result.uploads.single() is HighlightUpload.Update)
     }
 
     @Test
     fun `a later change on the server wins over an older one waiting here`() {
-        val changed = row(state = HIGHLIGHT_WAITING, note = "written offline", updatedAt = noon)
+        val changed = row(state = HIGHLIGHT_WAITING).copy(note = "written offline", updatedAtEpochMillis = noon)
 
-        val result = plan(local = listOf(changed), remote = listOf(server(note = "written later on the web", updatedAt = noon + 30 * minute)))
+        val result = plan(
+            local = listOf(changed),
+            remote = listOf(server(note = "written later on the web", updatedAt = noon + 30 * minute)),
+        )
 
         assertTrue(result.uploads.isEmpty())
         val written = result.writes.single().row
@@ -148,7 +153,7 @@ class HighlightSyncPlanTest {
 
     @Test
     fun `a highlight removed here is removed on the server`() {
-        val removed = row(state = HIGHLIGHT_WAITING, deleted = true, updatedAt = noon + minute)
+        val removed = row(state = HIGHLIGHT_WAITING).copy(deleted = true, updatedAtEpochMillis = noon + minute)
 
         val result = plan(local = listOf(removed), remote = listOf(server()))
 
@@ -158,7 +163,7 @@ class HighlightSyncPlanTest {
 
     @Test
     fun `a highlight removed here but changed on the server later comes back`() {
-        val removed = row(state = HIGHLIGHT_WAITING, deleted = true, updatedAt = noon)
+        val removed = row(state = HIGHLIGHT_WAITING).copy(deleted = true, updatedAtEpochMillis = noon)
 
         val result = plan(local = listOf(removed), remote = listOf(server(note = "kept on the web", updatedAt = noon + 30 * minute)))
 
@@ -171,8 +176,8 @@ class HighlightSyncPlanTest {
     @Test
     fun `a highlight removed on the server is removed here, and one removed on both sides goes`() {
         val inStep = row(id = "a", remoteId = "7")
-        val removedHere = row(id = "b", remoteId = "8", state = HIGHLIGHT_WAITING, deleted = true)
-        val neverSent = row(id = "c", remoteId = null, state = HIGHLIGHT_WAITING, deleted = true)
+        val removedHere = row(id = "b", remoteId = "8", state = HIGHLIGHT_WAITING).copy(deleted = true)
+        val neverSent = row(id = "c", remoteId = null, state = HIGHLIGHT_WAITING).copy(deleted = true)
 
         val result = plan(local = listOf(inStep, removedHere, neverSent), remote = emptyList())
 
@@ -183,7 +188,7 @@ class HighlightSyncPlanTest {
     // A note typed here offline isn't lost because the highlight went elsewhere: it goes back up.
     @Test
     fun `a highlight changed here after the server removed it goes up again`() {
-        val changed = row(state = HIGHLIGHT_WAITING, note = "my note", remoteId = "7")
+        val changed = row(state = HIGHLIGHT_WAITING, remoteId = "7").copy(note = "my note")
 
         val result = plan(local = listOf(changed), remote = emptyList())
 
@@ -207,7 +212,10 @@ class HighlightSyncPlanTest {
     // KOReader sends a changed highlight as a new one in the same place.
     @Test
     fun `a highlight made again elsewhere under a new id stays one highlight`() {
-        val result = plan(local = listOf(row(remoteId = "7")), remote = listOf(server(id = "15", note = "changed in KOReader", updatedAt = noon + minute)))
+        val result = plan(
+            local = listOf(row(remoteId = "7")),
+            remote = listOf(server(id = "15", note = "changed in KOReader", updatedAt = noon + minute)),
+        )
 
         assertTrue(result.purges.isEmpty())
         val relinked = result.writes.single().row
@@ -250,7 +258,7 @@ class HighlightSyncPlanTest {
 
     @Test
     fun `a highlight removed here before it reached the server doesn't remove someone else's at its place`() {
-        val removed = row(state = HIGHLIGHT_WAITING, remoteId = null, deleted = true)
+        val removed = row(state = HIGHLIGHT_WAITING, remoteId = null).copy(deleted = true)
 
         val result = plan(local = listOf(removed), remote = listOf(server(id = "2")))
 
@@ -274,7 +282,10 @@ class HighlightSyncPlanTest {
         val inStep = row(id = "a", remoteId = "7")
         val gone = row(id = "b", remoteId = "8")
 
-        val result = plan(local = listOf(inStep, gone), remote = listOf(server(id = "7", cfi = null, note = "n", updatedAt = noon + minute)))
+        val result = plan(
+            local = listOf(inStep, gone),
+            remote = listOf(server(id = "7", cfi = null, note = "n", updatedAt = noon + minute)),
+        )
 
         assertFalse(result.needsPlaces)
         assertEquals("n", result.writes.single().row.note)

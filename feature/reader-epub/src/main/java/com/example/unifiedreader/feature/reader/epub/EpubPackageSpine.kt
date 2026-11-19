@@ -25,9 +25,14 @@ internal data class EpubPackageSpine(val items: List<EpubSpineItem>) {
                 .firstNotNullOfOrNull { it.attr("full-path").takeIf(String::isNotBlank) }
 
         /** The spine of the package document [opf], found at [opfPath] in the book. */
-        fun parse(opf: ByteArray, opfPath: String): EpubPackageSpine? {
-            val packageElement = parseXml(opf).children().firstOrNull() ?: return null
-            val spine = packageElement.children().firstOrNull { it.localName() == "spine" } ?: return null
+        fun parse(opf: ByteArray, opfPath: String): EpubPackageSpine? =
+            parseXml(opf).children().firstOrNull()?.let { packageElement ->
+                packageElement.children()
+                    .firstOrNull { it.localName() == "spine" }
+                    ?.let { spine -> spineOf(packageElement, spine, opfPath) }
+            }
+
+        private fun spineOf(packageElement: Element, spine: Element, opfPath: String): EpubPackageSpine {
             val manifest = packageElement.children().firstOrNull { it.localName() == "manifest" }
             val hrefById = manifest?.children().orEmpty()
                 .filter { it.localName() == "item" }
@@ -35,14 +40,15 @@ internal data class EpubPackageSpine(val items: List<EpubSpineItem>) {
             val spineStep = CfiStep(index = 2 * (spine.elementSiblingIndex() + 1), id = spine.id().takeIf(String::isNotEmpty))
             val directory = opfPath.substringBeforeLast('/', missingDelimiterValue = "")
             val items = spine.children().mapIndexedNotNull { position, itemref ->
-                val href = hrefById[itemref.attr("idref")] ?: return@mapIndexedNotNull null
-                EpubSpineItem(
-                    path = resolvePath(directory, href),
-                    packageSteps = listOf(
-                        spineStep,
-                        CfiStep(index = 2 * (position + 1), id = itemref.id().takeIf(String::isNotEmpty)),
-                    ),
-                )
+                hrefById[itemref.attr("idref")]?.let { href ->
+                    EpubSpineItem(
+                        path = resolvePath(directory, href),
+                        packageSteps = listOf(
+                            spineStep,
+                            CfiStep(index = 2 * (position + 1), id = itemref.id().takeIf(String::isNotEmpty)),
+                        ),
+                    )
+                }
             }
             return EpubPackageSpine(items)
         }
@@ -72,14 +78,14 @@ private fun percentDecode(value: String): String {
     var position = 0
     while (position < value.length) {
         val char = value[position]
-        val escaped = if (char == '%' && position + 2 <= value.lastIndex) {
-            value.substring(position + 1, position + 3).toIntOrNull(HEX_RADIX)
+        val escaped = if (char == '%' && position + ESCAPE_LENGTH <= value.length) {
+            value.substring(position + 1, position + ESCAPE_LENGTH).toIntOrNull(HEX_RADIX)
         } else {
             null
         }
         if (escaped != null) {
             bytes.write(escaped)
-            position += 3
+            position += ESCAPE_LENGTH
         } else {
             bytes.write(char.toString().toByteArray(Charsets.UTF_8))
             position += 1
@@ -89,5 +95,8 @@ private fun percentDecode(value: String): String {
 }
 
 private const val HEX_RADIX = 16
+
+// `%` and two hex digits.
+private const val ESCAPE_LENGTH = 3
 
 private fun Element.localName(): String = tagName().substringAfter(':').lowercase()

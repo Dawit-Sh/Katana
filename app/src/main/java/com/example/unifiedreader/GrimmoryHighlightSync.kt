@@ -61,9 +61,10 @@ class GrimmoryHighlightSync @Inject constructor(
     private val mutex = Mutex()
 
     /** [books]' highlights from the server, and their changes waiting here up to it. False when it failed. */
-    suspend fun syncBooks(books: List<ReadableItem>): Boolean = run(books.filter(ReadableItem::syncsHighlightsWithGrimmory)) { annotations, token, synced ->
-        synced.eachBook { item -> syncBook(annotations, token, item, remote = null) }
-    }
+    suspend fun syncBooks(books: List<ReadableItem>): Boolean =
+        run(books.filter(ReadableItem::syncsHighlightsWithGrimmory)) { annotations, token, synced ->
+            synced.eachBook { item -> syncBook(annotations, token, item, remote = null) }
+        }
 
     /**
      * Every book's highlights from the server in one request, then what waits here: [catalog] is the

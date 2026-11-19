@@ -83,7 +83,7 @@ const val HIGHLIGHT_CLOCK_MARGIN_MILLIS: Long = 2 * 60 * 1000L
  *   a lost answer, KOReader making a changed highlight again, or the same words highlighted in
  *   KOReader and here don't leave two.
  * - The last change wins. A change on this device not yet sent loses only to a server copy newer by
- *   [marginMillis]; a highlight in step simply takes the server's copy.
+ *   [HIGHLIGHT_CLOCK_MARGIN_MILLIS]; a highlight in step simply takes the server's copy.
  * - A highlight removed on one side is removed on the other, unless the other side changed it later
  *   (a change on this device not yet sent puts it back on the server).
  * - A new highlight on this device goes up once its place on the server is worked out (by the reader).
@@ -94,7 +94,6 @@ fun planHighlightSync(
     remote: List<RemoteHighlight>,
     nowEpochMillis: Long,
     newId: () -> String,
-    marginMillis: Long = HIGHLIGHT_CLOCK_MARGIN_MILLIS,
 ): HighlightSyncPlan {
     val remoteIds = remote.mapTo(mutableSetOf(), RemoteHighlight::remoteId)
     val byRemoteId = local.filter { row -> row.remoteId != null }.associateBy { row -> row.remoteId }
@@ -105,7 +104,7 @@ fun planHighlightSync(
         return HighlightSyncPlan(needsPlaces = true)
     }
 
-    val plan = PlanBuilder(marginMillis)
+    val plan = PlanBuilder()
     val matchedLocalIds = mutableSetOf<String>()
     remote.forEach { server ->
         val row = byRemoteId[server.remoteId]
@@ -130,11 +129,12 @@ fun planHighlightSync(
  * characters a little differently). One removed here before it ever reached the server is no one's.
  */
 private fun ReaderHighlightEntity.isSameHighlightAs(server: RemoteHighlight): Boolean {
-    if (deleted && remoteId == null) return false
-    val place = remoteCfi ?: return false
-    val serverPlace = server.cfi ?: return false
-    return sameCfiPlace(place, serverPlace) ||
-        (cfiChapterKey(place) == cfiChapterKey(serverPlace) && wordsKey(text) == wordsKey(server.text))
+    val place = remoteCfi?.takeUnless { deleted && remoteId == null }
+    val serverPlace = server.cfi
+    return place != null && serverPlace != null && (
+        sameCfiPlace(place, serverPlace) ||
+            (cfiChapterKey(place) == cfiChapterKey(serverPlace) && wordsKey(text) == wordsKey(server.text))
+        )
 }
 
 private fun ReaderHighlightEntity.isUnplacedNew(): Boolean =
@@ -145,7 +145,7 @@ private fun ReaderHighlightEntity.isUnplacedNew(): Boolean =
 private fun mayBeOnServerUnderAnotherId(row: ReaderHighlightEntity): Boolean =
     !row.deleted && (row.remoteId != null || (row.syncState == HIGHLIGHT_WAITING && row.remoteCfi != null))
 
-private class PlanBuilder(private val marginMillis: Long) {
+private class PlanBuilder {
     val writes = mutableListOf<HighlightRowWrite>()
     val purges = mutableListOf<HighlightRowPurge>()
     val uploads = mutableListOf<HighlightUpload>()
@@ -154,28 +154,18 @@ private class PlanBuilder(private val marginMillis: Long) {
 
     fun matched(row: ReaderHighlightEntity, server: RemoteHighlight) {
         val linked = row.copy(remoteId = server.remoteId, remoteCfi = row.remoteCfi ?: server.cfi)
-        val linkChanged = linked.remoteId != row.remoteId || linked.remoteCfi != row.remoteCfi
-        val serverNewer = server.updatedAtEpochMillis?.let { it > row.updatedAtEpochMillis + marginMillis } ?: false
+        val serverNewer = server.updatedAtEpochMillis?.let { it > row.updatedAtEpochMillis + HIGHLIGHT_CLOCK_MARGIN_MILLIS } ?: false
         when {
-            row.syncState == HIGHLIGHT_IN_STEP && !row.deleted -> when {
-                row.differsFrom(server) -> write(row, linked.takingServerCopy(server))
-                linkChanged -> write(row, linked)
-            }
+            row.syncState == HIGHLIGHT_IN_STEP && !row.deleted ->
+                write(row, if (row.differsFrom(server)) linked.takingServerCopy(server) else linked)
             serverNewer -> write(row, linked.takingServerCopy(server).copy(deleted = false))
             row.deleted -> {
-                if (linkChanged) write(row, linked)
+                write(row, linked)
                 uploads += HighlightUpload.Delete(row.id, row.updatedAtEpochMillis, server.remoteId)
             }
             row.differsFrom(server) -> {
-                if (linkChanged) write(row, linked)
-                uploads += HighlightUpload.Update(
-                    localId = row.id,
-                    expectedUpdatedAt = row.updatedAtEpochMillis,
-                    remoteId = server.remoteId,
-                    note = row.note,
-                    color = HighlightColor.fromStored(row.color),
-                    style = HighlightStyle.fromStored(row.style),
-                )
+                write(row, linked)
+                uploads += row.toUpdate(server.remoteId)
             }
             // The same on both sides already: nothing to send.
             else -> write(row, linked.copy(syncState = HIGHLIGHT_IN_STEP))
@@ -196,8 +186,9 @@ private class PlanBuilder(private val marginMillis: Long) {
         }
     }
 
+    // Nothing when [row] is [stored] as it is.
     private fun write(stored: ReaderHighlightEntity, row: ReaderHighlightEntity) {
-        writes += HighlightRowWrite(row, expectedUpdatedAt = stored.updatedAtEpochMillis)
+        if (row != stored) writes += HighlightRowWrite(row, expectedUpdatedAt = stored.updatedAtEpochMillis)
     }
 
     private fun ReaderHighlightEntity.takingServerCopy(server: RemoteHighlight) = copy(
@@ -215,6 +206,15 @@ private fun ReaderHighlightEntity.differsFrom(server: RemoteHighlight): Boolean 
         HighlightStyle.fromStored(style) != server.style
 
 private fun String?.asNote(): String? = this?.trim()?.takeIf(String::isNotEmpty)
+
+private fun ReaderHighlightEntity.toUpdate(remoteId: String) = HighlightUpload.Update(
+    localId = id,
+    expectedUpdatedAt = updatedAtEpochMillis,
+    remoteId = remoteId,
+    note = note,
+    color = HighlightColor.fromStored(color),
+    style = HighlightStyle.fromStored(style),
+)
 
 private fun ReaderHighlightEntity.toCreate(): HighlightUpload.Create? {
     val cfi = remoteCfi ?: return null

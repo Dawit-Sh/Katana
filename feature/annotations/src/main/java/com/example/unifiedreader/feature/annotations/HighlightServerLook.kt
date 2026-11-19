@@ -23,9 +23,7 @@ fun HighlightColor.toServerHex(): String = when (this) {
 
 fun highlightColorFromServer(hex: String?): HighlightColor {
     val rgb = hex?.trim()?.removePrefix("#")?.takeIf { it.length == HEX_DIGITS }?.toIntOrNull(HEX_RADIX)
-        ?: return HighlightColor.Default
-    KnownColors[rgb]?.let { return it }
-    return nearestInHue(rgb)
+    return rgb?.let { KnownColors[it] ?: nearestInHue(it) } ?: HighlightColor.Default
 }
 
 val HighlightStyle.serverName: String
@@ -75,17 +73,17 @@ private fun nearestInHue(rgb: Int): HighlightColor {
 
 // The hue in degrees, or null for a grey (no colour to match).
 private fun hueOf(rgb: Int): Double? {
-    val r = (rgb shr 16 and 0xFF) / CHANNEL_MAX
-    val g = (rgb shr 8 and 0xFF) / CHANNEL_MAX
-    val b = (rgb and 0xFF) / CHANNEL_MAX
+    val r = (rgb shr RED_SHIFT and CHANNEL_MASK) / CHANNEL_MAX
+    val g = (rgb shr GREEN_SHIFT and CHANNEL_MASK) / CHANNEL_MAX
+    val b = (rgb and CHANNEL_MASK) / CHANNEL_MAX
     val high = max(r, max(g, b))
     val low = min(r, min(g, b))
     val chroma = high - low
     if (chroma < GREY_CHROMA) return null
     val sector = when (high) {
         r -> ((g - b) / chroma).mod(SECTORS)
-        g -> (b - r) / chroma + 2.0
-        else -> (r - g) / chroma + 4.0
+        g -> (b - r) / chroma + GREEN_SECTOR
+        else -> (r - g) / chroma + BLUE_SECTOR
     }
     return sector * SECTOR_DEGREES
 }
@@ -93,7 +91,12 @@ private fun hueOf(rgb: Int): Double? {
 private const val HEX_DIGITS = 6
 private const val HEX_RADIX = 16
 private const val RGB_MASK = 0xFFFFFFL
+private const val RED_SHIFT = 16
+private const val GREEN_SHIFT = 8
+private const val CHANNEL_MASK = 0xFF
 private const val CHANNEL_MAX = 255.0
+private const val GREEN_SECTOR = 2.0
+private const val BLUE_SECTOR = 4.0
 private const val GREY_CHROMA = 0.12
 private const val SECTORS = 6.0
 private const val SECTOR_DEGREES = 60.0
