@@ -216,6 +216,49 @@ class HighlightSyncPlanTest {
         assertEquals("changed in KOReader", relinked.note)
     }
 
+    // The web reader asserts element ids in a CFI, the KOReader plugin doesn't.
+    @Test
+    fun `the same place written by another reader is the same highlight`() {
+        val mine = row(state = HIGHLIGHT_WAITING, remoteId = null, cfi = "epubcfi(/6/14!/4/2[chapter]/4,/1:116,/1:196)")
+
+        val result = plan(local = listOf(mine), remote = listOf(server(id = "2", cfi = "epubcfi(/6/14!/4/2/4,/1:116,/1:196)")))
+
+        assertTrue(result.uploads.isEmpty())
+        assertEquals("2", result.writes.single().row.remoteId)
+    }
+
+    @Test
+    fun `the same words highlighted in the same chapter elsewhere are the same highlight`() {
+        val mine = row(state = HIGHLIGHT_WAITING, remoteId = null, cfi = "epubcfi(/6/14!/4/2/4,/1:118,/1:198)")
+
+        val sameChapter = plan(local = listOf(mine), remote = listOf(server(id = "2", cfi = "epubcfi(/6/14!/4/2/4,/1:116,/1:196)")))
+        val otherChapter = plan(local = listOf(mine), remote = listOf(server(id = "2", cfi = "epubcfi(/6/16!/4/2/4,/1:116,/1:196)")))
+
+        assertEquals("2", sameChapter.writes.single().row.remoteId)
+        assertTrue(sameChapter.uploads.isEmpty())
+        assertTrue(otherChapter.uploads.single() is HighlightUpload.Create)
+    }
+
+    @Test
+    fun `a server highlight with the words of one made here and not yet placed waits for that one to be placed`() {
+        val unplaced = row(state = HIGHLIGHT_WAITING, remoteId = null, cfi = null)
+
+        val result = plan(local = listOf(unplaced), remote = listOf(server(id = "2")))
+
+        assertTrue(result.writes.isEmpty() && result.uploads.isEmpty())
+    }
+
+    @Test
+    fun `a highlight removed here before it reached the server doesn't remove someone else's at its place`() {
+        val removed = row(state = HIGHLIGHT_WAITING, remoteId = null, deleted = true)
+
+        val result = plan(local = listOf(removed), remote = listOf(server(id = "2")))
+
+        assertTrue(result.uploads.isEmpty())
+        assertEquals(listOf("h1"), result.purges.map(HighlightRowPurge::id))
+        assertEquals("2", result.writes.single().row.remoteId)
+    }
+
     @Test
     fun `from the list without places, a book that may hold one of these under another id asks for its own list`() {
         val sentWithoutAnswer = row(state = HIGHLIGHT_WAITING, remoteId = null)

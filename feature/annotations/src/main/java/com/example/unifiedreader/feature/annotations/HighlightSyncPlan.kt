@@ -79,8 +79,9 @@ const val HIGHLIGHT_CLOCK_MARGIN_MILLIS: Long = 2 * 60 * 1000L
  * Brings one book's highlights on this device ([local], removed ones included) and on the server
  * ([remote], the book's complete list there) in step. The rules:
  * - A highlight is the same on both sides by the server's id; one this device made that has no id
- *   yet (or one whose id the server dropped) is matched by its place, so a lost answer or KOReader
- *   making a changed highlight again doesn't leave two.
+ *   yet (or one whose id the server dropped) is matched by its place or its words in the chapter, so
+ *   a lost answer, KOReader making a changed highlight again, or the same words highlighted in
+ *   KOReader and here don't leave two.
  * - The last change wins. A change on this device not yet sent loses only to a server copy newer by
  *   [marginMillis]; a highlight in step simply takes the server's copy.
  * - A highlight removed on one side is removed on the other, unless the other side changed it later
@@ -108,11 +109,12 @@ fun planHighlightSync(
     val matchedLocalIds = mutableSetOf<String>()
     remote.forEach { server ->
         val row = byRemoteId[server.remoteId]
-            ?: server.cfi?.let { cfi ->
-                unmatchedOnServer.firstOrNull { row -> row.remoteCfi == cfi && row.id !in matchedLocalIds }
-            }
+            ?: unmatchedOnServer.firstOrNull { row -> row.id !in matchedLocalIds && row.isSameHighlightAs(server) }
         if (row == null) {
-            plan.writes += HighlightRowWrite(server.toNewRow(book, newId(), nowEpochMillis), expectedUpdatedAt = null)
+            // The same words made here and not yet placed the server's way: wait until they are, to match them.
+            if (local.none { it.isUnplacedNew() && wordsKey(it.text) == wordsKey(server.text) }) {
+                plan.writes += HighlightRowWrite(server.toNewRow(book, newId(), nowEpochMillis), expectedUpdatedAt = null)
+            }
         } else {
             matchedLocalIds += row.id
             plan.matched(row, server)
@@ -121,6 +123,22 @@ fun planHighlightSync(
     local.filterNot { row -> row.id in matchedLocalIds }.forEach(plan::notOnServer)
     return plan.build()
 }
+
+/**
+ * A highlight here that is [server]'s under another id (or none yet): at the same place, however
+ * the CFI is written, or the same words in the same chapter (two readers may count a place's
+ * characters a little differently). One removed here before it ever reached the server is no one's.
+ */
+private fun ReaderHighlightEntity.isSameHighlightAs(server: RemoteHighlight): Boolean {
+    if (deleted && remoteId == null) return false
+    val place = remoteCfi ?: return false
+    val serverPlace = server.cfi ?: return false
+    return sameCfiPlace(place, serverPlace) ||
+        (cfiChapterKey(place) == cfiChapterKey(serverPlace) && wordsKey(text) == wordsKey(server.text))
+}
+
+private fun ReaderHighlightEntity.isUnplacedNew(): Boolean =
+    !deleted && remoteId == null && remoteCfi == null && syncState == HIGHLIGHT_WAITING
 
 // A highlight this device has that the server may hold under an id this device doesn't know: one
 // whose id the server dropped, or one sent without hearing back (only a placed one is ever sent).
