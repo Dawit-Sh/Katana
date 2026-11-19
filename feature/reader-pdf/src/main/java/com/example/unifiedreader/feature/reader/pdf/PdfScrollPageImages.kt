@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableFloatStateOf
 
 /** A drawn page an item on screen holds; [image] is what it draws. */
 internal class PdfHeldPage(
@@ -37,7 +38,7 @@ internal class PdfScrollPageImages(
     val aspects = mutableStateMapOf<Int, Float>()
 
     /** The shape a page is laid out with until its own is known: the first one learned. */
-    var typicalAspect by mutableStateOf(PdfDefaultPageAspect)
+    var typicalAspect by mutableFloatStateOf(PdfDefaultPageAspect)
         private set
 
     private var typicalLearned = false

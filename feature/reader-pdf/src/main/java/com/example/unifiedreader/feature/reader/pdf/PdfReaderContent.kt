@@ -70,16 +70,20 @@ internal fun rememberPdfPagesChoice(
     sessionStore: ReaderSessionStore?,
     pagesPreferences: ReaderPagesPreferencesStore,
 ): PdfPagesChoice {
-    val choice = remember(item.id, sessionStore, pagesPreferences) { PdfPagesChoice(item, sessionStore, pagesPreferences) }
     // A rotation keeps the choice made in this visit.
     var kept by rememberSaveable(item.id) { mutableStateOf<String?>(null) }
     val hydrated by sessionStore?.isHydratedFlow?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(true) }
     val pick by pagesPreferences.pickFlow.collectAsStateWithLifecycle()
-    LaunchedEffect(choice, hydrated, pick.isLoaded) {
-        if (choice.mode != null || !hydrated || !pick.isLoaded) return@LaunchedEffect
-        choice.resolve(pick.pageImages)
-        ReaderPagesMode.entries.firstOrNull { it.name == kept }?.let { choice.mode = it }
+    fun PdfPagesChoice.resolveWhenLoaded() {
+        if (mode != null || !hydrated || !pick.isLoaded) return
+        resolve(pick.pageImages)
+        ReaderPagesMode.entries.firstOrNull { it.name == kept }?.let { mode = it }
     }
+    // Both have long loaded when a book opens, so the way of reading is known in the first frame.
+    val choice = remember(item.id, sessionStore, pagesPreferences) {
+        PdfPagesChoice(item, sessionStore, pagesPreferences).apply { resolveWhenLoaded() }
+    }
+    LaunchedEffect(choice, hydrated, pick.isLoaded) { choice.resolveWhenLoaded() }
     LaunchedEffect(choice.mode) { kept = choice.mode?.name ?: kept }
     return choice
 }
