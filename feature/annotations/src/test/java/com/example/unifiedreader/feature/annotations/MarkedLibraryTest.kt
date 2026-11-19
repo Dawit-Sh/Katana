@@ -60,6 +60,41 @@ class MarkedLibraryTest {
     }
 
     @Test
+    fun `a bookmark is found by its page and its chapter too, so a scan's bookmark turns up`() {
+        val scan = bookmark("b2", trees, text = null, at = 0.5, made = 70).copy(page = 120, pageCount = 300)
+        val chaptered = bookmark("b3", suspect, "a quiet morning", at = 0.2, made = 80)
+            .let { it.copy(place = it.place.copy(chapterTitle = "Chapter Four")) }
+
+        assertTrue(MarkSearch.matches(scan, "page 120"))
+        assertTrue(MarkSearch.matches(scan, "120 of 300"))
+        assertTrue(MarkSearch.matches(chaptered, "chapter four"))
+        assertTrue(MarkSearch.matches(chaptered, "  QUIET "))
+        assertTrue(MarkSearch.matches(scan, ""))
+        assertTrue(!MarkSearch.matches(scan, "chapter four"))
+    }
+
+    @Test
+    fun `a book's page shows only the marks a search finds, and every mark without one`() {
+        val theHole = library.book(hole.itemId)!!
+
+        val found = theHole.only("looked")
+        assertEquals(listOf("b1"), found.bookmarks.map(ReaderBookmark::id))
+        assertTrue(found.highlights.isEmpty() && found.words.isEmpty())
+        assertEquals(listOf("h3", "h1"), theHole.only("").highlights.map(ReaderHighlight::id))
+        assertEquals(theHole, theHole.only("  "))
+    }
+
+    @Test
+    fun `a book opened from a search starts with that search`() {
+        val state = BookmarksState()
+        state.query = "looked"
+
+        state.openBook(hole.itemId)
+
+        assertEquals("looked", state.bookQuery)
+    }
+
+    @Test
     fun `books come in the order of their last mark, or by title`() {
         assertEquals(listOf(hole, suspect, trees), library.shown(MarkKind.All, "", MarkedBookOrder.LastMarked).map(MarkedBook::book))
         assertEquals(listOf(suspect, hole, trees), library.shown(MarkKind.All, "", MarkedBookOrder.Title).map(MarkedBook::book))
@@ -96,7 +131,7 @@ class MarkedLibraryTest {
             updatedAtEpochMillis = updated,
         )
 
-    private fun bookmark(id: String, book: AnnotatedBook, text: String, at: Double, made: Long) = ReaderBookmark(
+    private fun bookmark(id: String, book: AnnotatedBook, text: String?, at: Double, made: Long) = ReaderBookmark(
         id = id,
         book = book,
         place = AnnotationPlace(href = "c.xhtml", locatorJson = "{}", chapterTitle = null, progression = at),

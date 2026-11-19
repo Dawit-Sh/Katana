@@ -79,6 +79,7 @@ import kotlinx.coroutines.withContext
  * where those rows come from (the books of its source); a cover there shows that book's page.
  * A tag or genre filters the library by it when [onFilterByTag] is given.
  * [onBack], when given, returns to the book this page was opened from (Back, or the arrow).
+ * The app's [LocalLibraryBookPageBookmarks] adds the book's bookmarks after its progress.
  */
 @Composable
 fun LibraryBookPage(
@@ -119,6 +120,7 @@ fun LibraryBookPage(
         ),
     )
     var confirmRemove by remember(item.id) { mutableStateOf(false) }
+    val bookmarks = LocalLibraryBookPageBookmarks.current
     // A cover in the rows swaps the page's book; the new one starts at its top.
     val listState = remember(item.id) { LazyListState() }
     AppSideSheet(onDismissRequest = onDismiss) {
@@ -176,6 +178,7 @@ fun LibraryBookPage(
                     }
                 }
             }
+            bookmarks?.invoke(this) { dismiss() }
             val lists = actionContext.listsContaining(item)
             if (lists.isNotEmpty()) {
                 item(key = "lists") {

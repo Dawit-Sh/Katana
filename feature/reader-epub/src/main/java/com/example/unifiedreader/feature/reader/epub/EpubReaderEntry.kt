@@ -457,7 +457,8 @@ fun EpubReaderScreen(
                     )
                 },
             )
-            val pageBookmarks = rememberPageBookmarks(bookBookmarks, currentLocator, framePage, currentPage)
+            val bookmarkView = EpubBookmarkView(currentLocator, framePage, currentPage, shownPreferences.layoutMode)
+            val pageBookmarks = activity.rememberPageBookmarks(bookBookmarks, item.id, bookmarkView)
             // A bookmark or highlight opened from the Bookmarks page: go there once the book shows.
             EpubPendingJumpEffect(annotationJumps, item.id, ready = initialRestoreLocked) { locator ->
                 readerTouched = true

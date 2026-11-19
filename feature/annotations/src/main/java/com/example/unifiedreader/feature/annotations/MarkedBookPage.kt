@@ -58,6 +58,8 @@ internal fun MarkedBookPage(
     LaunchedEffect(scrolled) { state.scrolled = scrolled }
     val gutter = appGutter()
     val kind = state.bookKind
+    val query = state.bookQuery
+    val shown = remember(book, query) { book.only(query) }
     LazyColumn(
         state = listState,
         modifier = modifier.fillMaxSize(),
@@ -78,9 +80,21 @@ internal fun MarkedBookPage(
             )
         }
         item(key = "chips") { MarkKindChips(book = book, selected = kind, onSelect = { state.bookKind = it }) }
-        if (kind == MarkKind.All || kind == MarkKind.Bookmarks) bookmarkRows(book, actions)
-        if (kind == MarkKind.All || kind == MarkKind.Highlights) highlightRows(book, actions)
-        if (kind == MarkKind.All || kind == MarkKind.Words) wordRows(book, actions)
+        item(key = "search") {
+            MarkSearchField(query = query, onQueryChange = { state.bookQuery = it }, placeholder = BookmarksCopy.BookSearchPlaceholder)
+        }
+        if (query.isNotBlank() && !shown.has(kind)) {
+            item(key = "nothing") {
+                Text(
+                    text = BookmarksCopy.NothingInBook,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (kind == MarkKind.All || kind == MarkKind.Bookmarks) bookmarkRows(shown, actions)
+        if (kind == MarkKind.All || kind == MarkKind.Highlights) highlightRows(shown, actions)
+        if (kind == MarkKind.All || kind == MarkKind.Words) wordRows(shown, actions)
     }
 }
 
@@ -152,7 +166,7 @@ private fun MarkKindChips(book: MarkedBook, selected: MarkKind, onSelect: (MarkK
 
 private fun LazyListScope.bookmarkRows(book: MarkedBook, actions: BookmarksActions) {
     if (book.bookmarks.isEmpty()) return
-    item(key = "bookmarks-label") { SectionLabel(BookmarksCopy.Bookmarks) }
+    item(key = "bookmarks-label") { SectionLabel(bookmarksHeading(book.bookmarks.size)) }
     items(book.bookmarks, key = { "b-${it.id}" }) { bookmark ->
         MarkRow(onClick = { actions.openAt(book.book, bookmark.place.locatorJson) }) {
             Icon(

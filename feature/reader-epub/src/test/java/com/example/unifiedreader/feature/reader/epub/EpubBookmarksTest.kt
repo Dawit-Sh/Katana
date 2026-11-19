@@ -49,4 +49,27 @@ class EpubBookmarksTest {
 
         assertTrue(spot.isOn(here(pageIndex = 11, totalPages = 12)))
     }
+
+    @Test
+    fun `scrolling, a bookmark is on screen only while its place is between the screen's top and bottom`() {
+        val spot = EpubBookmarkSpot(href = "OEBPS/c1.xhtml", progression = 0.40, position = 8)
+        // Readium reports a scrolled chapter as page 0 of 1, which the page test would match everywhere.
+        fun scrolled(top: Double, share: Double?) =
+            EpubPageHere(href = "OEBPS/c1.xhtml", pageIndex = 0, totalPages = 1, position = 8, scrollTop = top, scrollShare = share)
+
+        assertTrue(spot.isOn(scrolled(top = 0.40, share = 0.1)))
+        assertTrue(spot.isOn(scrolled(top = 0.35, share = 0.1)))
+        assertFalse(spot.isOn(scrolled(top = 0.0, share = 0.1)))
+        assertFalse(spot.isOn(scrolled(top = 0.45, share = 0.1)))
+        assertFalse(spot.isOn(scrolled(top = 0.90, share = 0.1)))
+    }
+
+    @Test
+    fun `scrolling, nothing is on screen until the screen's share of the chapter is known`() {
+        val spot = EpubBookmarkSpot(href = "OEBPS/c1.xhtml", progression = 0.40, position = 8)
+
+        val unmeasured = EpubPageHere("OEBPS/c1.xhtml", pageIndex = 0, totalPages = 1, position = 8, scrollTop = 0.40, scrollShare = null)
+
+        assertFalse(spot.isOn(unmeasured))
+    }
 }
