@@ -22,9 +22,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,10 +52,13 @@ import com.example.unifiedreader.ui.components.AppIcons
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 /**
- * The PDF reader on the shared frame: the title over the author with previous and next at the
- * top; the page strip over the percentage, the slider and the page in the dock. It has no panels.
+ * The PDF reader on the shared frame: the title over the author with previous and next and the reading
+ * settings at the top; the page strip over the percentage, the slider and the page in the dock. Its one
+ * panel is the settings card (Pages, page number), under its button.
  */
 @Composable
 internal fun PdfReaderChrome(
@@ -67,19 +71,20 @@ internal fun PdfReaderChrome(
     progress: Float,
     canNavigatePrevious: Boolean,
     canNavigateNext: Boolean,
+    settings: PdfReaderSettings,
+    overlayVisible: Boolean,
     onBack: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onPageSelected: (Int) -> Unit,
 ) {
-    val configuration = LocalConfiguration.current
-    val thumbnailHeight = ReaderChromeDefaults.stripThumbnailHeight(
-        screenWidthDp = configuration.screenWidthDp,
-        screenHeightDp = configuration.screenHeightDp,
-    )
+    var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(overlayVisible) {
+        if (!overlayVisible) settingsOpen = false
+    }
     ReaderChromeFrame(
-        panelOpen = false,
-        onDismissPanel = {},
+        panelOpen = settingsOpen,
+        onDismissPanel = { settingsOpen = false },
         topBar = {
             ReaderTopBar(title = title, subtitle = author, onBack = onBack) {
                 ReaderBarButton(
@@ -94,38 +99,78 @@ internal fun PdfReaderChrome(
                     onClick = onNext,
                     enabled = canNavigateNext,
                 )
-            }
-        },
-        dock = {
-            ReaderDock(
-                strip = if (pageCount > 0) {
-                    {
-                        PdfPagePreviewStrip(
-                            pageRenderer = pageRenderer,
-                            documentState = documentState,
-                            pageCount = pageCount,
-                            currentPageIndex = currentPageIndex,
-                            thumbnailHeight = thumbnailHeight,
-                            onPageSelected = onPageSelected,
-                        )
-                    }
-                } else {
-                    null
-                },
-            ) {
-                ReaderDockProgress(
-                    progress = progress,
-                    percentLabel = "${(progress.coerceIn(0f, 1f) * 100f).roundToInt()}%",
-                    positionLabel = if (pageCount > 0) "${currentPageIndex + 1} / $pageCount" else "",
-                    onProgressSelected = { selected ->
-                        if (pageCount > 0) {
-                            onPageSelected((selected * (pageCount - 1)).roundToInt().coerceIn(0, pageCount - 1))
-                        }
-                    },
+                ReaderBarButton(
+                    icon = AppIcons.Tune,
+                    contentDescription = "Reading settings",
+                    active = settingsOpen,
+                    onClick = { settingsOpen = !settingsOpen },
                 )
             }
         },
-    ) { }
+        dock = {
+            PdfReaderDock(
+                pageRenderer = pageRenderer,
+                documentState = documentState,
+                pageCount = pageCount,
+                currentPageIndex = currentPageIndex,
+                progress = progress,
+                onPageSelected = onPageSelected,
+            )
+        },
+    ) { slot ->
+        PdfReaderSettingsPanel(
+            isOpen = settingsOpen,
+            slot = slot,
+            settings = settings,
+            onDismissRequest = { settingsOpen = false },
+        )
+    }
+}
+
+/** The dock: the page strip over the percentage, the slider and the page. */
+@Composable
+private fun PdfReaderDock(
+    pageRenderer: PageImageRenderer,
+    documentState: ReaderDocumentState,
+    pageCount: Int,
+    currentPageIndex: Int,
+    progress: Float,
+    onPageSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val configuration = LocalConfiguration.current
+    val thumbnailHeight = ReaderChromeDefaults.stripThumbnailHeight(
+        screenWidthDp = configuration.screenWidthDp,
+        screenHeightDp = configuration.screenHeightDp,
+    )
+    ReaderDock(
+        modifier = modifier,
+        strip = if (pageCount > 0) {
+            {
+                PdfPagePreviewStrip(
+                    pageRenderer = pageRenderer,
+                    documentState = documentState,
+                    pageCount = pageCount,
+                    currentPageIndex = currentPageIndex,
+                    thumbnailHeight = thumbnailHeight,
+                    onPageSelected = onPageSelected,
+                )
+            }
+        } else {
+            null
+        },
+    ) {
+        ReaderDockProgress(
+            progress = progress,
+            percentLabel = "${(progress.coerceIn(0f, 1f) * 100f).roundToInt()}%",
+            positionLabel = if (pageCount > 0) "${currentPageIndex + 1} / $pageCount" else "",
+            onProgressSelected = { selected ->
+                if (pageCount > 0) {
+                    onPageSelected((selected * (pageCount - 1)).roundToInt().coerceIn(0, pageCount - 1))
+                }
+            },
+        )
+    }
 }
 
 @Composable

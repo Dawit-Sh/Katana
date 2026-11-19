@@ -12,8 +12,11 @@ import com.example.unifiedreader.feature.reader.core.readerFileMissingFailure
 import com.example.unifiedreader.feature.reader.core.readerOpenFailureOf
 import java.io.File
 import java.io.FileNotFoundException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 
 /**
  * DjVu books in the page reader: pages drawn by DjVuLibre instead of PdfRenderer. DjVuLibre reads a
@@ -59,6 +62,49 @@ internal suspend fun renderDjvuPage(
             PdfPageRenderState.Error("Unable to show this DjVu page.")
         },
     )
+}
+
+/**
+ * A DjVu book for the scrolling page view: the same open document turn-pages mode uses (it stays open
+ * while the book is read, and the reader closes it as it leaves), drawn at the width asked for.
+ */
+internal class DjvuScrollPageSource(
+    private val context: Context,
+    private val item: ReadableItem,
+    private val documentUri: Uri,
+) : PdfScrollPageSource {
+    override suspend fun pageAspect(pageIndex: Int): Float? = withContext(Dispatchers.IO) {
+        runSuspendCatching {
+            OpenDjvuDocument.use(djvuFile(context, item, documentUri)) { document -> document.pageSize(pageIndex) }
+        }.getOrNull()
+            ?.takeIf { size -> size.width > 0 && size.height > 0 }
+            ?.let { size -> size.width.toFloat() / size.height }
+    }
+
+    override suspend fun render(pageIndex: Int, widthPx: Int): Bitmap? = withContext(Dispatchers.IO) {
+        var bitmap: Bitmap? = null
+        runSuspendCatching {
+            OpenDjvuDocument.use(djvuFile(context, item, documentUri)) { document ->
+                val size = document.pageSize(pageIndex)
+                val height = (widthPx.toLong() * size.height / size.width.coerceAtLeast(1)).toInt().coerceAtLeast(1)
+                Bitmap.createBitmap(widthPx, height, Bitmap.Config.ARGB_8888).also { page ->
+                    bitmap = page
+                    document.renderPage(pageIndex, page)
+                }
+            }
+        }.getOrElse {
+            bitmap?.recycle()
+            null
+        }?.takeIf { currentCoroutineContext().isActive || it.recycleAndFalse() }
+    }
+
+    // The reader closes the open document as it leaves (releaseDjvuDocument).
+    override fun close() = Unit
+}
+
+private fun Bitmap.recycleAndFalse(): Boolean {
+    recycle()
+    return false
 }
 
 /** Closes the DjVu document a closed reader leaves open. */

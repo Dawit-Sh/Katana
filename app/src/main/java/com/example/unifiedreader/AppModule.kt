@@ -882,6 +882,7 @@ object AppModule {
                     ?: remoteDocumentReadCache.documentUriForReading(item)
             },
             pageNumberPreferences = readerDisplay.pageNumbers,
+            pagesPreferences = readerDisplay.pages,
         ),
     )
 }

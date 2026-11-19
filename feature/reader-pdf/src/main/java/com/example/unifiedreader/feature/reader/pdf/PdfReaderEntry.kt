@@ -19,14 +19,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -46,38 +43,22 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.unifiedreader.core.model.FormatType
-import com.example.unifiedreader.core.model.LocatorType
 import com.example.unifiedreader.core.model.ReadableItem
-import com.example.unifiedreader.core.model.SourceType
-import com.example.unifiedreader.core.model.SyncState
-import com.example.unifiedreader.core.model.primaryAuthor
 import com.example.unifiedreader.core.model.runSuspendCatching
-import com.example.unifiedreader.feature.reader.core.ImmersiveReaderOverlay
-import com.example.unifiedreader.feature.reader.core.rememberReaderActiveSessionTracker
-import com.example.unifiedreader.feature.reader.core.rememberReaderSessionLifecycle
 import com.example.unifiedreader.feature.reader.core.ReaderDocumentState
-import com.example.unifiedreader.feature.reader.core.ReaderLocator
 import com.example.unifiedreader.feature.reader.core.ReaderOpenFailure
 import com.example.unifiedreader.feature.reader.core.ReaderOpenMode
-import com.example.unifiedreader.feature.reader.core.ReaderOpenStatus
-import com.example.unifiedreader.feature.reader.core.ReaderPageNumber
-import com.example.unifiedreader.feature.reader.core.ReaderPageNumberPills
-import com.example.unifiedreader.feature.reader.core.ReaderProgressSnapshot
 import com.example.unifiedreader.feature.reader.core.ReaderSessionStore
 import com.example.unifiedreader.feature.reader.core.ReaderTapSide
 import com.example.unifiedreader.feature.reader.core.ReaderZoomLayout
 import com.example.unifiedreader.feature.reader.core.ReaderZoomViewportState
 import com.example.unifiedreader.feature.reader.core.ReportReaderOpening
 import com.example.unifiedreader.feature.reader.core.detectReaderZoomGestures
-import com.example.unifiedreader.feature.reader.core.openingStep
 import com.example.unifiedreader.feature.reader.core.readerFileMissingFailure
 import com.example.unifiedreader.feature.reader.core.readerOpenFailureOf
-import com.example.unifiedreader.feature.reader.core.readerOverlayTokens
 import com.example.unifiedreader.feature.reader.core.readerTapSide
 import com.example.unifiedreader.feature.reader.core.rememberReaderDocument
-import com.example.unifiedreader.feature.reader.core.rememberReaderOverlayState
 import com.example.unifiedreader.feature.reader.preferences.InMemoryReaderPageNumberPreferencesStore
 import com.example.unifiedreader.feature.reader.preferences.ReaderPageNumberPreferencesStore
 import com.example.unifiedreader.journal.JournalReadingSessionRecorder
@@ -90,7 +71,16 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import androidx.compose.runtime.State
+import com.example.unifiedreader.feature.reader.preferences.InMemoryReaderPagesPreferencesStore
+import com.example.unifiedreader.feature.reader.preferences.ReaderPagesPreferencesStore
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
+/**
+ * The PDF and DjVu reader. Its pages turn one at a time or scroll as one strip ("Pages" in its settings,
+ * kept per book); the place, the reading session and the chrome are the same in both.
+ */
 @Composable
 fun PdfReaderScreen(
     item: ReadableItem,
@@ -99,25 +89,54 @@ fun PdfReaderScreen(
     sessionStore: ReaderSessionStore? = null,
     journalReadingSessionRecorder: JournalReadingSessionRecorder? = null,
     pageNumberPreferences: ReaderPageNumberPreferencesStore = remember { InMemoryReaderPageNumberPreferencesStore() },
+    pagesPreferences: ReaderPagesPreferencesStore = remember { InMemoryReaderPagesPreferencesStore() },
     openMode: ReaderOpenMode = ReaderOpenMode.Default,
     onBack: () -> Unit = {},
     onCompletionRequested: () -> Unit = {},
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val tokens = readerOverlayTokens()
-    val overlayState = rememberReaderOverlayState(
-        key = "pdf-overlay-${item.id}",
-        initiallyVisible = true,
-    )
-    val sessionHydrated by sessionStore?.isHydratedFlow?.collectAsStateWithLifecycle()
-        ?: remember { mutableStateOf(true) }
-    val savedProgressByItemId by sessionStore?.progressByItemIdFlow?.collectAsStateWithLifecycle()
-        ?: remember { mutableStateOf(emptyMap()) }
     // Try again asks for the file again.
     var openAttempt by remember(item.id) { mutableIntStateOf(0) }
     val documentState by rememberReaderDocument(item, documentUri, documentUriProvider, openAttempt)
-    val documentInfo by produceState<PdfDocumentInfoState>(
+    val documentInfo by rememberPdfDocumentInfo(item, documentState)
+    val pageCount = (documentInfo as? PdfDocumentInfoState.Ready)?.pageCount ?: 0
+    val pages = rememberPdfPagesChoice(item, sessionStore, pagesPreferences)
+    val place = rememberPdfReaderPlace(item, documentState, pageCount, openMode, pages.mode, sessionStore)
+    val actions = rememberPdfReaderSessionActions(
+        item = item,
+        place = place,
+        pageCount = pageCount,
+        sessionStore = sessionStore,
+        journalReadingSessionRecorder = journalReadingSessionRecorder,
+        scope = rememberCoroutineScope(),
+        onBack = onBack,
+        onCompletionRequested = onCompletionRequested,
+    )
+    val pageRenderer = remember(item.id, item.format) { pageImageRenderer(context.applicationContext, item) }
+    if (item.format == FormatType.DJVU) {
+        DisposableEffect(item.id) { onDispose(::releaseDjvuDocument) }
+    }
+    // The opening state stays until the first page is drawn.
+    val opening = remember(item.id) { PdfOpeningState() }
+    ReportReaderOpening(
+        status = pdfOpenStatus(documentInfo, documentState, opening.pageFailed, opening.firstPageShown, item),
+        retry = { openAttempt++ },
+    )
+    PdfReaderContent(
+        parts = PdfReaderParts(PdfReaderBook(item, documentState, pageCount, pageRenderer), place, pages, actions, opening),
+        pageNumberPreferences = pageNumberPreferences,
+        turnPages = { navigation -> PdfTurnPages(item, documentState, pageCount, place, pageRenderer, opening, navigation) },
+    )
+}
+
+/** The page count, read once the file is here: PdfRenderer for a PDF, DjVuLibre for a DjVu book. */
+@Composable
+private fun rememberPdfDocumentInfo(
+    item: ReadableItem,
+    documentState: ReaderDocumentState,
+): State<PdfDocumentInfoState> {
+    val context = LocalContext.current
+    return produceState<PdfDocumentInfoState>(
         initialValue = PdfDocumentInfoState.Loading,
         key1 = documentState.cacheKey,
     ) {
@@ -133,43 +152,27 @@ fun PdfReaderScreen(
             }
         }
     }
-    val pageCount = (documentInfo as? PdfDocumentInfoState.Ready)?.pageCount ?: 0
-    var currentPageIndex by remember(item.id, documentState.cacheKey) {
-        mutableIntStateOf(0)
-    }
+}
+
+/**
+ * Turn pages: one page at a time, drawn when it is turned to (sharper when zoomed), as before scrolling
+ * came. Nothing of the scrolling view runs here.
+ */
+@Composable
+private fun PdfTurnPages(
+    item: ReadableItem,
+    documentState: ReaderDocumentState,
+    pageCount: Int,
+    place: PdfReaderPlace,
+    pageRenderer: PageImageRenderer,
+    opening: PdfOpeningState,
+    navigation: PdfNavigation,
+    modifier: Modifier = Modifier,
+) {
+    val currentPageIndex = place.pageIndex
     var renderLongEdgePx by remember(item.id, documentState.cacheKey, currentPageIndex) {
         mutableIntStateOf(PDF_RENDER_LONG_EDGE_PX)
     }
-    var initialRestoreCompleted by remember(item.id, documentState.cacheKey, openMode) {
-        mutableStateOf(false)
-    }
-    var userNavigated by remember(item.id, documentState.cacheKey, openMode) {
-        mutableStateOf(false)
-    }
-    val restoredProgress = savedProgressByItemId[item.id]
-    LaunchedEffect(
-        item.id,
-        documentState.cacheKey,
-        pageCount,
-        openMode,
-        sessionHydrated,
-        restoredProgress,
-    ) {
-        if (initialRestoreCompleted) return@LaunchedEffect
-        if (!sessionHydrated) return@LaunchedEffect
-        if (pageCount <= 0) return@LaunchedEffect
-        if (userNavigated) {
-            initialRestoreCompleted = true
-            return@LaunchedEffect
-        }
-        currentPageIndex = initialPdfPageIndex(
-            savedProgress = restoredProgress ?: sessionStore?.getProgress(item),
-            pageCount = pageCount,
-            openMode = openMode,
-        )
-        initialRestoreCompleted = true
-    }
-    val pageRenderer = remember(item.id, item.format) { pageImageRenderer(context.applicationContext, item) }
     val pageState by produceState<PdfPageRenderState>(
         initialValue = PdfPageRenderState.Loading,
         documentState.cacheKey,
@@ -180,199 +183,31 @@ fun PdfReaderScreen(
         val uri = (documentState as? ReaderDocumentState.Ready)?.uri
         val targetPageIndex = currentPageIndex.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
         val renderedState = when {
-            uri == null -> PdfPageRenderState.Empty
-            pageCount <= 0 -> PdfPageRenderState.Empty
+            uri == null || pageCount <= 0 -> PdfPageRenderState.Empty
             else -> withContext(Dispatchers.IO) { pageRenderer(uri, targetPageIndex, renderLongEdgePx) }
         }
         val previousReadyPage = value as? PdfPageRenderState.Ready
-        if (
-            renderedState is PdfPageRenderState.Error &&
-            previousReadyPage?.pageIndex == targetPageIndex
-        ) {
+        if (renderedState is PdfPageRenderState.Error && previousReadyPage?.pageIndex == targetPageIndex) {
             return@produceState
         }
         value = renderedState
     }
-    if (item.format == FormatType.DJVU) {
-        DisposableEffect(item.id) { onDispose(::releaseDjvuDocument) }
-    }
-    // The opening state stays until the first page is drawn.
-    var firstPageShown by remember(item.id) { mutableStateOf(false) }
     LaunchedEffect(pageState) {
-        if (pageState is PdfPageRenderState.Ready) firstPageShown = true
+        if (pageState is PdfPageRenderState.Ready) opening.firstPageShown = true
+        opening.pageFailed = pageState is PdfPageRenderState.Error
     }
-    ReportReaderOpening(
-        status = pdfOpenStatus(documentInfo, documentState, pageState, firstPageShown, item),
-        retry = { openAttempt++ },
-    )
-    val tracker = rememberReaderActiveSessionTracker(
-        item = item,
-        recorder = journalReadingSessionRecorder,
-        scope = scope,
-    )
-    LaunchedEffect(pageCount, initialRestoreCompleted) {
-        if (pageCount > 0 && initialRestoreCompleted) {
-            tracker?.start(
-                page = currentPageIndex + 1,
-                percent = (currentPageIndex + 1).toDouble() / pageCount.toDouble(),
-            )
-        }
-    }
-    LaunchedEffect(item.id, currentPageIndex, pageCount, initialRestoreCompleted, userNavigated) {
-        if (!shouldPersistPdfProgress(
-                pageCount = pageCount,
-                initialRestoreCompleted = initialRestoreCompleted,
-                userNavigated = userNavigated,
-            )
-        ) {
-            return@LaunchedEffect
-        }
-        sessionStore?.savePdfProgress(
-            item = item,
-            pageIndex = currentPageIndex,
-            pageCount = pageCount,
-        )
-    }
-    val latestPageIndex by rememberUpdatedState(currentPageIndex)
-    val latestPageCount by rememberUpdatedState(pageCount)
-    val latestInitialRestoreCompleted by rememberUpdatedState(initialRestoreCompleted)
-    val flushReadingSession by rememberUpdatedState(
-        newValue = {
-            if (latestPageCount > 0) {
-                tracker?.flushAndReset(
-                    page = latestPageIndex + 1,
-                    percent = (latestPageIndex + 1).toDouble() / latestPageCount.toDouble(),
-                    pageCount = latestPageCount,
-                )
+    PdfPageViewport(
+        pageState = pageState,
+        modifier = modifier.fillMaxSize(),
+        onToggleOverlay = navigation.toggleOverlay,
+        onPrevious = navigation.previous,
+        onNext = navigation.next,
+        onRenderLongEdgeRequested = { pageIndex, requestedLongEdge ->
+            if (pageIndex == place.pageIndex && requestedLongEdge > renderLongEdgePx) {
+                renderLongEdgePx = requestedLongEdge
             }
         },
     )
-    val persistPdfProgress by rememberUpdatedState(
-        newValue = {
-            if (shouldPersistPdfProgress(
-                    pageCount = latestPageCount,
-                    initialRestoreCompleted = latestInitialRestoreCompleted,
-                    userNavigated = userNavigated,
-                )
-            ) {
-                sessionStore?.savePdfProgress(
-                    item = item,
-                    pageIndex = latestPageIndex,
-                    pageCount = latestPageCount,
-                )
-            }
-        },
-    )
-    val flushSessionStoreWrites by rememberUpdatedState(
-        newValue = {
-            sessionStore?.requestFlushPendingWrites()
-        },
-    )
-    val startReadingSession by rememberUpdatedState(
-        newValue = {
-            if (latestPageCount > 0 && latestInitialRestoreCompleted) {
-                tracker?.start(
-                    page = latestPageIndex + 1,
-                    percent = (latestPageIndex + 1).toDouble() / latestPageCount.toDouble(),
-                )
-            }
-        },
-    )
-    val closeReader = rememberReaderSessionLifecycle(
-        // The next book in a series replaces this one in place: restart for it, with or without a journal.
-        key = item.id to tracker,
-        onStart = startReadingSession,
-        onLeave = {
-            flushReadingSession()
-            persistPdfProgress()
-            flushSessionStoreWrites()
-        },
-        onBack = onBack,
-    )
-
-    val safePageIndex = currentPageIndex.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
-    val pageNumbersVisible by pageNumberPreferences.isVisibleFlow.collectAsStateWithLifecycle()
-    val currentPageProgress = if (pageCount > 0) {
-        (safePageIndex + 1).toFloat() / pageCount.toFloat()
-    } else {
-        0f
-    }
-    val navigateToPage: (Int) -> Unit = { targetPage ->
-        if (pageCount > 0) {
-            val safeTargetPage = targetPage.coerceIn(0, pageCount - 1)
-            if (safeTargetPage != currentPageIndex) {
-                userNavigated = true
-                currentPageIndex = safeTargetPage
-            }
-        }
-    }
-    val navigatePrevious = {
-        navigateToPage(currentPageIndex - 1)
-    }
-    val navigateNext = {
-        if (pageCount > 0 && currentPageIndex >= pageCount - 1) {
-            userNavigated = true
-            sessionStore?.savePdfProgress(
-                item = item,
-                pageIndex = currentPageIndex,
-                pageCount = pageCount,
-                isFinished = true,
-            )
-            flushSessionStoreWrites()
-            flushReadingSession()
-            onCompletionRequested()
-        } else {
-            navigateToPage(currentPageIndex + 1)
-        }
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(tokens.colors.fallbackPage),
-    ) {
-        ImmersiveReaderOverlay(
-            overlayState = overlayState,
-            autoHideDelayMillis = 0L,
-            modifier = Modifier.fillMaxSize(),
-            pageIndicator = if (pageNumbersVisible && pageCount > 0) {
-                { ReaderPageNumberPills(listOf(ReaderPageNumber("${safePageIndex + 1} / $pageCount"))) }
-            } else {
-                null
-            },
-            content = {
-                PdfPageViewport(
-                    pageState = pageState,
-                    modifier = Modifier.fillMaxSize(),
-                    onToggleOverlay = overlayState::toggle,
-                    onPrevious = navigatePrevious,
-                    onNext = navigateNext,
-                    onRenderLongEdgeRequested = { pageIndex, requestedLongEdge ->
-                        if (pageIndex == currentPageIndex && requestedLongEdge > renderLongEdgePx) {
-                            renderLongEdgePx = requestedLongEdge
-                        }
-                    },
-                )
-            },
-            overlay = {
-                PdfReaderChrome(
-                    title = item.title,
-                    author = item.bookMetadata?.primaryAuthor(),
-                    pageRenderer = pageRenderer,
-                    documentState = documentState,
-                    pageCount = pageCount,
-                    currentPageIndex = safePageIndex,
-                    progress = currentPageProgress,
-                    canNavigatePrevious = pageCount > 0 && currentPageIndex > 0,
-                    canNavigateNext = pageCount > 0,
-                    onBack = closeReader,
-                    onPrevious = navigatePrevious,
-                    onNext = navigateNext,
-                    onPageSelected = navigateToPage,
-                )
-            },
-        )
-    }
 }
 
 @Composable
@@ -643,53 +478,6 @@ internal suspend fun renderPdfPage(
     }
 }
 
-private fun initialPdfPageIndex(
-    savedProgress: ReaderProgressSnapshot?,
-    pageCount: Int,
-    openMode: ReaderOpenMode,
-): Int {
-    if (openMode == ReaderOpenMode.StartFromBeginning) return 0
-    val savedPage = savedProgress
-        ?.takeIf { progress -> progress.locatorType == LocatorType.PAGE && !progress.isFinished }
-        ?.page
-    return savedPage?.coerceIn(0, (pageCount - 1).coerceAtLeast(0)) ?: 0
-}
-
-private fun ReaderSessionStore.savePdfProgress(
-    item: ReadableItem,
-    pageIndex: Int,
-    pageCount: Int,
-    isFinished: Boolean = false,
-) {
-    val safePageCount = pageCount.coerceAtLeast(0)
-    val safePageIndex = if (safePageCount > 0) {
-        pageIndex.coerceIn(0, safePageCount - 1)
-    } else {
-        0
-    }
-    saveProgress(
-        item = item,
-        locator = ReaderLocator(
-            locatorType = LocatorType.PAGE,
-            page = safePageIndex,
-            percent = if (safePageCount > 0) {
-                (safePageIndex + 1).toDouble() / safePageCount.toDouble()
-            } else {
-                null
-            },
-        ),
-        isFinished = isFinished,
-        syncState = if (item.sourceType == SourceType.LOCAL) SyncState.CLEAN else SyncState.DIRTY,
-        pageCount = safePageCount,
-    )
-}
-
-private fun shouldPersistPdfProgress(
-    pageCount: Int,
-    initialRestoreCompleted: Boolean,
-    userNavigated: Boolean,
-): Boolean = pageCount > 0 && initialRestoreCompleted && userNavigated
-
 private fun pdfProgressLabel(
     currentPageIndex: Int,
     pageCount: Int,
@@ -697,22 +485,6 @@ private fun pdfProgressLabel(
     "Page ${currentPageIndex + 1} of $pageCount"
 } else {
     "Preparing PDF"
-}
-
-/** Until the first page is drawn: the opening; a document or first page that can't be read: why. */
-private fun pdfOpenStatus(
-    info: PdfDocumentInfoState,
-    document: ReaderDocumentState,
-    page: PdfPageRenderState,
-    firstPageShown: Boolean,
-    item: ReadableItem,
-): ReaderOpenStatus = when {
-    info is PdfDocumentInfoState.Error -> ReaderOpenStatus.Failed(info.failure)
-    firstPageShown -> ReaderOpenStatus.Open
-    page is PdfPageRenderState.Error -> ReaderOpenStatus.Failed(
-        if (item.format == FormatType.DJVU) ReaderOpenFailure.DjvuUnreadable else ReaderOpenFailure.PdfUnreadable,
-    )
-    else -> ReaderOpenStatus.Opening(document.openingStep(item))
 }
 
 internal sealed interface PdfDocumentInfoState {
