@@ -76,6 +76,15 @@ class LibraryDownloadSelectionTest {
         )
     }
 
+    @Test
+    fun `selection ends when nothing can be picked, but never while picking books for a list`() {
+        assertEquals(true, librarySelectionRunsOut(selectableCount = 0, isSelectionMode = true, pickingAnyItem = false))
+        assertEquals(false, librarySelectionRunsOut(selectableCount = 3, isSelectionMode = true, pickingAnyItem = false))
+        assertEquals(false, librarySelectionRunsOut(selectableCount = 0, isSelectionMode = false, pickingAnyItem = false))
+        // Add books: the library opens before its covers are reported, and a search may find nothing.
+        assertEquals(false, librarySelectionRunsOut(selectableCount = 0, isSelectionMode = true, pickingAnyItem = true))
+    }
+
     private fun item(id: String) = ReadableItem(
         id = id,
         sourceType = SourceType.KAVITA,

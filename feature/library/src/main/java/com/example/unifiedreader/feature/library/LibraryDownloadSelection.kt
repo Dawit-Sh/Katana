@@ -29,6 +29,17 @@ internal fun orderLibraryDownloadSelection(
 }
 
 /**
+ * Whether the selection ends by itself because nothing in view can be picked. Never while picking books
+ * for a list ([pickingAnyItem]): there every book can be picked, so a view with none (the covers not in
+ * yet, a search that finds nothing) doesn't end it; Close and Back end it and go back to the list.
+ */
+fun librarySelectionRunsOut(
+    selectableCount: Int,
+    isSelectionMode: Boolean,
+    pickingAnyItem: Boolean,
+): Boolean = isSelectionMode && selectableCount == 0 && !pickingAnyItem
+
+/**
  * The roots "Select all" and "Download selected" work over. The screen reports its rendered selectable
  * roots, which for a paged grid is only the loaded window; [viewDownloadableItems] (the recompute's
  * visible items, same membership as the paged view once it has landed) fills in the rest. Before the
