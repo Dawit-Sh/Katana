@@ -20,6 +20,7 @@ import com.example.unifiedreader.feature.reader.core.ReaderPageNumber
 import com.example.unifiedreader.feature.reader.core.ReaderPageNumberPills
 import com.example.unifiedreader.feature.reader.core.ReaderSessionStore
 import com.example.unifiedreader.feature.reader.core.readerOverlayTokens
+import com.example.unifiedreader.feature.reader.core.rememberReaderJumpBack
 import com.example.unifiedreader.feature.reader.core.rememberReaderOverlayState
 import com.example.unifiedreader.feature.reader.preferences.ReaderPageNumberPreferencesStore
 import com.example.unifiedreader.feature.reader.preferences.ReaderPagesMode
@@ -162,6 +163,12 @@ internal fun PdfReaderContent(
             toggleOverlay = overlayState::toggle,
         )
     }
+    // After a jump from the slider or the page strip: "Back to page 8" for a moment.
+    val jumpBack = rememberReaderJumpBack<Int>(item.id) { pageIndex -> navigation.toPage(pageIndex) }
+    val jumpTo = { target: Int ->
+        if (abs(target - place.pageIndex) > 1) jumpBack.jumped(place.pageIndex, place.safePageIndex(pageCount) + 1)
+        navigation.toPage(target)
+    }
     val safePageIndex = place.safePageIndex(pageCount)
     val pageNumbersVisible by pageNumberPreferences.isVisibleFlow.collectAsStateWithLifecycle()
     Box(modifier = modifier.fillMaxSize().background(readerOverlayTokens().colors.fallbackPage)) {
@@ -185,6 +192,7 @@ internal fun PdfReaderContent(
                 PdfReaderBars(
                     parts = parts,
                     navigation = navigation,
+                    onJump = jumpTo,
                     overlayVisible = overlayState.isVisible,
                     settings = PdfReaderSettings(
                         pagesMode = parts.pages.mode ?: ReaderPagesMode.Turn,
@@ -203,6 +211,7 @@ internal fun PdfReaderContent(
 private fun PdfReaderBars(
     parts: PdfReaderParts,
     navigation: PdfNavigation,
+    onJump: (Int) -> Unit,
     overlayVisible: Boolean,
     settings: PdfReaderSettings,
 ) {
@@ -223,7 +232,7 @@ private fun PdfReaderBars(
         onBack = parts.actions.close,
         onPrevious = navigation.previous,
         onNext = navigation.next,
-        onPageSelected = navigation.toPage,
+        onPageSelected = onJump,
     )
 }
 

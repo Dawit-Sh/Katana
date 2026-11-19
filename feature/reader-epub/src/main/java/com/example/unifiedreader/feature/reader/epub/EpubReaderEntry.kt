@@ -50,6 +50,7 @@ import com.example.unifiedreader.feature.reader.core.findContextAncestor
 import com.example.unifiedreader.feature.reader.core.openingStep
 import com.example.unifiedreader.feature.reader.core.readerSessionChapterPreferences
 import com.example.unifiedreader.feature.reader.core.rememberReaderDocument
+import com.example.unifiedreader.feature.reader.core.rememberReaderJumpBack
 import com.example.unifiedreader.feature.reader.core.rememberReaderOverlayState
 import com.example.unifiedreader.feature.reader.preferences.ReaderDisplayPreferences
 import com.example.unifiedreader.journal.JournalReadingSessionRecorder
@@ -205,6 +206,12 @@ fun EpubReaderScreen(
     val translationState = translation?.state?.collectAsStateWithLifecycle()?.value
     val translationShown = translationSession?.current?.collectAsStateWithLifecycle()?.value != null
     var noteReturn by remember(item.id) { mutableStateOf<EpubNoteReturn?>(null) }
+    // After a jump from the slider, the contents, a search hit or a mark: "Back to page 8" for a moment.
+    val jumpBack = rememberReaderJumpBack<Locator>(item.id) { locator ->
+        readerTouched = true
+        navigationRequest = EpubLocatorNavigationRequest(seekRequestId++, locator)
+    }
+    val leaveForJump = { currentLocator?.let { locator -> jumpBack.jumped(locator, currentPage) } }
     val readerPreferences = EpubReaderPreferences(
         typographyMode = typographyMode,
         fontFamily = fontFamily,
@@ -460,12 +467,14 @@ fun EpubReaderScreen(
             val pageBookmarks = rememberPageBookmarks(bookBookmarks, currentLocator, framePage, currentPage)
             // A bookmark or highlight opened from the Bookmarks page: go there once the book shows.
             EpubPendingJumpEffect(annotationJumps, item.id, ready = initialRestoreLocked) { locator ->
+                leaveForJump()
                 readerTouched = true
                 navigationRequest = EpubLocatorNavigationRequest(seekRequestId++, locator)
             }
             val bookSearch = rememberEpubBookSearch(state.publication)
             val goToSearchMatch = { match: Locator? ->
                 match?.let { locator ->
+                    leaveForJump()
                     readerTouched = true
                     navigationRequest = EpubLocatorNavigationRequest(seekRequestId++, locator)
                 }
@@ -697,6 +706,7 @@ fun EpubReaderScreen(
                                 null
                             },
                             onProgressSelected = { selectedProgress ->
+                                leaveForJump()
                                 currentProgress = selectedProgress.toDouble()
                                 readerTouched = true
                                 navigationRequest = EpubProgressSeekRequest(
@@ -716,6 +726,7 @@ fun EpubReaderScreen(
                                 onDismissRequest = { openPanel = null },
                                 onEntrySelected = { entry ->
                                     openPanel = null
+                                    leaveForJump()
                                     readerTouched = true
                                     navigationRequest = EpubTocNavigationRequest(
                                         id = seekRequestId++,
@@ -813,6 +824,7 @@ fun EpubReaderScreen(
                                     controller = controller,
                                     onDismissRequest = { openPanel = null },
                                     onJump = { locator ->
+                                        leaveForJump()
                                         readerTouched = true
                                         navigationRequest = EpubLocatorNavigationRequest(seekRequestId++, locator)
                                     },
