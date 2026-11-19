@@ -124,6 +124,7 @@ class RemoteDownloadQueueController(
             addAll(actionItems.map(ReadableItem::id))
         }
         val now = timeProvider()
+        val canSchedule = canScheduleSource(sourceType)
         val entry = DownloadEntry(
             id = UUID.randomUUID().toString(),
             selectedItemId = selectedItemId,
@@ -132,7 +133,8 @@ class RemoteDownloadQueueController(
             actionItems = actionItems.map(ReadableItem::toQueuedDownloadItem),
             trackedItemIds = trackedItemIds,
             completedItemIds = emptySet(),
-            status = DownloadEntryStatus.Queued,
+            // A server not known to be reachable: the entry says it waits for it until it answers.
+            status = if (canSchedule) DownloadEntryStatus.Queued else DownloadEntryStatus.PausedConnectivity,
             createdAtEpochMillis = now,
             updatedAtEpochMillis = now,
         )
@@ -144,7 +146,7 @@ class RemoteDownloadQueueController(
                 outcome = DownloadQueueOutcome.AlreadyQueued,
             )
         }
-        if (canScheduleSource(entry.sourceType)) {
+        if (canSchedule) {
             scheduler.scheduleEntry(entry.id)
         }
         return DownloadQueueActionResult(
@@ -180,15 +182,27 @@ class RemoteDownloadQueueController(
         scheduler.cancelEntry(entryId)
     }
 
+    /**
+     * Try again: the entry is queued again, and goes on from the files and bytes it has. Returns the entry's
+     * source when it was queued again, so the caller can check a server not known to be reachable; until it
+     * is, the entry waits for it (and says so) instead of sitting in the queue with no reason shown.
+     */
     suspend fun retry(
         entryId: String,
         canScheduleSource: (SourceType) -> Boolean = { true },
-    ) {
+    ): SourceType? {
         val retried = store.retryEntryIfNoOtherActiveTrackedItems(entryId)
-        val sourceType = store.getEntry(entryId)?.sourceType
-        if (retried && sourceType != null && canScheduleSource(sourceType)) {
-            scheduler.scheduleEntry(entryId)
+        val sourceType = store.getEntry(entryId)?.sourceType?.takeIf { retried }
+        when {
+            sourceType == null -> Unit
+            canScheduleSource(sourceType) -> scheduler.scheduleEntry(entryId)
+            else -> store.updateStatusIfCurrentStatusIn(
+                entryId = entryId,
+                expectedStatuses = setOf(DownloadEntryStatus.Queued),
+                status = DownloadEntryStatus.PausedConnectivity,
+            )
         }
+        return sourceType
     }
 
     suspend fun remove(

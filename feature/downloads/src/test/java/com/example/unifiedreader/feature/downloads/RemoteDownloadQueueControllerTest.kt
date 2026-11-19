@@ -1177,6 +1177,62 @@ class RemoteDownloadLostConnectionTest {
         assertTrue(controller.remove("entry-1"))
         assertEquals(listOf("book-1", "book-2", "book-3"), dataSource.forgottenPartialItemIds)
     }
+
+    @Test
+    fun `try again while the server is not known to be online waits for it and says so`() = runTest {
+        val scheduler = RecordingDownloadWorkScheduler()
+        val store = InMemoryDownloadQueueStore(
+            initialEntries = listOf(threeBookEntry(status = DownloadEntryStatus.Failed)),
+        )
+        val controller = RemoteDownloadQueueController(
+            store = store,
+            scheduler = scheduler,
+            remoteDownloadDataSources = listOf(TestRemoteItemDownloadDataSource()),
+        )
+
+        val sourceType = controller.retry("entry-1", canScheduleSource = { false })
+
+        // The caller checks this source now; until it answers, the row says what it waits for.
+        assertEquals(SourceType.KAVITA, sourceType)
+        val entry = store.entries.single()
+        assertEquals(DownloadEntryStatus.PausedConnectivity, entry.status)
+        assertEquals("Waiting for Kavita", entry.waitingLabel(item = null))
+        assertTrue(scheduler.scheduledEntryIds.isEmpty())
+    }
+
+    @Test
+    fun `try again on a reachable server queues and schedules at once`() = runTest {
+        val scheduler = RecordingDownloadWorkScheduler()
+        val store = InMemoryDownloadQueueStore(
+            initialEntries = listOf(threeBookEntry(status = DownloadEntryStatus.Failed)),
+        )
+        val controller = RemoteDownloadQueueController(
+            store = store,
+            scheduler = scheduler,
+            remoteDownloadDataSources = listOf(TestRemoteItemDownloadDataSource()),
+        )
+
+        assertEquals(SourceType.KAVITA, controller.retry("entry-1", canScheduleSource = { true }))
+        assertEquals(DownloadEntryStatus.Queued, store.entries.single().status)
+        assertEquals(listOf("entry-1"), scheduler.scheduledEntryIds)
+    }
+
+    @Test
+    fun `a download queued while its server can't be reached says it waits for it`() = runTest {
+        val scheduler = RecordingDownloadWorkScheduler()
+        val store = InMemoryDownloadQueueStore()
+        val controller = RemoteDownloadQueueController(
+            store = store,
+            scheduler = scheduler,
+            remoteDownloadDataSources = listOf(TestRemoteItemDownloadDataSource()),
+        )
+        val item = testReadableItem("book-1")
+
+        controller.enqueue(item = item, items = listOf(item), canScheduleSource = { false })
+
+        assertEquals(DownloadEntryStatus.PausedConnectivity, store.entries.single().status)
+        assertTrue(scheduler.scheduledEntryIds.isEmpty())
+    }
 }
 
 private class InMemoryDownloadQueueStore(

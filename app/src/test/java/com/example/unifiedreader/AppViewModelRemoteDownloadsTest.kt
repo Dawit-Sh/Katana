@@ -738,6 +738,37 @@ class AppViewModelRemoteDownloadsTest {
         assertTrue(remoteBook.id in viewModel.uiState.downloadedRemoteItemIds)
     }
 
+    @Test
+    fun `try again after a restart checks the server at once and the download starts`() {
+        val remoteBook = grimmoryBook()
+        val dataSource = ScriptedRemoteDownloadDataSource(
+            sourceType = SourceType.GRIMMORY,
+            failures = mutableListOf(IllegalStateException("Internal Server Error")),
+        )
+        val healthCheck = CountingOnlineHealthCheck(SourceType.GRIMMORY)
+        val policy = RemoteSourceConnectivityPolicy().apply { markReachable(SourceType.GRIMMORY) }
+        val viewModel = createViewModel(
+            sampleItems = listOf(remoteBook),
+            remoteDownloadDataSources = listOf(dataSource),
+            remoteSourceConnectivityPolicy = policy,
+            remoteSourceHealthChecks = listOf(healthCheck),
+        )
+        viewModel.onSourceSelected(SourceType.GRIMMORY)
+        viewModel.onDownloadRemoteItem(remoteBook)
+        waitForUiState { viewModel.downloadsSnapshot.failedEntries.isNotEmpty() }
+
+        // As after a restart: reachability isn't kept, so nothing knows Grimmory is there.
+        policy.clear(SourceType.GRIMMORY)
+        shadowOf(Looper.getMainLooper()).idle()
+        viewModel.retryDownload(viewModel.downloadsSnapshot.failedEntries.single().id)
+        waitForUiState {
+            viewModel.downloadsSnapshot.entries.map(DownloadEntry::status) == listOf(DownloadEntryStatus.Completed)
+        }
+
+        assertEquals(1, healthCheck.callCount)
+        assertEquals(SourceConnectivityState.Online, policy.reachabilityFor(SourceType.GRIMMORY))
+    }
+
     private fun grimmoryBook() = sampleItem(
         id = "grimmory-epub",
         title = "Remote Book",

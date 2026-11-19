@@ -141,7 +141,22 @@ class AppRemoteDownloadController @Inject constructor(
         canScheduleSource: (SourceType) -> Boolean,
     ) {
         scope.launch {
-            remoteDownloadQueueController.retry(entryId, canScheduleSource)
+            val sourceType = remoteDownloadQueueController.retry(entryId, canScheduleSource) ?: return@launch
+            checkSourceForRetry(sourceType)
+        }
+    }
+
+    /**
+     * Try again checks a server not known to be online right away, unknown (reachability isn't kept across a
+     * restart) or offline (the retry timer could be minutes off): the entry waits for it meanwhile, and its
+     * coming online reschedules the queue. Grimmory's check doesn't renew the sign-in.
+     */
+    private suspend fun checkSourceForRetry(sourceType: SourceType) {
+        when (remoteSourceConnectivityPolicy.reachabilityFor(sourceType)) {
+            SourceConnectivityState.Unknown,
+            SourceConnectivityState.Offline -> remoteSourceConnectivityStartupCoordinator.retrySource(sourceType)
+            SourceConnectivityState.Checking,
+            SourceConnectivityState.Online -> Unit
         }
     }
 
