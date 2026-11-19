@@ -28,7 +28,7 @@ internal suspend fun pushDirtyStumpProgress(
         ProgressPushPlan.Push(
             push = {
                 tokens.run { token ->
-                    val serverCopy = progress.newerServerCopy(
+                    val serverAnswer = progress.serverAnswer(
                         remote = api.getProgress(
                             accessToken = token,
                             mediaId = mediaId,
@@ -36,7 +36,7 @@ internal suspend fun pushDirtyStumpProgress(
                             pageCount = item.pageCount,
                         ),
                     )
-                    if (serverCopy != null) return@run PendingProgressPush.ServerNewer(serverCopy)
+                    if (serverAnswer != null) return@run serverAnswer
                     api.pushStumpProgressOperation(accessToken = token, mediaId = mediaId, operation = operation)
                     PendingProgressPush.Pushed
                 }

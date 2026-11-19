@@ -19,6 +19,7 @@ import com.example.unifiedreader.core.model.LibraryFilterPanel
 import com.example.unifiedreader.core.model.LibrarySortMode
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
+import com.example.unifiedreader.core.model.SyncState
 import com.example.unifiedreader.data.repository.JournalEntrySaveUseCase
 import com.example.unifiedreader.feature.downloads.DownloadEntriesSnapshot
 import com.example.unifiedreader.feature.downloads.DownloadQueueActionResult
@@ -453,6 +454,43 @@ class AppViewModel @Inject constructor(
 
     fun dismissReaderCompletion() {
         readerCoordinator.dismissReaderCompletion(updateState = ::updateUiState)
+    }
+
+    /**
+     * The stay-or-go question before a book opens ([AppUiState.progressOfferPrompt]): go to the server's
+     * older place, or stay on this device's and send it to the server as the latest read. Then it opens.
+     */
+    fun answerProgressOffer(goToServer: Boolean) {
+        val prompt = uiState.progressOfferPrompt ?: return
+        val item = prompt.item
+        val pageCount = readerSessionStore.getSession(item)?.pageCount ?: item.pageCount
+        if (goToServer) {
+            val server = prompt.offer.toServerSnapshot()
+            readerSessionStore.saveProgress(
+                item = item,
+                locator = server.toReaderLocator(),
+                isFinished = server.isFinished,
+                syncState = SyncState.CLEAN,
+                pageCount = pageCount,
+                updatedAtEpochMillis = server.updatedAtEpochMillis,
+            )
+        } else {
+            readerSessionStore.getProgress(item)?.let { local ->
+                readerSessionStore.saveProgress(
+                    item = item,
+                    locator = local.toReaderLocator(),
+                    isFinished = local.isFinished,
+                    syncState = SyncState.DIRTY,
+                    pageCount = pageCount,
+                )
+            }
+        }
+        readerCoordinator.openAfterProgressOffer(prompt = prompt, updateState = ::updateUiState)
+    }
+
+    /** Closes the stay-or-go question without opening the book; it asks again next time. */
+    fun dismissProgressOffer() {
+        updateUiState { it.copy(progressOfferPrompt = null) }
     }
 
     fun startReaderCompletionNextItem() {

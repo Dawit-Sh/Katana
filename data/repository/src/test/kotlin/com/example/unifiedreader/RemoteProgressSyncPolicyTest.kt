@@ -192,4 +192,72 @@ class RemoteProgressSyncPolicyTest {
             decision,
         )
     }
+
+    @Test
+    fun `a newer server copy behind this device is offered, not applied, when asked to`() {
+        // The Hole: p. 8 here (9%), another device opened it at 6% later on.
+        val local = ProgressSyncSnapshot(
+            itemId = "book-1",
+            locatorType = LocatorType.CFI,
+            cfi = "/6/8",
+            percent = 0.09,
+            syncState = SyncState.DIRTY,
+            updatedAtEpochMillis = 1_000L,
+        )
+        val behind = ReadingProgress(
+            itemId = "book-1",
+            locatorType = LocatorType.CFI,
+            cfi = "/6/4",
+            percent = 0.06,
+            updatedAtEpochMillis = 1_000_000L,
+        )
+        val ahead = behind.copy(cfi = "/6/12", percent = 0.12)
+        val barelyBehind = behind.copy(percent = 0.087)
+
+        val offered = decideRemoteProgressSync(local, behind, nowEpochMillis = 2_000_000L).askingBeforeGoingBack(local)
+        val movedOn = decideRemoteProgressSync(local, ahead, nowEpochMillis = 2_000_000L).askingBeforeGoingBack(local)
+        val samePlace = decideRemoteProgressSync(local, barelyBehind, nowEpochMillis = 2_000_000L).askingBeforeGoingBack(local)
+        val asBefore = decideRemoteProgressSync(local, behind, nowEpochMillis = 2_000_000L)
+
+        assertEquals(
+            RemoteProgressSyncDecision.OfferRemote(
+                locator = behind.toProgressSyncLocator(),
+                isFinished = false,
+                updatedAtEpochMillis = 1_000_000L,
+            ),
+            offered,
+        )
+        assertEquals(RemoteProgressSyncDecision.ApplyRemote::class, movedOn::class)
+        assertEquals(RemoteProgressSyncDecision.ApplyRemote::class, samePlace::class)
+        assertEquals(RemoteProgressSyncDecision.ApplyRemote::class, asBefore::class)
+    }
+
+    @Test
+    fun `an older server copy behind this device is kept out as before`() {
+        val local = ProgressSyncSnapshot(
+            itemId = "book-1",
+            locatorType = LocatorType.PERCENT,
+            percent = 0.50,
+            isFinished = true,
+            syncState = SyncState.CLEAN,
+            updatedAtEpochMillis = 500L,
+        )
+        val olderBehind = ReadingProgress(
+            itemId = "book-1",
+            locatorType = LocatorType.PERCENT,
+            percent = 0.20,
+            updatedAtEpochMillis = 400L,
+        )
+        val newerNotFinished = olderBehind.copy(percent = 0.60, updatedAtEpochMillis = 600L)
+
+        assertEquals(
+            RemoteProgressSyncDecision.KeepLocal,
+            decideRemoteProgressSync(local, olderBehind, nowEpochMillis = 700L).askingBeforeGoingBack(local),
+        )
+        // Finished here and not there counts as behind, whatever the percentage says.
+        assertEquals(
+            RemoteProgressSyncDecision.OfferRemote::class,
+            decideRemoteProgressSync(local, newerNotFinished, nowEpochMillis = 700L).askingBeforeGoingBack(local)::class,
+        )
+    }
 }

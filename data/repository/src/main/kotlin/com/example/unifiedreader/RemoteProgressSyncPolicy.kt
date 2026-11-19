@@ -17,6 +17,16 @@ sealed interface RemoteProgressSyncDecision {
         val isFinished: Boolean,
         val updatedAtEpochMillis: Long,
     ) : RemoteProgressSyncDecision
+
+    /**
+     * The server's copy is the more recent read but sits behind this device's place: keep this device's
+     * and ask before going back (KOReader asks the same way), instead of moving the book back on its own.
+     */
+    data class OfferRemote(
+        val locator: ProgressSyncLocator,
+        val isFinished: Boolean,
+        val updatedAtEpochMillis: Long,
+    ) : RemoteProgressSyncDecision
 }
 
 fun decideRemoteProgressSync(
@@ -75,6 +85,40 @@ fun decideRemoteProgressSync(
  */
 const val PENDING_LOCAL_PROGRESS_CLOCK_TOLERANCE_MILLIS = 2 * 60 * 1000L
 
+/**
+ * This decision, except that a server copy that wins while sitting behind [local]'s place is offered
+ * ([RemoteProgressSyncDecision.OfferRemote]) instead of applied: the book asks before going back.
+ */
+fun RemoteProgressSyncDecision.askingBeforeGoingBack(local: ProgressSyncSnapshot?): RemoteProgressSyncDecision {
+    val apply = this as? RemoteProgressSyncDecision.ApplyRemote
+    return if (apply != null && local != null && isBehind(apply.locator.percent, apply.isFinished, local)) {
+        RemoteProgressSyncDecision.OfferRemote(
+            locator = apply.locator,
+            isFinished = apply.isFinished,
+            updatedAtEpochMillis = apply.updatedAtEpochMillis,
+        )
+    } else {
+        this
+    }
+}
+
+/**
+ * Whether a server place ([percent] of the book, [isFinished]) sits behind [local]: not finished where
+ * [local] is, or further back by more than [BACKWARD_PROGRESS_MARGIN]. A place without a percentage can't
+ * be compared, so it isn't.
+ */
+fun isBehind(percent: Double?, isFinished: Boolean, local: ProgressSyncSnapshot): Boolean {
+    val localPercent = local.percent
+    return when {
+        local.isFinished && !isFinished -> true
+        isFinished || percent == null || localPercent == null -> false
+        else -> percent < localPercent - BACKWARD_PROGRESS_MARGIN
+    }
+}
+
+/** Half a percent of the book: a server copy closer than this to this device's place is not "going back". */
+const val BACKWARD_PROGRESS_MARGIN = 0.005
+
 fun applyRemoteProgressSyncDecision(
     store: ProgressSyncStore,
     item: ReadableItem,
@@ -83,6 +127,8 @@ fun applyRemoteProgressSyncDecision(
 ) {
     when (decision) {
         RemoteProgressSyncDecision.KeepLocal -> Unit
+        // The caller holds the offer until you choose (BackwardProgressOffers); the place stays.
+        is RemoteProgressSyncDecision.OfferRemote -> Unit
         RemoteProgressSyncDecision.ClearLocal -> store.clearProgress(item.id)
         is RemoteProgressSyncDecision.ApplyRemote -> store.saveProgress(
             item = item,

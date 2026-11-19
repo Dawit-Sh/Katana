@@ -59,6 +59,17 @@ data class AppReaderCompletionState(
 )
 
 /**
+ * A book about to open whose server place is behind this device's ([offer]): it opens once you pick
+ * stay or go. [item], [selectedReaderItem] and [openMode] are how it was being opened.
+ */
+data class AppProgressOfferPrompt(
+    val item: ReadableItem,
+    val selectedReaderItem: ReadableItem?,
+    val openMode: ReaderOpenMode,
+    val offer: BackwardProgressOffer,
+)
+
+/**
  * The list a book was opened from, in [itemIds]' order: while it holds the open book, Read next
  * follows the list instead of the series. Opening a book from anywhere else clears it.
  */
@@ -127,6 +138,7 @@ data class AppUiState(
     val pendingRemoteSyncSummary: AppPendingRemoteSyncSummary = AppPendingRemoteSyncSummary(),
     val sourceConnectivityBySource: Map<SourceType, SourceConnectivityState> = emptyMap(),
     val readerCompletionState: AppReaderCompletionState? = null,
+    val progressOfferPrompt: AppProgressOfferPrompt? = null,
     val readerListContext: AppReaderListContext? = null,
 ) {
     val selectedLibraryFilters: LibraryFilterState
