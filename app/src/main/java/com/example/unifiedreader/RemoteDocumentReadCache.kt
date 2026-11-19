@@ -5,13 +5,14 @@ import android.net.Uri
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.core.model.isBookReaderFormat
-import com.example.unifiedreader.core.model.writeFileAtomically
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 class RemoteDocumentReadCache @Inject constructor(
     @param:ApplicationContext private val context: Context,
@@ -20,6 +21,9 @@ class RemoteDocumentReadCache @Inject constructor(
     private val remoteSourceConnectivityPolicy: RemoteSourceConnectivityPolicy,
 ) {
     private val readCacheMutex = Mutex()
+    private val partialDownloads = PartialDownloads(
+        File(context.applicationContext.cacheDir, "grimmory-reader-documents-partial"),
+    )
     private val grimmoryRequestRunner = GrimmoryStoredSessionRequestRunner(grimmoryCredentialStore)
 
     fun hasCachedDocument(
@@ -39,28 +43,26 @@ class RemoteDocumentReadCache @Inject constructor(
         readCacheMutex.withLock {
             if (file.hasReadableContent()) return@withLock
             try {
-                writeFileAtomically(
-                    destination = file,
-                    targetDescription = "reader cache for ${item.title}",
-                ) { temporaryFile ->
-                    runWithStoredSessionAddressFailover(
-                        sessionStore = grimmoryCredentialStore,
-                        session = session,
-                        createApi = grimmoryApiFactory::create,
-                    ) { api, activeSession ->
-                        grimmoryRequestRunner.run(
-                            api = api,
-                            session = activeSession,
-                        ) { accessToken ->
-                            api.downloadBookContent(
-                                accessToken = accessToken,
-                                bookId = remoteItemId,
-                                bookType = item.remoteFileType ?: item.format.name,
-                                destination = temporaryFile,
-                            )
-                        }
+                // A book whose download broke off goes on from its bytes when it is opened again.
+                val partial = partialDownloads.forBook(file)
+                runWithStoredSessionAddressFailover(
+                    sessionStore = grimmoryCredentialStore,
+                    session = session,
+                    createApi = grimmoryApiFactory::create,
+                ) { api, activeSession ->
+                    grimmoryRequestRunner.run(
+                        api = api,
+                        session = activeSession,
+                    ) { accessToken ->
+                        api.downloadBookContentResumably(
+                            accessToken = accessToken,
+                            bookId = remoteItemId,
+                            bookType = item.remoteFileType ?: item.format.name,
+                            target = partial,
+                        )
                     }
                 }
+                withContext(Dispatchers.IO) { partial.moveInto(file, targetDescription = "reader cache for ${item.title}") }
                 downloadedFromNetwork = true
             } catch (error: CancellationException) {
                 throw error

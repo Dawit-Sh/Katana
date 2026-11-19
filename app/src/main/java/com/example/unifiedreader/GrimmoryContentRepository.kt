@@ -4,8 +4,7 @@ import android.content.Context
 import com.example.unifiedreader.core.model.AppReadableFormats
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
-import com.example.unifiedreader.core.model.writeFileAtomically
-import java.io.File
+import com.example.unifiedreader.core.network.PartialDownloadFile
 
 interface GrimmoryContentDataSource : com.example.unifiedreader.feature.downloads.RemoteItemDownloadDataSource
 
@@ -28,11 +27,8 @@ class GrimmoryContentRepository(
         session: GrimmoryStoredSession,
         item: ReadableItem,
         remoteItemId: String,
-        destination: File,
-    ) = writeFileAtomically(
-        destination = destination,
-        targetDescription = "downloaded Grimmory file for ${item.title}",
-    ) { temporaryFile ->
+        target: PartialDownloadFile,
+    ) {
         runWithStoredSessionAddressFailover(
             sessionStore = grimmoryCredentialStore,
             session = session,
@@ -42,11 +38,11 @@ class GrimmoryContentRepository(
                 api = api,
                 session = activeSession,
             ) { accessToken ->
-                api.downloadBookContent(
+                api.downloadBookContentResumably(
                     accessToken = accessToken,
                     bookId = remoteItemId,
                     bookType = item.remoteFileType ?: item.format.name,
-                    destination = temporaryFile,
+                    target = target,
                 )
             }
         }

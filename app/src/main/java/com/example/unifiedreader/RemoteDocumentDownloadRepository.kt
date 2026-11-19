@@ -5,6 +5,7 @@ import android.net.Uri
 import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
+import com.example.unifiedreader.core.network.PartialDownloadFile
 import com.example.unifiedreader.feature.downloads.RemoteItemDownloadDataSource
 import com.example.unifiedreader.feature.downloads.RemoteItemDownloadResult
 import java.io.File
@@ -13,6 +14,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
+/**
+ * A server's books downloaded to this device, one file each in [storageDirectoryName]. A download in progress
+ * lives apart, in `download-partials/`, until it is whole: one that breaks off (the Wi-Fi drops, the system
+ * stops the work) goes on from its bytes next time, and a half file is never taken for a book.
+ */
 abstract class RemoteDocumentDownloadRepository<Session : StoredSourceSession>(
     private val context: Context,
     final override val sourceType: SourceType,
@@ -22,6 +28,9 @@ abstract class RemoteDocumentDownloadRepository<Session : StoredSourceSession>(
     private val missingSessionMessage: String,
 ) : RemoteItemDownloadDataSource {
     private val documentDownloadMutex = Mutex()
+    private val partialDownloads = PartialDownloads(
+        File(File(context.applicationContext.filesDir, PARTIAL_DOWNLOADS_DIRECTORY_NAME), storageDirectoryName),
+    )
 
     final override fun supports(
         item: ReadableItem,
@@ -31,7 +40,7 @@ abstract class RemoteDocumentDownloadRepository<Session : StoredSourceSession>(
         item: ReadableItem,
     ): Uri? {
         if (!supports(item)) return null
-        val file = localFileFor(item)
+        val file = item.documentFile
         return if (file.isFile && file.length() > 0L) {
             Uri.fromFile(file)
         } else {
@@ -53,18 +62,23 @@ abstract class RemoteDocumentDownloadRepository<Session : StoredSourceSession>(
                 downloadedFromNetwork = false,
             )
         }
-        val file = localFileFor(item)
+        val file = item.documentFile
         var downloadedFromNetwork = false
         documentDownloadMutex.withLock {
             storedDocumentUri(item)?.let { return@withLock }
             val session = sessionStore.activeSessionFor(item) ?: error(missingSessionMessage)
             val remoteItemId = item.remoteId ?: error("Unable to resolve ${sourceType.displayName()} item id.")
+            val partial = partialDownloads.forBook(file)
+            withContext(Dispatchers.IO) { partialDownloads.forgetAbandoned(keep = partial) }
             download(
                 session = session,
                 item = item,
                 remoteItemId = remoteItemId,
-                destination = file,
+                target = partial,
             )
+            withContext(Dispatchers.IO) {
+                partial.moveInto(file, targetDescription = "downloaded ${sourceType.displayName()} file for ${item.title}")
+            }
             onStoredDocumentChanged(item)
             downloadedFromNetwork = true
         }
@@ -84,11 +98,18 @@ abstract class RemoteDocumentDownloadRepository<Session : StoredSourceSession>(
             .mapTo(mutableSetOf(), ReadableItem::id)
     }
 
+    final override suspend fun deletePartialDownload(
+        item: ReadableItem,
+    ) = withContext(Dispatchers.IO) {
+        if (supports(item)) partialDownloads.forBook(item.documentFile).delete()
+    }
+
     final override suspend fun deleteStoredDocument(
         item: ReadableItem,
     ): Boolean = withContext(Dispatchers.IO) {
         if (!supports(item)) return@withContext false
-        val file = localFileFor(item)
+        val file = item.documentFile
+        partialDownloads.forBook(file).delete()
         val deleted = file.exists() && file.delete()
         if (deleted) {
             onStoredDocumentChanged(item)
@@ -96,11 +117,15 @@ abstract class RemoteDocumentDownloadRepository<Session : StoredSourceSession>(
         deleted
     }
 
+    /**
+     * Downloads [item] into [target], going on after the bytes it already holds when the server allows; on
+     * return [target] holds the whole file. When the connection breaks off, [target] keeps what arrived.
+     */
     protected abstract suspend fun download(
         session: Session,
         item: ReadableItem,
         remoteItemId: String,
-        destination: File,
+        target: PartialDownloadFile,
     )
 
     protected open fun onStoredDocumentChanged(
@@ -112,16 +137,15 @@ abstract class RemoteDocumentDownloadRepository<Session : StoredSourceSession>(
         extension: String,
     ): String = item.remoteDocumentCacheFileName(extension)
 
-    private fun localFileFor(
-        item: ReadableItem,
-    ): File {
-        val extension = item.format.name.lowercase()
-        return File(
+    // Where the book is kept once downloaded, there or not.
+    private val ReadableItem.documentFile: File
+        get() = File(
             File(context.applicationContext.filesDir, storageDirectoryName),
-            cacheFileName(item = item, extension = extension),
+            cacheFileName(item = this, extension = format.name.lowercase()),
         )
-    }
 }
+
+private const val PARTIAL_DOWNLOADS_DIRECTORY_NAME = "download-partials"
 
 internal fun ReadableItem.remoteDocumentCacheFileName(
     extension: String,

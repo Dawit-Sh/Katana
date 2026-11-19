@@ -6,6 +6,7 @@ import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.core.model.remoteLibraryId
 import com.example.unifiedreader.core.model.remoteItemId
+import com.example.unifiedreader.core.network.PartialDownloadFile
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,6 +14,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -55,10 +57,53 @@ class RemoteDocumentDownloadRepositoryTest {
         assertEquals(listOf(item.id), invalidatedItemIds)
         assertNull(repository.storedDocumentUri(item))
     }
+
+    @Test
+    fun `a download that breaks off keeps its bytes apart and the next try goes on from them`() = runBlocking {
+        val repository = TestRemoteDocumentDownloadRepository(
+            cacheInvalidationDispatcher = DownloadedRemoteComicCacheInvalidationDispatcher(),
+            breakOffAfter = "first half|",
+        )
+        val item = testRemoteComic(id = "broken-off")
+
+        val failure = runCatching { repository.downloadToLocalStorage(item) }.exceptionOrNull()
+
+        assertTrue("$failure", failure is java.net.SocketException)
+        // Half a file is never taken for the book.
+        assertNull(repository.storedDocumentUri(item))
+        assertEquals(listOf(0L), repository.bytesHeldAtStart)
+
+        val uri = repository.downloadToLocalStorage(item)
+
+        assertNotNull(uri)
+        assertEquals(listOf(0L, "first half|".length.toLong()), repository.bytesHeldAtStart)
+        assertEquals("first half|second half", File(checkNotNull(uri?.path)).readText())
+        assertTrue(repository.partialFiles().isEmpty())
+    }
+
+    @Test
+    fun `removing a book or its download forgets the bytes a broken-off download kept`() = runBlocking {
+        val repository = TestRemoteDocumentDownloadRepository(
+            cacheInvalidationDispatcher = DownloadedRemoteComicCacheInvalidationDispatcher(),
+            breakOffAfter = "first half|",
+        )
+        val first = testRemoteComic(id = "forget-on-cancel")
+        val second = testRemoteComic(id = "forget-on-delete")
+        runCatching { repository.downloadToLocalStorage(first) }
+        runCatching { repository.downloadToLocalStorage(second) }
+        assertEquals(4, repository.partialFiles().size)
+
+        repository.deletePartialDownload(first)
+        repository.deleteStoredDocument(second)
+
+        assertTrue(repository.partialFiles().isEmpty())
+    }
 }
 
 private class TestRemoteDocumentDownloadRepository(
     private val cacheInvalidationDispatcher: DownloadedRemoteComicCacheInvalidationDispatcher,
+    // Each first try writes this much, then the connection drops.
+    private val breakOffAfter: String? = null,
 ) : RemoteDocumentDownloadRepository<TestDownloadStoredSession>(
     context = ApplicationProvider.getApplicationContext(),
     sourceType = SourceType.KAVITA,
@@ -74,14 +119,34 @@ private class TestRemoteDocumentDownloadRepository(
     ),
     missingSessionMessage = "Missing test session.",
 ) {
+    val bytesHeldAtStart = mutableListOf<Long>()
+    private val brokenOffItemIds = mutableSetOf<String>()
+
+    fun partialFiles(): List<File> {
+        val filesDir = ApplicationProvider.getApplicationContext<android.content.Context>().filesDir
+        return File(filesDir, "download-partials/test-remote-document-downloads")
+            .walkTopDown()
+            .filter(File::isFile)
+            .toList()
+    }
+
     override suspend fun download(
         session: TestDownloadStoredSession,
         item: ReadableItem,
         remoteItemId: String,
-        destination: File,
+        target: PartialDownloadFile,
     ) {
-        destination.parentFile?.mkdirs()
-        destination.writeText("downloaded:$remoteItemId")
+        bytesHeldAtStart += target.downloadedBytes
+        target.dataFile.parentFile?.mkdirs()
+        if (breakOffAfter == null) {
+            target.dataFile.writeText("downloaded:$remoteItemId")
+        } else if (brokenOffItemIds.add(item.id)) {
+            target.dataFile.writeText(breakOffAfter)
+            target.infoFile.writeText("totalBytes=22")
+            throw java.net.SocketException("Software caused connection abort")
+        } else {
+            target.dataFile.appendText("second half")
+        }
     }
 
     override fun onStoredDocumentChanged(

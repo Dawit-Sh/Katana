@@ -4,9 +4,8 @@ import android.content.Context
 import com.example.unifiedreader.core.model.ComicReaderFormats
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
-import com.example.unifiedreader.core.model.writeFileAtomically
+import com.example.unifiedreader.core.network.PartialDownloadFile
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.io.File
 import javax.inject.Inject
 
 class StumpContentRepository @Inject constructor(
@@ -28,11 +27,8 @@ class StumpContentRepository @Inject constructor(
         session: StumpStoredSession,
         item: ReadableItem,
         remoteItemId: String,
-        destination: File,
-    ) = writeFileAtomically(
-        destination = destination,
-        targetDescription = "downloaded Stump file for ${item.title}",
-    ) { temporaryFile ->
+        target: PartialDownloadFile,
+    ) {
         runWithStoredSessionAddressFailover(
             sessionStore = stumpCredentialStore,
             session = session,
@@ -42,10 +38,10 @@ class StumpContentRepository @Inject constructor(
                 api = api,
                 session = activeSession,
             ) { accessToken ->
-                api.downloadMediaFile(
+                api.downloadMediaFileResumably(
                     accessToken = accessToken,
                     mediaId = remoteItemId,
-                    destination = temporaryFile,
+                    target = target,
                 )
             }
         }

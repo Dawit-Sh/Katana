@@ -39,6 +39,11 @@ interface RemoteItemDownloadDataSource {
     suspend fun deleteStoredDocument(
         item: ReadableItem,
     ): Boolean
+
+    /** Forgets the bytes a download of [item] that broke off had kept, so the next one starts over. */
+    suspend fun deletePartialDownload(
+        item: ReadableItem,
+    ) = Unit
 }
 
 data class RemoteItemDownloadResult(

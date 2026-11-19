@@ -4,9 +4,8 @@ import android.content.Context
 import com.example.unifiedreader.core.model.AppReadableFormats
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
-import com.example.unifiedreader.core.model.writeFileAtomically
+import com.example.unifiedreader.core.network.PartialDownloadFile
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.io.File
 import javax.inject.Inject
 
 class KavitaContentRepository @Inject constructor(
@@ -28,11 +27,8 @@ class KavitaContentRepository @Inject constructor(
         session: KavitaStoredSession,
         item: ReadableItem,
         remoteItemId: String,
-        destination: File,
-    ) = writeFileAtomically(
-        destination = destination,
-        targetDescription = "downloaded Kavita file for ${item.title}",
-    ) { temporaryFile ->
+        target: PartialDownloadFile,
+    ) {
         runWithStoredSessionAddressFailover(
             sessionStore = kavitaCredentialStore,
             session = session,
@@ -42,11 +38,11 @@ class KavitaContentRepository @Inject constructor(
                 api = api,
                 session = activeSession,
             ) { accessToken, apiKey ->
-                api.downloadChapter(
+                api.downloadChapterResumably(
                     accessToken = accessToken,
                     chapterId = remoteItemId,
                     apiKey = apiKey,
-                    destination = temporaryFile,
+                    target = target,
                 )
             }
         }
