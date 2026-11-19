@@ -1,12 +1,10 @@
 package com.example.unifiedreader
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import com.example.unifiedreader.ui.theme.AppMotion
 import com.example.unifiedreader.core.model.SourceType
 import kotlinx.coroutines.delay
@@ -245,21 +243,17 @@ fun UnifiedReaderAppContent(
                             }
                         }
                     }
-                    // Adding a server comes and goes on the same fade-through as a screen change; the last
-                    // request keeps drawing while it fades out.
+                    // Adding a server comes over the screen like a peer screen (fading in as it grows from
+                    // 0.98) and leaves the same way backwards; the last request keeps drawing while it goes.
                     val startRequest = sourceStartRequest?.takeIf { !isReaderMode }
                     val shownStartRequest = remember { mutableStateOf(startRequest) }
                     if (startRequest != null) shownStartRequest.value = startRequest
                     AnimatedVisibility(
                         visible = startRequest != null,
-                        enter = fadeIn(
-                            tween(
-                                durationMillis = AppMotion.screenFadeInMillis,
-                                delayMillis = AppMotion.screenFadeOutMillis,
-                                easing = LinearOutSlowInEasing,
-                            ),
-                        ) + scaleIn(AppMotion.spatial(), initialScale = AppMotion.fadeThroughInitialScale),
-                        exit = fadeOut(tween(AppMotion.screenFadeOutMillis, easing = LinearEasing)),
+                        enter = fadeIn(AppMotion.pageFadeIn()) +
+                            scaleIn(AppMotion.pageMove(), initialScale = AppMotion.pageInitialScale),
+                        exit = fadeOut(AppMotion.pageFadeAway()) +
+                            scaleOut(AppMotion.pageMove(), targetScale = AppMotion.pageInitialScale),
                         modifier = Modifier.fillMaxSize(),
                     ) {
                         shownStartRequest.value?.let { request ->

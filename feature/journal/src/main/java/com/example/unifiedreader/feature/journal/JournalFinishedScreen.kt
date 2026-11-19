@@ -176,7 +176,7 @@ fun JournalFinishedScreen(
                     .fillMaxWidth()
                     .graphicsLayer {
                         alpha = shown.value
-                        scaleX = AppMotion.fadeThroughInitialScale + (1f - AppMotion.fadeThroughInitialScale) * shown.value
+                        scaleX = AppMotion.panelInitialScale + (1f - AppMotion.panelInitialScale) * shown.value
                         scaleY = scaleX
                     }
                     .clip(shape)

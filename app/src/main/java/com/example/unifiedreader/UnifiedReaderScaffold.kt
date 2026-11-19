@@ -1,6 +1,5 @@
 package com.example.unifiedreader
 
-import androidx.compose.animation.AnimatedContent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -82,6 +81,8 @@ import com.example.unifiedreader.feature.settings.settingsUsesSidePane
 import com.example.unifiedreader.feature.updates.AppUpdateActions
 import com.example.unifiedreader.feature.updates.AppUpdateState
 import com.example.unifiedreader.ui.components.AppBackground
+import com.example.unifiedreader.ui.components.AppBarSwitch
+import com.example.unifiedreader.ui.components.AppScreenBack
 import com.example.unifiedreader.ui.components.AppScreenHost
 import com.example.unifiedreader.ui.components.AppToastHost
 import com.example.unifiedreader.ui.components.AppTopBarDefaults
@@ -450,8 +451,14 @@ fun UnifiedReaderScaffold(
                         .fillMaxSize()
                         .appGlassSource(),
                 ) {
+                    // Back from Lists, Bookmarks, Journal or Settings returns to the library (with the
+                    // predictive gesture) once the screen has nothing of its own left to close. An open
+                    // menu closes first: its own back is registered before this one, so this one steps aside.
                     AppScreenHost(
                         screen = uiState.topLevel,
+                        back = topLevelBackTarget(uiState.topLevel)?.takeIf { drawerState.isClosed }?.let { target ->
+                            AppScreenBack(target) { viewModel.onTopLevelSelected(target) }
+                        },
                         modifier = Modifier.fillMaxSize(),
                     ) { topLevel ->
                         when (topLevel) {
@@ -551,7 +558,7 @@ fun UnifiedReaderScaffold(
                                 modifier = Modifier.fillMaxSize(),
                             )
 
-                            TopLevelDestination.Lists -> if (listsViewModel != null) {
+                            TopLevelDestination.Lists -> if (listsViewModel != null) AppBackground(modifier = Modifier.fillMaxSize()) {
                                 ListsRoute(
                                     state = listsState,
                                     uiState = uiState,
@@ -575,7 +582,7 @@ fun UnifiedReaderScaffold(
                                 )
                             }
 
-                            TopLevelDestination.Bookmarks -> if (bookmarks != null) {
+                            TopLevelDestination.Bookmarks -> if (bookmarks != null) AppBackground(modifier = Modifier.fillMaxSize()) {
                                 BookmarksRoute(
                                     bookmarks = bookmarks,
                                     uiState = uiState,
@@ -587,7 +594,7 @@ fun UnifiedReaderScaffold(
                                 )
                             }
 
-                            TopLevelDestination.Journal -> {
+                            TopLevelDestination.Journal -> AppBackground(modifier = Modifier.fillMaxSize()) {
                                 // The heavy full journal snapshot (stats/timelines/catalog join) is
                                 // built in the background once the library has loaded (see
                                 // rememberWarmJournalSnapshot); until the first one, the lightweight
@@ -643,18 +650,16 @@ fun UnifiedReaderScaffold(
                 }
                 Box(modifier = Modifier.align(Alignment.TopCenter)) {
                     CompositionLocalProvider(LocalDrawerButtonDot provides (waitingUpdateVersion != null)) {
-                        // The bar changes with the screen under it, on the screen's fade-through.
-                        AnimatedContent(
+                        // The bar changes with the screen under it, on the screen's change.
+                        AppBarSwitch(
                             targetState = uiState.topLevel,
-                            transitionSpec = { topBarFadeThrough() },
                             contentAlignment = Alignment.TopCenter,
                             label = "topLevelTopBar",
                         ) { topLevel ->
                             when (topLevel) {
-                                TopLevelDestination.Library -> AnimatedContent(
+                                TopLevelDestination.Library -> AppBarSwitch(
                                     targetState = activeLibraryShelfBrowser,
                                     contentKey = { browser -> browser?.kind },
-                                    transitionSpec = { topBarFadeThrough() },
                                     contentAlignment = Alignment.TopCenter,
                                     label = "libraryTopBar",
                                 ) { shelfBrowser ->

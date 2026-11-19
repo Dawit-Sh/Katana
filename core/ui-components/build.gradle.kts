@@ -5,6 +5,8 @@ plugins {
 
 android {
     namespace = "com.example.unifiedreader.core.ui.components"
+    // AppScreenHostBackTest runs the host on Robolectric, in an activity from ui-test-manifest.
+    testOptions.unitTests.isIncludeAndroidResources = true
 }
 
 dependencies {
@@ -16,6 +18,11 @@ dependencies {
     implementation(libs.haze)
 
     testImplementation(libs.junit4)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
 // The rule tests (FeatureMaterialImportRuleTest, AppLayoutRuleTest, DesignSystemRuleTest) scan

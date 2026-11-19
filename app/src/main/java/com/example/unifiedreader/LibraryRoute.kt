@@ -183,6 +183,7 @@ internal fun LibraryRoute(
             screen = screen,
             frame = currentFrame,
             transitionFor = ::libraryScreenTransition,
+            ground = true,
             modifier = Modifier.fillMaxSize(),
         ) { shownScreen, frame ->
             // The shelves (and the "See all" browser) render from this context. Its download/read maps come
@@ -439,10 +440,10 @@ internal fun libraryScreenTransition(
     from: LibraryScreenKey,
     to: LibraryScreenKey,
 ): AppScreenTransition = when {
-    from.source != to.source -> AppScreenTransition.FadeThrough
+    from.source != to.source -> AppScreenTransition.Fade
     to.depth > from.depth -> AppScreenTransition.Forward
     to.depth < from.depth -> AppScreenTransition.Backward
-    else -> AppScreenTransition.FadeThrough
+    else -> AppScreenTransition.Fade
 }
 
 /** Everything one library screen draws from, kept per screen while it animates out. */

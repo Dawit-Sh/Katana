@@ -224,9 +224,11 @@ fun SettingsScreen(
                 when {
                     from == null || to?.parent == from -> AppScreenTransition.Forward
                     to == null || from.parent == to -> AppScreenTransition.Backward
-                    else -> AppScreenTransition.FadeThrough
+                    else -> AppScreenTransition.Fade
                 }
             },
+            // The settings route is on the ground: a page covers the hub as it slides in.
+            ground = true,
         ) { openPage ->
             if (openPage == null) {
                 hub(null, appGutter(), Modifier)

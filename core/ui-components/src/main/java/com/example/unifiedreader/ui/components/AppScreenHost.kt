@@ -9,10 +9,7 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.Easing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.SeekableTransitionState
-import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -21,9 +18,11 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -35,6 +34,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -49,12 +49,15 @@ import androidx.compose.ui.unit.dp
 import com.example.unifiedreader.ui.theme.AppMotion
 import kotlin.coroutines.cancellation.CancellationException
 
-/** How an [AppScreenHost] moves from one screen to the next. */
+/** How an [AppScreenHost] moves from one screen to the next (the values are [AppMotion]'s page change). */
 enum class AppScreenTransition {
-    /** Between peers (Library, Journal, Settings; opening a book): fade out, then fade up from 0.96. */
-    FadeThrough,
+    /**
+     * Between peers (Library, Lists, Journal, Settings; opening a book): the new screen fades in over
+     * the old one as it grows from 0.98, and the old one fades out under it.
+     */
+    Fade,
 
-    /** One level deeper (a series, a shelf, a settings page): both screens slide toward the start. */
+    /** One level deeper (a series, a shelf, a settings page): both screens slide toward the start as they cross-fade. */
     Forward,
 
     /** Back up a level: the reverse of [Forward]. */
@@ -135,14 +138,23 @@ fun AppScreenBackHandler(
 }
 
 /**
- * Shows one screen at a time and animates between them: [AppScreenTransition.FadeThrough] between
- * peers and a 30 dp shared-axis slide between levels, as [transitionFor] decides. With [back]
+ * Shows one screen at a time and animates between them: [AppScreenTransition.Fade] between
+ * peers and a 30 dp shared-axis slide between levels, as [transitionFor] decides. A change waits
+ * until the new screen has been composed and drawn once (the old one stays as it was meanwhile),
+ * then plays: the screen never goes blank between two screens, and a heavy screen's first frame
+ * never eats into the change. With [back]
  * set, back is handled here, and a predictive back gesture shows [AppScreenBack.target]
  * underneath while the current screen follows the finger, shrinks and rounds its corners;
  * letting go finishes the change from there, cancelling springs back.
  *
  * Screens with the same [contentKey] share one slot, so changing between them recomposes in
  * place instead of animating.
+ *
+ * With [ground], each screen is drawn on the window's ground (the background colour and the
+ * theme's pattern) while a change plays, so the new screen covers the old one as it fades in
+ * instead of the two showing through each other. Use it where the host fills an area that is
+ * itself on that ground at the same place (a route on [AppBackground]), so the pattern lines up;
+ * not in a sheet, a pane beside another, or over a book.
  */
 @Composable
 fun <S> AppScreenHost(
@@ -150,7 +162,8 @@ fun <S> AppScreenHost(
     modifier: Modifier = Modifier,
     back: AppScreenBack<S>? = null,
     contentKey: (S) -> Any? = { it },
-    transitionFor: (from: S, to: S) -> AppScreenTransition = { _, _ -> AppScreenTransition.FadeThrough },
+    transitionFor: (from: S, to: S) -> AppScreenTransition = { _, _ -> AppScreenTransition.Fade },
+    ground: Boolean = false,
     content: @Composable (S) -> Unit,
 ) {
     AppScreenHost(
@@ -160,6 +173,7 @@ fun <S> AppScreenHost(
         back = back,
         contentKey = contentKey,
         transitionFor = transitionFor,
+        ground = ground,
     ) { shown, _ -> content(shown) }
 }
 
@@ -175,7 +189,8 @@ fun <S, F> AppScreenHost(
     modifier: Modifier = Modifier,
     back: AppScreenBack<S>? = null,
     contentKey: (S) -> Any? = { it },
-    transitionFor: (from: S, to: S) -> AppScreenTransition = { _, _ -> AppScreenTransition.FadeThrough },
+    transitionFor: (from: S, to: S) -> AppScreenTransition = { _, _ -> AppScreenTransition.Fade },
+    ground: Boolean = false,
     content: @Composable (screen: S, frame: F) -> Unit,
 ) {
     val seekState = remember { SeekableTransitionState(screen) }
@@ -200,6 +215,7 @@ fun <S, F> AppScreenHost(
             seekState.seekTo(gesture.progress * GestureShare, targetState = gestureBack.target)
         } else {
             if (seekState.currentState != screen || seekState.targetState != screen) {
+                seekState.holdUntilDrawn(screen)
                 seekState.animateTo(screen)
             }
             gesture.follows = false
@@ -218,6 +234,9 @@ fun <S, F> AppScreenHost(
     val layoutDirection = LocalLayoutDirection.current
     val density = LocalDensity.current
     val leavingAround = LocalAppScreenLeaving.current
+    // While a change plays (or a gesture scrubs one), every screen in it is opaque.
+    val groundColor = MaterialTheme.colorScheme.background
+    val changing = ground && seekState.currentState != seekState.targetState
     CompositionLocalProvider(LocalAppScreenBackGesture provides gesture) {
         screenTransition.AnimatedContent(
             modifier = modifier,
@@ -248,7 +267,8 @@ fun <S, F> AppScreenHost(
                             shape = RoundedCornerShape(corner)
                             clip = true
                         }
-                    },
+                    }
+                    .then(if (changing) Modifier.background(groundColor).appGroundPattern() else Modifier),
             ) {
                 CompositionLocalProvider(LocalAppScreenLeaving provides leaving) {
                     content(shown, shownFrame)
@@ -268,25 +288,40 @@ fun appScreenTransform(
     density: Density,
 ): ContentTransform = screenTransform(kind, layoutDirection, density)
 
+/**
+ * A change from a settled screen first composes and draws the new screen at the change's start
+ * (where it is see-through and the old screen is as it was), and only then plays. The frame that
+ * builds a heavy screen (the library, a book) then falls before the change instead of inside it,
+ * where it would skip the change's first frames: the old screen gone at once, a bare frame, the
+ * new one popping in. An interrupted change, or one a gesture has already started, just goes on.
+ */
+internal suspend fun <S> SeekableTransitionState<S>.holdUntilDrawn(target: S) {
+    if (currentState != targetState || targetState == target) return
+    seekTo(0f, targetState = target)
+    awaitNewContentDrawn()
+}
+
+/** The frame after a change composes, lays out and draws what it brought; the one after that is free. */
+internal suspend fun awaitNewContentDrawn() {
+    repeat(FramesUntilDrawn) { withFrameNanos { } }
+}
+
+private const val FramesUntilDrawn = 2
+
 private fun screenTransform(
     kind: AppScreenTransition,
     layoutDirection: LayoutDirection,
     density: Density,
 ): ContentTransform {
-    val fadeOut = fadeOut(tween(AppMotion.screenFadeOutMillis, easing = LinearEasing))
-    val fadeIn = fadeIn(
-        tween(
-            durationMillis = AppMotion.screenFadeInMillis,
-            delayMillis = AppMotion.screenFadeOutMillis,
-            easing = LinearOutSlowInEasing,
-        ),
-    )
+    // The new screen fades in over the old one; the old one fades out under it once it is mostly covered.
+    val fadeIn = fadeIn(AppMotion.pageFadeIn())
+    val fadeOut = fadeOut(AppMotion.pageFadeOut())
     val towardEnd = if (layoutDirection == LayoutDirection.Ltr) 1 else -1
     val offset = with(density) { AppMotion.sharedAxisOffset.roundToPx() } * towardEnd
-    val slideSpec = AppMotion.spatial(IntOffset.VisibilityThreshold)
+    val slideSpec = AppMotion.pageMove<IntOffset>()
     val (enter, exit) = when (kind) {
-        AppScreenTransition.FadeThrough ->
-            fadeIn + scaleIn(AppMotion.spatial(), initialScale = AppMotion.fadeThroughInitialScale) to fadeOut
+        AppScreenTransition.Fade ->
+            fadeIn + scaleIn(AppMotion.pageMove(), initialScale = AppMotion.pageInitialScale) to fadeOut
 
         AppScreenTransition.Forward ->
             slideInHorizontally(slideSpec) { offset } + fadeIn to slideOutHorizontally(slideSpec) { -offset } + fadeOut

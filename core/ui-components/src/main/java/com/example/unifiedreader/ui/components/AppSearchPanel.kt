@@ -119,9 +119,9 @@ fun AppSearchPanel(
                 AnimatedVisibility(
                     visibleState = visibleState,
                     enter = fadeIn(AppMotion.effects()) +
-                        scaleIn(AppMotion.spatial(), initialScale = AppMotion.fadeThroughInitialScale, transformOrigin = TransformOrigin(0.5f, 0f)),
+                        scaleIn(AppMotion.spatial(), initialScale = AppMotion.panelInitialScale, transformOrigin = TransformOrigin(0.5f, 0f)),
                     exit = fadeOut(AppMotion.effects()) +
-                        scaleOut(AppMotion.spatial(), targetScale = AppMotion.fadeThroughInitialScale, transformOrigin = TransformOrigin(0.5f, 0f)),
+                        scaleOut(AppMotion.spatial(), targetScale = AppMotion.panelInitialScale, transformOrigin = TransformOrigin(0.5f, 0f)),
                 ) {
                     AppPanel(
                         modifier = modifier

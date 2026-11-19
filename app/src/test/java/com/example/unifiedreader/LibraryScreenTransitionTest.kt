@@ -34,7 +34,7 @@ class LibraryScreenTransitionTest {
         val oneSeries = libraryScreenKey(kavitaRoot.copy(selectedKavitaSeriesKey = "lib::1"), shelvesOpen = false)
         val anotherSeries = libraryScreenKey(kavitaRoot.copy(selectedKavitaSeriesKey = "lib::2"), shelvesOpen = false)
 
-        assertEquals(AppScreenTransition.FadeThrough, libraryScreenTransition(oneSeries, anotherSeries))
+        assertEquals(AppScreenTransition.Fade, libraryScreenTransition(oneSeries, anotherSeries))
     }
 
     @Test
@@ -42,8 +42,8 @@ class LibraryScreenTransitionTest {
         val kavitaSeries = libraryScreenKey(kavitaRoot.copy(selectedKavitaSeriesKey = "series-1"), shelvesOpen = false)
         val local = libraryScreenKey(AppUiState(selectedSource = SourceType.LOCAL), shelvesOpen = false)
 
-        assertEquals(AppScreenTransition.FadeThrough, libraryScreenTransition(kavitaSeries, local))
-        assertEquals(AppScreenTransition.FadeThrough, libraryScreenTransition(local, kavitaSeries))
+        assertEquals(AppScreenTransition.Fade, libraryScreenTransition(kavitaSeries, local))
+        assertEquals(AppScreenTransition.Fade, libraryScreenTransition(local, kavitaSeries))
     }
 
     @Test
