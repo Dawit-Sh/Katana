@@ -31,8 +31,11 @@ detekt = "1.23.8"
 # The Kotlin version detekt 1.23.8 is built with; its own classpath must stay on it.
 detektKotlin = "2.0.21"
 composeRulesDetekt = "0.4.27"
+# PDFium for the text of PDF pages (selection, highlights). 1.0.x is built with Kotlin 2.2 like us; 2.x needs 2.4.
+pdfiumAndroid = "1.0.35"
 
 [libraries]
+pdfium-android = { group = "io.legere", name = "pdfiumandroid", version.ref = "pdfiumAndroid" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
 androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version = "1.4.1" }

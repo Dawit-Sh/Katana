@@ -1,6 +1,7 @@
 package com.example.unifiedreader.feature.reader.epub
 
 import android.view.ActionMode
+import com.example.unifiedreader.feature.reader.core.ReaderSelectionHighlight
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.epub.css.FontStyle
 import org.readium.r2.navigator.epub.css.FontWeight
@@ -26,7 +27,7 @@ internal fun epubNavigatorFragmentConfiguration(
         // Readium's own colour type is opaque only, so the value goes in as raw CSS.
         readiumCssRsProperties = readiumCssRsProperties.copy(
             pageGutter = pageGutterPx?.let(Length::Px) ?: readiumCssRsProperties.pageGutter,
-            overrides = readiumCssRsProperties.overrides + (SelectionBackgroundProperty to EpubSelectionHighlight.css),
+            overrides = readiumCssRsProperties.overrides + (SelectionBackgroundProperty to ReaderSelectionHighlight.css),
         )
         useReadiumCssFontSize = false
         // Highlights: Readium's fill and underline, plus our strikethrough and squiggle (EpubHighlightStyles.kt),

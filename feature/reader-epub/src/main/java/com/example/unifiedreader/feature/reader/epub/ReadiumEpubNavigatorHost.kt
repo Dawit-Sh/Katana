@@ -23,6 +23,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.FragmentContainerView
 import androidx.lifecycle.lifecycleScope
 import com.example.unifiedreader.core.model.ReadableItem
+import com.example.unifiedreader.feature.annotations.copyToClipboard
 import com.example.unifiedreader.feature.reader.core.ReaderTapSide
 import com.example.unifiedreader.feature.reader.core.ReaderTapZoneMaxWidth
 import com.example.unifiedreader.feature.reader.core.readerTapSide

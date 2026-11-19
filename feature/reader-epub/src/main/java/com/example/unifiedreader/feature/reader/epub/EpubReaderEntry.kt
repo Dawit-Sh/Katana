@@ -33,6 +33,8 @@ import com.example.unifiedreader.core.model.SyncState
 import com.example.unifiedreader.core.model.primaryAuthor
 import com.example.unifiedreader.feature.annotations.AnnotatedBook
 import com.example.unifiedreader.feature.annotations.AnnotationJumps
+import com.example.unifiedreader.feature.annotations.HighlightCardOverlay
+import com.example.unifiedreader.feature.annotations.HighlightNoteDialog
 import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
 import com.example.unifiedreader.feature.reader.core.ImmersiveReaderOverlay
 import com.example.unifiedreader.feature.reader.core.rememberReaderActiveSessionTracker
@@ -576,8 +578,8 @@ fun EpubReaderScreen(
                         ReaderTranslationOverlay(session = translationSession, service = translation)
                     }
                     annotationController?.let { controller ->
-                        EpubHighlightCardOverlay(controller = controller, highlights = bookHighlights)
-                        EpubHighlightNoteDialog(controller = controller, highlights = bookHighlights)
+                        HighlightCardOverlay(editor = controller.editor, highlights = bookHighlights)
+                        HighlightNoteDialog(editor = controller.editor, highlights = bookHighlights)
                     }
                 },
                 content = {

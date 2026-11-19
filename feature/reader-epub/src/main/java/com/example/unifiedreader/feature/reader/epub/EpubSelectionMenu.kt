@@ -1,8 +1,5 @@
 package com.example.unifiedreader.feature.reader.epub
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.view.ActionMode
 import android.view.Menu
 import android.view.MenuItem
@@ -252,11 +249,6 @@ internal fun CoroutineScope.withCurrentSelection(
         if (!read.isShort && !follows) fragment.clearSelection()
         block(read)
     }
-}
-
-internal fun Context.copyToClipboard(text: String) {
-    val clipboard = getSystemService(ClipboardManager::class.java) ?: return
-    clipboard.setPrimaryClip(ClipData.newPlainText(null, text))
 }
 
 /**

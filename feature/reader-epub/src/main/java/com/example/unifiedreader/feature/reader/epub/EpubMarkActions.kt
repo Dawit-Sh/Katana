@@ -1,9 +1,6 @@
 package com.example.unifiedreader.feature.reader.epub
 
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import com.example.unifiedreader.feature.annotations.AnnotatedBook
 import com.example.unifiedreader.feature.annotations.AnnotationExports
 import com.example.unifiedreader.feature.annotations.MarkdownExport
@@ -15,21 +12,6 @@ import com.example.unifiedreader.ui.components.AppToastState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.readium.r2.shared.publication.Locator
-
-/** The highlight being shared as an image, from its card; null while the share card is closed. */
-@Stable
-internal class EpubQuoteSharing {
-    var highlightId by mutableStateOf<String?>(null)
-        private set
-
-    fun open(highlightId: String) {
-        this.highlightId = highlightId
-    }
-
-    fun close() {
-        highlightId = null
-    }
-}
 
 /** The page bookmarks of the open book: the top bar's toggle and the panel's remove. Saved at once. */
 @Stable
