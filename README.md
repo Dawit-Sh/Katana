@@ -42,9 +42,6 @@ to work with. That's pretty much how Katana started.
 
 - **Bookmark sync.** Bookmarks stay on the device for now; they should sync both ways with Grimmory, like
   highlights do.
-- **Update checks without GitHub's limit.** The in-app updater asks GitHub's API, which allows 60 checks an hour per
-  connection; it could read the website's version file instead.
-- **"Add books" on an empty list** opens the Local library and drops the selection. Worth a look.
 
 ## Build it yourself
 
