@@ -47,8 +47,8 @@ Settings › About. The APKs aren't from the Play Store, so Play Protect may sho
 - **More formats.** MOBI, AZW, AZW3, FB2 and DjVu.
 - **Journal bits.** A reading streak card in the side menu and this month's highlights in the journal.
 - **Settings regrouped**, with a Storage page to see and clear what's on the device.
-- **Steadier sync.** The Grimmory sign-in survives flaky Wi-Fi, and Katana notices by itself when the server
-  is back.
+- **Steady on bad Wi-Fi.** The Grimmory sign-in survives a flaky connection, downloads pick up where they
+  stopped instead of starting over, and Katana notices by itself when the server is back.
 - **Modern phones.** The page keeps clear of camera holes and notches, one page at a time in landscape, and
   back leaves a book in one swipe.
 
