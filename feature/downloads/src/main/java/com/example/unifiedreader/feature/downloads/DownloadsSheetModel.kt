@@ -1,5 +1,6 @@
 package com.example.unifiedreader.feature.downloads
 
+import com.example.unifiedreader.core.model.DeviceClock
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.displayName
 import com.example.unifiedreader.core.model.libraryPrimaryText
@@ -79,7 +80,7 @@ internal fun downloadFinishedTimeLabel(
     val then = Instant.ofEpochMilli(epochMillis).atZone(zone)
     val today = localDateOf(nowEpochMillis, zone)
     return if (!then.toLocalDate().isBefore(today.minusDays(1))) {
-        then.format(DateTimeFormatter.ofPattern("HH:mm", Locale.US))
+        DeviceClock.format(then)
     } else {
         shortDayLabel(then.toLocalDate(), today)
     }

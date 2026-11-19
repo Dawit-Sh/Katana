@@ -1,11 +1,25 @@
 package com.example.unifiedreader.feature.settings
 
+import com.example.unifiedreader.core.model.DeviceClock
 import java.util.Calendar
 import java.util.Locale
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Test
 
 class SettingsFormattingTest {
+    // These read times the 24-hour way; DeviceClockTest covers the 12-hour default.
+    @Before
+    fun useTwentyFourHourClock() {
+        DeviceClock.uses24Hour = true
+    }
+
+    @After
+    fun restoreClock() {
+        DeviceClock.uses24Hour = false
+    }
+
     private val now = at(2026, Calendar.OCTOBER, 23, 12, 0)
 
     @Test

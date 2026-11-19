@@ -1,15 +1,29 @@
 package com.example.unifiedreader.feature.settings
 
+import com.example.unifiedreader.core.model.DeviceClock
 import com.example.unifiedreader.core.model.SourceConnectivityState
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.core.model.resolveLibraryFilterPanels
 import com.example.unifiedreader.ui.components.AppStatusTone
 import java.util.Calendar
 import java.util.Locale
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Test
 
 class SettingsHubLabelsTest {
+    // These read times the 24-hour way; DeviceClockTest covers the 12-hour default.
+    @Before
+    fun useTwentyFourHourClock() {
+        DeviceClock.uses24Hour = true
+    }
+
+    @After
+    fun restoreClock() {
+        DeviceClock.uses24Hour = false
+    }
+
     @Test
     fun `source status follows the stored session and connectivity`() {
         val connected = RemoteSourceConnectionUiState(source = SourceType.KAVITA, hasStoredSession = true)

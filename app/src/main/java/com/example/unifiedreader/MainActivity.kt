@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
+import com.example.unifiedreader.core.model.DeviceClock
 import com.example.unifiedreader.feature.library.LocalLibraryBookDescriptionLoader
 import com.example.unifiedreader.feature.reader.epub.discardRestoredEpubNavigators
 import com.example.unifiedreader.feature.reader.epub.installEpubNavigatorRestoreFactory
@@ -27,6 +28,7 @@ class MainActivity : FragmentActivity() {
         installEpubNavigatorRestoreFactory()
         super.onCreate(savedInstanceState)
         discardRestoredEpubNavigators()
+        DeviceClock.uses24Hour = android.text.format.DateFormat.is24HourFormat(this)
         // A fresh start keeps the splash up while the first screen is still placeholders; a
         // recreated activity (a rotation) has no splash to keep.
         val launchHold = if (savedInstanceState == null) {
@@ -49,6 +51,12 @@ class MainActivity : FragmentActivity() {
             }
         }
         AppStartupLog.mark("activity.setContent")
+    }
+
+    // Follows a change to the 24-hour clock setting made while Katana was in the background.
+    override fun onResume() {
+        super.onResume()
+        DeviceClock.uses24Hour = android.text.format.DateFormat.is24HourFormat(this)
     }
 }
 

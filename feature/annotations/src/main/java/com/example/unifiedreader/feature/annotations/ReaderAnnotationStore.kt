@@ -64,6 +64,14 @@ interface ReaderAnnotationStore : ReaderBookmarkStore, SavedWordStudyStore {
      */
     val placement: HighlightPlacementStore
         get() = HighlightPlacementStore.None
+
+    /**
+     * Puts right the chapter names saved with a book's highlights and bookmarks: [chapterOf] names the
+     * chapter at a place (its file and how far through the book), and only names that differ are
+     * written. Marks made before 1.0.6 in a book whose chapters share one file were all named after
+     * the last chapter. Nothing for a store that keeps no marks.
+     */
+    suspend fun correctChapterNames(itemId: String, chapterOf: (href: String, progression: Double?) -> String?) = Unit
 }
 
 class RoomReaderAnnotationStore(
@@ -76,6 +84,21 @@ class RoomReaderAnnotationStore(
 ) : ReaderAnnotationStore,
     ReaderBookmarkStore by RoomReaderBookmarkStore(bookmarkDao, ioDispatcher, now, newId),
     SavedWordStudyStore by RoomSavedWordStudyStore(studyDao, ioDispatcher, now) {
+
+    override suspend fun correctChapterNames(
+        itemId: String,
+        chapterOf: (href: String, progression: Double?) -> String?,
+    ) = io {
+        // A mark without its place in the book can't be named again for sure, so it keeps its name.
+        dao.highlightChapterPlaces(itemId).filter { it.progression != null }.forEach { mark ->
+            val name = chapterOf(mark.href, mark.progression)
+            if (name != mark.chapterTitle) dao.setHighlightChapter(mark.id, name)
+        }
+        dao.bookmarkChapterPlaces(itemId).filter { it.progression != null }.forEach { mark ->
+            val name = chapterOf(mark.href, mark.progression)
+            if (name != mark.chapterTitle) dao.setBookmarkChapter(mark.id, name)
+        }
+    }
 
     override fun highlights(itemId: String): Flow<List<ReaderHighlight>> =
         dao.observeHighlights(itemId).map { rows -> rows.map(ReaderHighlightEntity::toModel) }.flowOn(ioDispatcher)

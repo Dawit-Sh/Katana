@@ -1,17 +1,31 @@
 package com.example.unifiedreader.feature.journal
 
+import com.example.unifiedreader.core.model.DeviceClock
 import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.ReadableItemKind
 import com.example.unifiedreader.core.model.SourceType
 import java.util.Calendar
 import java.util.Locale
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 class JournalOverviewModelTest {
+    // These read times the 24-hour way; DeviceClockTest covers the 12-hour default.
+    @Before
+    fun useTwentyFourHourClock() {
+        DeviceClock.uses24Hour = true
+    }
+
+    @After
+    fun restoreClock() {
+        DeviceClock.uses24Hour = false
+    }
+
 
     @Test
     fun `heat levels step by quarters of the busiest day`() {

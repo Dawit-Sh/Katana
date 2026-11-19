@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.example.unifiedreader.core.model.DeviceClock
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.core.model.displayName
 import com.example.unifiedreader.ui.components.AppIconButton
@@ -61,12 +62,12 @@ internal fun librarySyncStatus(
     )
 }
 
-/** "Last synced today at 17:07", "yesterday at 09:12", "16 Nov at 21:40", or never. */
+/** "Last synced today at 5:07 PM", "yesterday at 9:12 AM", "16 Nov at 9:40 PM", or never. */
 internal fun lastSyncedLabel(atEpochMillis: Long?, now: Instant, zone: ZoneId): String {
     atEpochMillis ?: return LibrarySyncCopy.NeverSynced
     val at = Instant.ofEpochMilli(atEpochMillis).atZone(zone)
     val today = now.atZone(zone).toLocalDate()
-    val time = at.format(TimeFormat)
+    val time = DeviceClock.format(at)
     return when (at.toLocalDate()) {
         today -> "Last synced today at $time"
         today.minusDays(1) -> "Last synced yesterday at $time"
@@ -135,7 +136,6 @@ internal object LibrarySyncCopy {
     const val SyncNow = "Sync now"
 }
 
-private val TimeFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
 private val DayFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
 private val DayYearFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
 

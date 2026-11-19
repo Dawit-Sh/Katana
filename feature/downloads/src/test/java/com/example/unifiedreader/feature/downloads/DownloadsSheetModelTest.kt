@@ -1,16 +1,30 @@
 package com.example.unifiedreader.feature.downloads
 
 import com.example.unifiedreader.core.model.BookMetadata
+import com.example.unifiedreader.core.model.DeviceClock
 import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
 import java.time.LocalDateTime
 import java.time.ZoneOffset
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Before
 import org.junit.Test
 
 class DownloadsSheetModelTest {
+    // These read times the 24-hour way; DeviceClockTest covers the 12-hour default.
+    @Before
+    fun useTwentyFourHourClock() {
+        DeviceClock.uses24Hour = true
+    }
+
+    @After
+    fun restoreClock() {
+        DeviceClock.uses24Hour = false
+    }
+
     private val zone = ZoneOffset.UTC
     private val now = at(2026, 10, 23, 15, 0)
 

@@ -1,15 +1,29 @@
 package com.example.unifiedreader
 
+import com.example.unifiedreader.core.model.DeviceClock
 import com.example.unifiedreader.core.model.SourceType
 import java.time.Instant
 import java.time.ZoneId
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 class LibrarySyncStatusTest {
+    // These read times the 24-hour way; DeviceClockTest covers the 12-hour default.
+    @Before
+    fun useTwentyFourHourClock() {
+        DeviceClock.uses24Hour = true
+    }
+
+    @After
+    fun restoreClock() {
+        DeviceClock.uses24Hour = false
+    }
+
     private val zone = ZoneId.of("Africa/Addis_Ababa")
     private val now = Instant.parse("2026-11-18T15:30:00Z") // 18:30 in Addis Ababa
 

@@ -1,5 +1,6 @@
 package com.example.unifiedreader.feature.annotations
 
+import com.example.unifiedreader.core.model.DeviceClock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -83,7 +84,7 @@ object BookmarksCopy {
         val at = Instant.ofEpochMilli(atEpochMillis).atZone(zone)
         val day = at.toLocalDate()
         return when {
-            day == today -> "today, " + at.format(TimeFormat)
+            day == today -> "today, " + DeviceClock.format(at)
             day == today.minusDays(1) -> "yesterday"
             day.year == today.year -> at.format(DayFormat)
             else -> at.format(DayYearFormat)
@@ -103,7 +104,6 @@ object BookmarksCopy {
         HighlightStyle.Squiggly -> "Squiggle"
     }
 
-    private val TimeFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.UK)
     // Day first, as in Britain, with three-letter months ("Sep"; the JDK's UK months say "Sept").
     private val DayFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM", Locale.US)
     private val DayYearFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.US)

@@ -91,7 +91,7 @@ const val PENDING_LOCAL_PROGRESS_CLOCK_TOLERANCE_MILLIS = 2 * 60 * 1000L
  */
 fun RemoteProgressSyncDecision.askingBeforeGoingBack(local: ProgressSyncSnapshot?): RemoteProgressSyncDecision {
     val apply = this as? RemoteProgressSyncDecision.ApplyRemote
-    return if (apply != null && local != null && isBehind(apply.locator.percent, apply.isFinished, local)) {
+    return if (apply != null && local != null && isBehind(apply.locator, apply.isFinished, local)) {
         RemoteProgressSyncDecision.OfferRemote(
             locator = apply.locator,
             isFinished = apply.isFinished,
@@ -99,6 +99,22 @@ fun RemoteProgressSyncDecision.askingBeforeGoingBack(local: ProgressSyncSnapshot
         )
     } else {
         this
+    }
+}
+
+/**
+ * Whether a server place sits behind [local]. Books read by the page (PDF, DjVu, comics) compare pages:
+ * a server's percentage can be stale (Grimmory keeps a comic's old one when only its page is sent), and
+ * the page is what the reader shows. Others compare how far through the book ([isBehind] by percent).
+ */
+fun isBehind(remote: ProgressSyncLocator, isFinished: Boolean, local: ProgressSyncSnapshot): Boolean {
+    val remotePage = remote.page?.takeIf { remote.cfi == null }
+    val localPage = local.page?.takeIf { local.cfi == null }
+    return when {
+        local.isFinished && !isFinished -> true
+        isFinished -> false
+        remotePage != null && localPage != null -> remotePage < localPage
+        else -> isBehind(remote.percent, isFinished, local)
     }
 }
 
