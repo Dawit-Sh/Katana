@@ -70,19 +70,30 @@ internal class EpubChapterPull(
     }
 }
 
-/** Watches one-finger drags on the page (without taking them from Readium) for [EpubChapterPull]. */
+/**
+ * Watches one-finger drags on the page (without taking them from Readium) for [EpubChapterPull]. A drag that
+ * starts after a long press is selecting words, not scrolling, and turns nothing.
+ */
 internal fun Modifier.observeEpubChapterPulls(pull: EpubChapterPull): Modifier = pointerInput(pull) {
     awaitEachGesture {
-        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         val edge = pull.edgeNow()
         var drag = Offset.Zero
         var fingers = 1
+        var movedAfterLongPress = false
         do {
             val event = awaitPointerEvent(PointerEventPass.Initial)
             fingers = maxOf(fingers, event.changes.count { it.pressed })
-            event.changes.firstOrNull()?.let { change -> drag += change.positionChange() }
+            event.changes.firstOrNull()?.let { change ->
+                val wasStill = drag.getDistance() <= viewConfiguration.touchSlop
+                drag += change.positionChange()
+                val startsMoving = wasStill && drag.getDistance() > viewConfiguration.touchSlop
+                if (startsMoving && change.uptimeMillis - down.uptimeMillis > viewConfiguration.longPressTimeoutMillis) {
+                    movedAfterLongPress = true
+                }
+            }
         } while (event.changes.any { it.pressed })
-        if (edge != null && fingers == 1) pull.onDragEnded(edge, drag, EpubChapterPullThresholdDp * density)
+        if (edge != null && fingers == 1 && !movedAfterLongPress) pull.onDragEnded(edge, drag, EpubChapterPullThresholdDp * density)
     }
 }
 
