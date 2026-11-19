@@ -1,5 +1,6 @@
 package com.example.unifiedreader.feature.reader.epub
 
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -55,13 +56,22 @@ internal class EpubHighlightPlaces(private val publication: Publication) {
         return EpubServerPlace.Found(EpubCfi.formatRange(item.packageSteps, start, end))
     }
 
-    /** Where the CFI [cfi] is in this copy of the book, or null when it isn't (another edition, say). */
-    suspend fun locatorOf(cfi: String): Locator? {
+    /**
+     * Where the CFI [cfi] of the highlighted [words] is in this copy of the book, or null when it
+     * isn't (another edition, say). A CFI whose characters are counted a little differently (the
+     * KOReader plugin counts some the file's way) still finds its words: the nearest place they are.
+     */
+    suspend fun locatorOf(cfi: String, words: String): Locator? {
         val range = EpubCfi.parse(cfi) ?: return null
         val item = spine()?.items?.getOrNull(range.spineIndex) ?: return null
         val link = linkFor(item.path) ?: return null
         val chapter = chapter(item.path) ?: return null
-        val span = chapter.spanOf(range) ?: return null
+        val atPlace = chapter.spanOf(range)
+        val span = when {
+            words.isBlank() -> atPlace
+            atPlace != null && chapter.holds(atPlace, words) -> atPlace
+            else -> chapter.find(words, before = null, after = null, near = atPlace?.start) ?: atPlace
+        } ?: return null
         val quote = chapter.quote(span)
         return Locator(
             href = link.url(),
@@ -171,13 +181,17 @@ private suspend fun EpubHighlightPlaces.place(
     val serverPlace = highlight.serverPlace
     if (serverPlace == null) {
         val locator = highlight.locatorJson.toLocatorOrNull() ?: return false.also { store.keepOnDevice(highlight.id) }
-        return when (val found = serverPlaceOf(locator)) {
+        val found = serverPlaceOf(locator)
+        Log.i(LOG_TAG, "Server place of ${highlight.id}: $found")
+        return when (found) {
             is EpubServerPlace.Found -> true.also { store.setServerPlace(highlight.id, found.cfi) }
             EpubServerPlace.NotFound -> true.also { store.keepOnDevice(highlight.id) }
             EpubServerPlace.Unreadable -> false
         }
     }
-    val locator = locatorOf(serverPlace) ?: return false
+    val locator = locatorOf(serverPlace, highlight.text)
+    Log.i(LOG_TAG, "Place of ${highlight.id} ($serverPlace): ${locator?.let { "${it.href} at ${it.locations.progression}" } ?: "not found"}")
+    if (locator == null) return false
     store.place(
         highlight.id,
         AnnotationPlace(
@@ -197,3 +211,4 @@ private fun String.toLocatorOrNull(): Locator? = try {
 }
 
 private const val PLACEMENT_START_DELAY_MILLIS = 1_500L
+private const val LOG_TAG = "HighlightPlaces"

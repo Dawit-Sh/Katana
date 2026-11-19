@@ -102,6 +102,7 @@ class GrimmoryHighlightSync @Inject constructor(
                 }
             }.fold(
                 onSuccess = {
+                    Log.i(LOG_TAG, "Highlights of ${synced.size} books in step with Grimmory.")
                     connectivity.markReachable(SourceType.GRIMMORY)
                     true
                 },

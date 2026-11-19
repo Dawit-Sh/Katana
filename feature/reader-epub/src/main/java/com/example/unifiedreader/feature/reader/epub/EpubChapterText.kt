@@ -52,10 +52,11 @@ internal class EpubChapterText private constructor(
 
     /**
      * Where the quoted [highlight] is, the occurrence whose text before and after best matches
-     * [before] and [after] (Readium's quote). Spaces, line breaks and soft hyphens don't count: a
-     * selection's text breaks lines between paragraphs where the document may have none.
+     * [before] and [after] (Readium's quote), then the one nearest [near]. Spaces, line breaks and
+     * soft hyphens don't count: a selection's text breaks lines between paragraphs where the
+     * document may have none.
      */
-    fun find(highlight: String, before: String?, after: String?): EpubTextSpan? {
+    fun find(highlight: String, before: String?, after: String?, near: Int? = null): EpubTextSpan? {
         val needle = squeeze(highlight).text
         if (needle.isEmpty()) return null
         val haystack = squeezedText
@@ -63,18 +64,25 @@ internal class EpubChapterText private constructor(
         val wantedAfter = after?.let { squeeze(it).text }.orEmpty()
         var best: Int? = null
         var bestScore = -1
+        var bestDistance = Int.MAX_VALUE
         var at = haystack.text.indexOf(needle)
         while (at >= 0) {
             val score = commonSuffix(haystack.text, at, wantedBefore) + commonPrefix(haystack.text, at + needle.length, wantedAfter)
-            if (score > bestScore) {
+            val distance = near?.let { kotlin.math.abs(haystack.origin[at] - it) } ?: 0
+            if (score > bestScore || (score == bestScore && distance < bestDistance)) {
                 best = at
                 bestScore = score
+                bestDistance = distance
             }
             at = haystack.text.indexOf(needle, at + 1)
         }
         val found = best ?: return null
         return EpubTextSpan(haystack.origin[found], haystack.origin[found + needle.length - 1] + 1)
     }
+
+    /** Whether [span] holds [words], spaces and line breaks aside. */
+    fun holds(span: EpubTextSpan, words: String): Boolean =
+        squeeze(text.substring(span.start, span.end)).text == squeeze(words).text
 
     /** The words of [span] with the text before and after them, and how far into the chapter they start. */
     fun quote(span: EpubTextSpan): EpubTextQuote = EpubTextQuote(

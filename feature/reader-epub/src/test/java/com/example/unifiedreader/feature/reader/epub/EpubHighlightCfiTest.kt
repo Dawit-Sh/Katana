@@ -119,6 +119,19 @@ class EpubHighlightCfiTest {
         assertEquals(chapter.text.indexOf("the river"), later.start)
     }
 
+    // The KOReader plugin counts some characters the file's way (an entity as its letters): its place may be off a little.
+    @Test
+    fun `a place a little off finds its words nearest to it`() {
+        val offPlace = checkNotNull(EpubCfi.parse("epubcfi(/6/8!/4/2[ch1]/6,/1:16,/1:25)")?.let(chapter::spanOf))
+        assertTrue(!chapter.holds(offPlace, "river and"))
+
+        val found = checkNotNull(chapter.find("river and", before = null, after = null, near = offPlace.start))
+
+        assertEquals("river and", chapter.text.substring(found.start, found.end))
+        val nearest = checkNotNull(chapter.find("the", before = null, after = null, near = chapter.text.indexOf("the river")))
+        assertEquals(chapter.text.indexOf("the river"), nearest.start)
+    }
+
     @Test
     fun `a quote not in the chapter isn't found`() {
         assertNull(chapter.find(highlight = "the burrow", before = null, after = null))
