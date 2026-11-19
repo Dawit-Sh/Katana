@@ -220,6 +220,16 @@ class ComicsReaderSessionAdapter(
         )
     }
 
+    override fun loadScrollAxis(item: ReadableItem): ComicScrollAxis =
+        restoreComicScrollAxis(sessionStore.getSession(item)?.preferences.orEmpty())
+
+    override fun saveScrollAxis(
+        item: ReadableItem,
+        axis: ComicScrollAxis,
+    ) {
+        sessionStore.updateSession(item = item, preferences = mapOf(ComicsScrollAxisKey to axis.name))
+    }
+
     override fun loadPageTurnStyle(item: ReadableItem): PageTurnStyle =
         restoreComicReaderPreferences(sessionStore.getSession(item))
             ?.pageTurnStyle

@@ -21,13 +21,29 @@ internal fun shouldNavigatePastContinuousEnd(
     source == NestedScrollSource.UserInput &&
     availableY < -thresholdPx
 
+/**
+ * How far a scroll the strip couldn't take pulls toward its end, as a vertical pull would (negative): up for a
+ * top-to-bottom strip, left for a left-to-right one, right for a right-to-left one.
+ */
+internal fun continuousForwardPull(
+    available: Offset,
+    axis: ComicScrollAxis,
+    rightToLeft: Boolean,
+): Float = when {
+    axis == ComicScrollAxis.Vertical -> available.y
+    rightToLeft -> -available.x
+    else -> available.x
+}
+
 @Composable
 internal fun rememberContinuousEndNavigationModifier(
     canScrollForward: Boolean,
     alreadyTriggered: Boolean,
     onNavigatePastEnd: () -> Unit,
+    axis: ComicScrollAxis = ComicScrollAxis.Vertical,
+    rightToLeft: Boolean = false,
 ): Modifier {
-    val connection = remember(canScrollForward, alreadyTriggered, onNavigatePastEnd) {
+    val connection = remember(canScrollForward, alreadyTriggered, onNavigatePastEnd, axis, rightToLeft) {
         object : NestedScrollConnection {
             override fun onPostScroll(
                 consumed: Offset,
@@ -37,7 +53,7 @@ internal fun rememberContinuousEndNavigationModifier(
                 if (
                     shouldNavigatePastContinuousEnd(
                         canScrollForward = canScrollForward,
-                        availableY = available.y,
+                        availableY = continuousForwardPull(available, axis, rightToLeft),
                         source = source,
                         alreadyTriggered = alreadyTriggered,
                     )

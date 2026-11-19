@@ -20,6 +20,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.unifiedreader.core.model.ReadableItem
+import com.example.unifiedreader.feature.reader.preferences.ComicReadingDirection
 import com.example.unifiedreader.ui.theme.UnifiedReaderThemeTokens
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -42,6 +43,9 @@ internal fun ComicsContinuousReaderSurface(
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = readerState.resumeAnchorPage.coerceIn(0, pages.lastIndex),
     )
+    // Top to bottom, or sideways in the comic's reading direction ("Direction" in the settings).
+    val axis = readerState.scrollAxis
+    val rightToLeft = readerState.readingDirection == ComicReadingDirection.RTL
     val endNavigationModifier = rememberContinuousEndNavigationModifier(
         canScrollForward = listState.canScrollForward,
         alreadyTriggered = hasTriggeredPastEndNavigation,
@@ -49,6 +53,8 @@ internal fun ComicsContinuousReaderSurface(
             hasTriggeredPastEndNavigation = true
             onNavigatePastEnd()
         },
+        axis = axis,
+        rightToLeft = rightToLeft,
     )
 
     BoxWithConstraints(
@@ -144,6 +150,22 @@ internal fun ComicsContinuousReaderSurface(
             )
         }
 
+        if (axis == ComicScrollAxis.Horizontal) {
+            ComicSidewaysStrip(
+                listState = listState,
+                item = item,
+                pages = pages,
+                pageSource = pageSource,
+                loadWindow = activePageWindow,
+                metadataLoadingEnabled = metadataLoadingEnabled,
+                rightToLeft = rightToLeft,
+                pageBox = sidewaysComicPageBox(maxWidth, maxHeight),
+                onVisiblePageLoaded = { pageIndex -> onVisiblePagesLoaded(listOf(pageIndex)) },
+                onToggleOverlay = onToggleOverlay,
+                modifier = endNavigationModifier,
+            )
+            return@BoxWithConstraints
+        }
         LazyColumn(
             state = listState,
             modifier = Modifier

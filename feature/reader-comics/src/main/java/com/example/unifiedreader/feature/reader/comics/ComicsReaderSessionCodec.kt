@@ -16,6 +16,7 @@ const val ComicsResumeAnchorPageKey = "resumeAnchorPage"
 const val ComicsResumeSegmentKey = "resumeSegment"
 const val ComicsResumeScrollOffsetRatioKey = "resumeScrollOffsetRatio"
 const val ComicsResumeProgressPageKey = "resumeProgressPage"
+const val ComicsScrollAxisKey = "scrollAxis"
 
 fun restoreComicReaderPreferences(
     session: ReaderSessionSnapshot?,
@@ -34,7 +35,8 @@ fun restoreComicReaderPreferences(
         preferences.containsKey(ComicsSplitWidePagesKey) ||
         preferences.containsKey(ComicsResumeAnchorPageKey) ||
         preferences.containsKey(ComicsResumeSegmentKey) ||
-        preferences.containsKey(ComicsResumeScrollOffsetRatioKey)
+        preferences.containsKey(ComicsResumeScrollOffsetRatioKey) ||
+        preferences.containsKey(ComicsScrollAxisKey)
     if (!hasKnownPreference) return null
     return ComicReaderPreferencesSnapshot(
         readerMode = preferences[ComicsReaderModeKey]
@@ -64,8 +66,16 @@ fun restoreComicReaderPreferences(
             ?.let(::sanitizeComicResumeScrollOffsetRatio),
         resumeProgressPage = preferences[ComicsResumeProgressPageKey]
             ?.toIntOrNull(),
+        scrollAxis = restoreComicScrollAxis(preferences),
     )
 }
+
+/** The way a scrolling comic runs, as saved for the book; top to bottom when nothing is saved. */
+fun restoreComicScrollAxis(
+    preferences: Map<String, String>,
+): ComicScrollAxis = preferences[ComicsScrollAxisKey]
+    ?.enumValueOrNull<ComicScrollAxis>()
+    ?: ComicScrollAxis.Vertical
 
 fun restoreComicReadingDirectionOverride(
     session: ReaderSessionSnapshot?,
@@ -100,6 +110,7 @@ fun buildComicReaderPreferencesMap(
     ComicsResumeSegmentKey to preferences.resumeSegment?.name.orEmpty(),
     ComicsResumeScrollOffsetRatioKey to preferences.resumeScrollOffsetRatio?.toString().orEmpty(),
     ComicsResumeProgressPageKey to preferences.resumeProgressPage?.toString().orEmpty(),
+    ComicsScrollAxisKey to preferences.scrollAxis.name,
 )
 
 fun buildComicReaderPreferencesPatch(

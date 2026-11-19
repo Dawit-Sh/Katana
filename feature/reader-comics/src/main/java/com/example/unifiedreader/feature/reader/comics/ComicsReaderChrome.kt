@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.feature.reader.core.ReaderBarButton
@@ -16,12 +17,27 @@ import com.example.unifiedreader.feature.reader.core.ReaderDock
 import com.example.unifiedreader.feature.reader.core.ReaderDockProgress
 import com.example.unifiedreader.feature.reader.core.ReaderTopBar
 import com.example.unifiedreader.feature.reader.core.ReaderWorkCoordinator
-import com.example.unifiedreader.feature.reader.core.curl.PageTurnStyle
-import com.example.unifiedreader.feature.reader.preferences.ComicReaderMode
 import com.example.unifiedreader.ui.components.AppIcons
 
 /** The comics reader's panels; one is open at a time. */
 internal enum class ComicsReaderPanel { None, Pages, Settings }
+
+/** The issue's pages and how the reader sees them now, for the bars and panels. */
+internal class ComicsChromePages(
+    val pages: List<ComicPageSpec>,
+    val currentPageIndexes: Set<Int>,
+    val progress: Float,
+    /** The spreads the page strip groups pages into, which in scroll mode is always one page. */
+    val stripSpreadMode: ComicSpreadMode,
+    val spreadPlanState: ComicSpreadPlanState,
+)
+
+/** Where the bars and panels get pages from. */
+internal class ComicsChromeSources(
+    val pageSource: ComicPageSource,
+    val readerWorkCoordinator: ReaderWorkCoordinator?,
+    val stripLoadingEnabled: Boolean,
+)
 
 /**
  * The comics reader's bars and panels: the issue over where it sits and the settings button at
@@ -32,30 +48,14 @@ internal enum class ComicsReaderPanel { None, Pages, Settings }
 @Composable
 internal fun ComicsReaderChrome(
     item: ReadableItem,
-    pages: List<ComicPageSpec>,
-    currentPage: Int,
-    currentPageIndexes: Set<Int>,
-    progress: Float,
-    readerMode: ComicReaderMode,
-    readingDirection: ComicReadingDirection,
-    pageFitMode: ComicPageFitMode,
-    spreadMode: ComicSpreadMode,
-    stripSpreadMode: ComicSpreadMode,
-    spreadPlanState: ComicSpreadPlanState,
-    pageTurnStyle: PageTurnStyle,
+    chromePages: ComicsChromePages,
+    sources: ComicsChromeSources,
+    readerState: ComicsReaderState,
     pageNumbersVisible: Boolean,
-    pageSource: ComicPageSource,
-    readerWorkCoordinator: ReaderWorkCoordinator?,
-    stripLoadingEnabled: Boolean,
     overlayVisible: Boolean,
     onBack: () -> Unit,
     onPageSelected: (Int) -> Unit,
     onProgressSelected: (Float) -> Unit,
-    onReaderModeChanged: (ComicReaderMode) -> Unit,
-    onReadingDirectionChanged: (ComicReadingDirection) -> Unit,
-    onPageFitModeChanged: (ComicPageFitMode) -> Unit,
-    onSpreadModeChanged: (ComicSpreadMode) -> Unit,
-    onPageTurnStyleChanged: (PageTurnStyle) -> Unit,
     onPageNumbersVisibleChanged: (Boolean) -> Unit,
 ) {
     val titles = remember(item) { comicReaderTitles(item) }
@@ -66,20 +66,11 @@ internal fun ComicsReaderChrome(
     fun toggle(panel: ComicsReaderPanel) {
         openPanel = if (openPanel == panel) ComicsReaderPanel.None else panel
     }
-    val configuration = LocalConfiguration.current
-    val thumbnailHeight = ReaderChromeDefaults.stripThumbnailHeight(
-        screenWidthDp = configuration.screenWidthDp,
-        screenHeightDp = configuration.screenHeightDp,
-    )
     ReaderChromeFrame(
         panelOpen = openPanel != ComicsReaderPanel.None,
         onDismissPanel = { openPanel = ComicsReaderPanel.None },
         topBar = {
-            ReaderTopBar(
-                title = titles.title,
-                subtitle = titles.subtitle,
-                onBack = onBack,
-            ) {
+            ReaderTopBar(title = titles.title, subtitle = titles.subtitle, onBack = onBack) {
                 ReaderBarButton(
                     icon = AppIcons.Tune,
                     contentDescription = "Reading settings",
@@ -89,47 +80,26 @@ internal fun ComicsReaderChrome(
             }
         },
         dock = {
-            ReaderDock(
-                strip = {
-                    ComicPagePreviewStrip(
-                        item = item,
-                        pages = pages,
-                        currentPage = currentPage,
-                        readingDirection = readingDirection,
-                        spreadMode = stripSpreadMode,
-                        spreadPlanState = spreadPlanState,
-                        pageSource = pageSource,
-                        thumbnailHeight = thumbnailHeight,
-                        readerWorkCoordinator = readerWorkCoordinator,
-                        previewLoadingEnabled = stripLoadingEnabled,
-                        onPageSelected = onPageSelected,
-                    )
-                },
-            ) {
-                ReaderBarButton(
-                    icon = AppIcons.GridView,
-                    contentDescription = "Pages",
-                    active = openPanel == ComicsReaderPanel.Pages,
-                    onClick = { toggle(ComicsReaderPanel.Pages) },
-                )
-                ReaderDockProgress(
-                    progress = progress,
-                    percentLabel = comicPercentLabel(progress),
-                    positionLabel = comicDockPositionLabel(currentPageIndexes, pages.size),
-                    readingDirection = comicProgressBarDirection(readerMode = readerMode, readingDirection = readingDirection),
-                    onProgressSelected = onProgressSelected,
-                )
-            }
+            ComicsReaderDock(
+                item = item,
+                chromePages = chromePages,
+                sources = sources,
+                readerState = readerState,
+                pagesPanelOpen = openPanel == ComicsReaderPanel.Pages,
+                onPagesClick = { toggle(ComicsReaderPanel.Pages) },
+                onPageSelected = onPageSelected,
+                onProgressSelected = onProgressSelected,
+            )
         },
     ) { slot ->
         ComicPagesPanel(
             item = item,
             issueLabel = titles.title,
-            pages = pages,
-            currentPageIndexes = currentPageIndexes,
-            progress = progress,
-            pageSource = pageSource,
-            readerWorkCoordinator = readerWorkCoordinator,
+            pages = chromePages.pages,
+            currentPageIndexes = chromePages.currentPageIndexes,
+            progress = chromePages.progress,
+            pageSource = sources.pageSource,
+            readerWorkCoordinator = sources.readerWorkCoordinator,
             // Opened on purpose, so its thumbnails load straight away.
             previewLoadingEnabled = true,
             isOpen = openPanel == ComicsReaderPanel.Pages,
@@ -143,19 +113,66 @@ internal fun ComicsReaderChrome(
         ComicsReaderPreferencesSheet(
             isOpen = openPanel == ComicsReaderPanel.Settings,
             slot = slot,
-            readerMode = readerMode,
-            readingDirection = readingDirection,
-            pageFitMode = pageFitMode,
-            spreadMode = spreadMode,
-            pageTurnStyle = pageTurnStyle,
+            readerState = readerState,
             pageNumbersVisible = pageNumbersVisible,
             onDismissRequest = { openPanel = ComicsReaderPanel.None },
-            onReaderModeChanged = onReaderModeChanged,
-            onReadingDirectionChanged = onReadingDirectionChanged,
-            onPageFitModeChanged = onPageFitModeChanged,
-            onSpreadModeChanged = onSpreadModeChanged,
-            onPageTurnStyleChanged = onPageTurnStyleChanged,
             onPageNumbersVisibleChanged = onPageNumbersVisibleChanged,
+        )
+    }
+}
+
+/** The dock: the page strip over the Pages button, the percentage, the slider and the page. */
+@Composable
+private fun ComicsReaderDock(
+    item: ReadableItem,
+    chromePages: ComicsChromePages,
+    sources: ComicsChromeSources,
+    readerState: ComicsReaderState,
+    pagesPanelOpen: Boolean,
+    onPagesClick: () -> Unit,
+    onPageSelected: (Int) -> Unit,
+    onProgressSelected: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val configuration = LocalConfiguration.current
+    val thumbnailHeight = ReaderChromeDefaults.stripThumbnailHeight(
+        screenWidthDp = configuration.screenWidthDp,
+        screenHeightDp = configuration.screenHeightDp,
+    )
+    ReaderDock(
+        modifier = modifier,
+        strip = {
+            ComicPagePreviewStrip(
+                item = item,
+                pages = chromePages.pages,
+                currentPage = readerState.currentPage,
+                readingDirection = readerState.readingDirection,
+                spreadMode = chromePages.stripSpreadMode,
+                spreadPlanState = chromePages.spreadPlanState,
+                pageSource = sources.pageSource,
+                thumbnailHeight = thumbnailHeight,
+                readerWorkCoordinator = sources.readerWorkCoordinator,
+                previewLoadingEnabled = sources.stripLoadingEnabled,
+                onPageSelected = onPageSelected,
+            )
+        },
+    ) {
+        ReaderBarButton(
+            icon = AppIcons.GridView,
+            contentDescription = "Pages",
+            active = pagesPanelOpen,
+            onClick = onPagesClick,
+        )
+        ReaderDockProgress(
+            progress = chromePages.progress,
+            percentLabel = comicPercentLabel(chromePages.progress),
+            positionLabel = comicDockPositionLabel(chromePages.currentPageIndexes, chromePages.pages.size),
+            readingDirection = comicProgressBarDirection(
+                readerMode = readerState.readerMode,
+                readingDirection = readerState.readingDirection,
+                scrollAxis = readerState.scrollAxis,
+            ),
+            onProgressSelected = onProgressSelected,
         )
     }
 }
