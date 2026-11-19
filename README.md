@@ -34,7 +34,7 @@ Settings › About. The APKs aren't from the Play Store, so Play Protect may sho
 - **Fire 7 support.** A 32-bit build, longer network time limits for slow Wi-Fi, and a much faster start
   (about 2 seconds on the Fire).
 - **Highlights and notes.** Four styles (highlight, underline, strikethrough, squiggly) in five colours, with
-  notes. Syncing them with Grimmory is coming in the next update.
+  notes, synced both ways with Grimmory for its EPUBs, so they show up in its web reader and in KOReader too.
 - **Words.** "Add to dictionary" saves a word with its sentence, and you can go over saved words as
   flashcards.
 - **Bookmarks**, and one page that collects every book's bookmarks and highlights.
