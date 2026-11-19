@@ -79,6 +79,8 @@ data class ComicReaderPreferencesSnapshot(
     val resumeScrollOffsetRatio: Float? = null,
     /** The progress page the resume position was saved with; null for sessions saved before it was kept. */
     val resumeProgressPage: Int? = null,
+    /** Which way the strip runs while scrolling; top to bottom for sessions saved before it was kept. */
+    val scrollAxis: ComicScrollAxis = ComicScrollAxis.Vertical,
 )
 
 enum class ComicPageLoadPriority {
@@ -192,6 +194,15 @@ interface ComicReaderPreferencesStore {
     fun loadResumeScrollOffsetRatio(
         item: ReadableItem,
     ): Float? = null
+
+    fun loadScrollAxis(
+        item: ReadableItem,
+    ): ComicScrollAxis = ComicScrollAxis.Vertical
+
+    fun saveScrollAxis(
+        item: ReadableItem,
+        axis: ComicScrollAxis,
+    ) = Unit
 
     fun saveResumeScrollOffsetRatio(
         item: ReadableItem,
@@ -336,6 +347,12 @@ class ComicsReaderState internal constructor(
     var splitWidePages by mutableStateOf(initialSplitWidePages)
         private set
 
+    /** Which way the strip runs while scrolling ([ComicScrollAxis]); set with the reader's "Direction". */
+    var scrollAxis by mutableStateOf(ComicScrollAxis.Vertical)
+        private set
+
+    private var hasExplicitScrollAxis by mutableStateOf(false)
+
     var resumeAnchorPage by mutableIntStateOf(initialResumeAnchorPage ?: initialPage)
         private set
 
@@ -425,6 +442,26 @@ class ComicsReaderState internal constructor(
     fun onPageTurnStyleChanged(pageTurnStyle: PageTurnStyle) {
         hasExplicitPageTurnStyle = true
         this.pageTurnStyle = pageTurnStyle
+    }
+
+    fun onScrollAxisChanged(axis: ComicScrollAxis) {
+        hasExplicitScrollAxis = true
+        if (scrollAxis == axis) return
+        scrollAxis = axis
+        // The strip turns: it starts again at the top (or start) of the page the reader was on.
+        resumeAnchorPage = currentPage.coerceIn(0, pageCount - 1)
+        resumeScrollOffsetRatio = null
+        hasRestoredResumeScrollOffsetRatio = false
+    }
+
+    fun restoreScrollAxisIfUnchanged(axis: ComicScrollAxis): Boolean {
+        if (hasExplicitScrollAxis || scrollAxis == axis) return false
+        scrollAxis = axis
+        return true
+    }
+
+    internal fun startWithScrollAxis(axis: ComicScrollAxis) {
+        scrollAxis = axis
     }
 
     fun onSplitWidePagesChanged(enabled: Boolean) {
@@ -574,6 +611,8 @@ class ComicsReaderState internal constructor(
                     if (it.hasRestoredResumeScrollOffsetRatio) 1 else 0,
                     it.pageTurnStyle.name,
                     if (it.hasExplicitPageTurnStyle) 1 else 0,
+                    it.scrollAxis.name,
+                    if (it.hasExplicitScrollAxis) 1 else 0,
                 )
             },
             restore = { restored ->
@@ -611,11 +650,18 @@ class ComicsReaderState internal constructor(
                     state.hasRestoredResumeSegment = (restored.getOrNull(17) as? Int) == 1
                     state.hasRestoredResumeScrollOffsetRatio = (restored.getOrNull(18) as? Int) == 1
                     state.hasExplicitPageTurnStyle = (restored.getOrNull(20) as? Int) == 1
+                    (restored.getOrNull(SavedScrollAxisIndex) as? String)
+                        ?.let { name -> ComicScrollAxis.entries.firstOrNull { it.name == name } }
+                        ?.let(state::startWithScrollAxis)
+                    state.hasExplicitScrollAxis = (restored.getOrNull(SavedExplicitScrollAxisIndex) as? Int) == 1
                 }
             },
         )
     }
 }
+
+private const val SavedScrollAxisIndex = 21
+private const val SavedExplicitScrollAxisIndex = 22
 
 internal fun isComicProgressFinished(
     pageIndex: Int,

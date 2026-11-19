@@ -8,6 +8,7 @@ import com.example.unifiedreader.feature.reader.preferences.DataStoreReaderBookL
 import com.example.unifiedreader.feature.reader.preferences.DataStoreReaderComfortPreferencesStore
 import com.example.unifiedreader.feature.reader.preferences.DataStoreReaderPageColorPreferencesStore
 import com.example.unifiedreader.feature.reader.preferences.DataStoreReaderPageNumberPreferencesStore
+import com.example.unifiedreader.feature.reader.preferences.DataStoreReaderPagesPreferencesStore
 import com.example.unifiedreader.feature.reader.preferences.ReaderDisplayPreferences
 import dagger.Module
 import dagger.Provides
@@ -20,7 +21,10 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.plus
 
-/** The readers' shared page settings (page number, page colour, light and keys); kept out of [AppModule], which should not grow. */
+/**
+ * The readers' shared page settings (page number, page colour, light and keys, PDF pages); kept out of
+ * [AppModule], which should not grow.
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 object ReaderDisplayPreferencesModule {
@@ -35,6 +39,7 @@ object ReaderDisplayPreferencesModule {
         pageColor = DataStoreReaderPageColorPreferencesStore(context, scope = applicationScope + appDispatchers.io),
         bookLook = DataStoreReaderBookLookPreferencesStore(context, scope = applicationScope + appDispatchers.io),
         comfort = DataStoreReaderComfortPreferencesStore(context, scope = applicationScope + appDispatchers.io),
+        pages = DataStoreReaderPagesPreferencesStore(context, scope = applicationScope + appDispatchers.io),
     )
 }
 

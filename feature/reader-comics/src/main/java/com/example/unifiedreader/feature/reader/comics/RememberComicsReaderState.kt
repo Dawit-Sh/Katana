@@ -21,6 +21,7 @@ fun rememberComicsReaderState(
     initialResumeAnchorPage: Int? = null,
     initialResumeSegment: ComicPageSegment? = null,
     initialResumeScrollOffsetRatio: Float? = null,
+    initialScrollAxis: ComicScrollAxis = ComicScrollAxis.Vertical,
 ): ComicsReaderState {
     val safePageCount = pageCount.coerceAtLeast(1)
     val safeInitialPage = initialPage.coerceIn(0, safePageCount - 1)
@@ -40,7 +41,7 @@ fun rememberComicsReaderState(
             initialResumeAnchorPage = initialResumeAnchorPage,
             initialResumeSegment = initialResumeSegment,
             initialResumeScrollOffsetRatio = initialResumeScrollOffsetRatio,
-        )
+        ).also { created -> created.startWithScrollAxis(initialScrollAxis) }
     }
     SideEffect {
         state.syncPageCount(safePageCount)

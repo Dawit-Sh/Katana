@@ -1,25 +1,37 @@
 package com.example.unifiedreader.feature.reader.epub
 
 import org.junit.Assert.assertEquals
+import com.example.unifiedreader.feature.reader.preferences.ReaderPagesMode
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EpubReaderPreferencesModelTest {
 
     @Test
-    fun `pages choice is Auto while the orientation default is on, whatever the stored mode`() {
+    fun `the orientation default turns pages, two at a time on Auto, whatever the stored mode`() {
         EpubReaderLayoutMode.entries.forEach { mode ->
-            assertEquals(mode.name, EpubPagesChoice.Auto, epubPagesChoice(useOrientationLayoutDefault = true, layoutMode = mode))
+            assertEquals(mode.name, ReaderPagesMode.Turn, epubPagesMode(useOrientationLayoutDefault = true, layoutMode = mode))
+            assertEquals(mode.name, EpubSpreadChoice.Auto, epubSpreadChoice(useOrientationLayoutDefault = true, layoutMode = mode))
         }
     }
 
     @Test
-    fun `pages choice maps each fixed layout and back`() {
-        EpubReaderLayoutMode.entries.forEach { mode ->
-            val choice = epubPagesChoice(useOrientationLayoutDefault = false, layoutMode = mode)
-            assertEquals(mode, choice.layoutMode)
-        }
+    fun `only the scroll layout scrolls, and two pages doesn't apply to it`() {
+        assertEquals(ReaderPagesMode.Scroll, epubPagesMode(useOrientationLayoutDefault = false, layoutMode = EpubReaderLayoutMode.Scroll))
+        assertNull(epubSpreadChoice(useOrientationLayoutDefault = false, layoutMode = EpubReaderLayoutMode.Scroll))
+        assertEquals(ReaderPagesMode.Turn, epubPagesMode(useOrientationLayoutDefault = false, layoutMode = EpubReaderLayoutMode.SinglePage))
+        assertEquals(ReaderPagesMode.Turn, epubPagesMode(useOrientationLayoutDefault = false, layoutMode = EpubReaderLayoutMode.DoublePage))
+    }
+
+    @Test
+    fun `two pages maps each fixed page layout and back`() {
+        assertEquals(EpubSpreadChoice.Off, epubSpreadChoice(false, EpubReaderLayoutMode.SinglePage))
+        assertEquals(EpubSpreadChoice.On, epubSpreadChoice(false, EpubReaderLayoutMode.DoublePage))
+        assertEquals(EpubReaderLayoutMode.SinglePage, EpubSpreadChoice.Off.layoutMode)
+        assertEquals(EpubReaderLayoutMode.DoublePage, EpubSpreadChoice.On.layoutMode)
+        assertNull(EpubSpreadChoice.Auto.layoutMode)
     }
 
     @Test

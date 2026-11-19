@@ -16,8 +16,9 @@ import com.example.unifiedreader.ui.components.AppLayout
 import com.example.unifiedreader.ui.components.AppTonalButton
 
 /**
- * The settings "Use these for new books" keeps: the text and the page turn. Page colour and
- * layout are left out; they have their own defaults (the last colour picked, the orientation).
+ * The settings "Use these for new books" keeps: the text, Pages (turn or scroll, and Two pages) and the
+ * page turn. Page colour is left out; it has its own default (the last colour picked). A look saved with
+ * Two pages on Auto keeps following the orientation.
  */
 internal val EpubNewBookLookKeys: Set<String> = setOf(
     EpubTypographyModeKey,
@@ -29,6 +30,8 @@ internal val EpubNewBookLookKeys: Set<String> = setOf(
     EpubParagraphIndentKey,
     EpubTextAlignKey,
     EpubPageTurnStyleKey,
+    EpubLayoutModeKey,
+    EpubLayoutOverrideKey,
 )
 
 /** This book's look, as "Use these for new books" saves it. */
@@ -46,7 +49,7 @@ internal fun epubOpeningPreferences(
 internal object EpubNewBookLookCopy {
     const val Button = "Use these for new books"
     const val Saved = "Saved for new books"
-    const val Note = "Books you haven't opened yet start with this font, size and spacing."
+    const val Note = "Books you haven't opened yet start with this font, size and spacing, and turn or scroll the same way."
 }
 
 @Composable

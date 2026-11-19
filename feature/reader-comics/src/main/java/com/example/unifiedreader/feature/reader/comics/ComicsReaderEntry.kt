@@ -120,6 +120,9 @@ fun ComicsReaderScreen(
         initialResumeAnchorPage = initialPosition.resumeAnchorPage,
         initialResumeSegment = initialPosition.resumeSegment,
         initialResumeScrollOffsetRatio = initialPosition.resumeScrollOffsetRatio,
+        initialScrollAxis = remember(item.id, preferencesStore) {
+            preferencesStore.loadScrollAxis(item)
+        },
     )
     val currentPageProgress = (readerState.currentPage + 1).toFloat() / pages.size.toFloat()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -213,6 +216,7 @@ fun ComicsReaderScreen(
                 preferencesStore.savePageFitMode(item, readerState.pageFitMode)
                 preferencesStore.saveSpreadMode(item, readerState.spreadMode)
                 preferencesStore.savePageTurnStyle(item, readerState.pageTurnStyle)
+                preferencesStore.saveScrollAxis(item, readerState.scrollAxis)
             }
         },
     )
@@ -265,6 +269,7 @@ fun ComicsReaderScreen(
             readerState.restorePageFitModeIfUnchanged(preferences.pageFitMode)
             readerState.restoreSpreadModeIfUnchanged(preferences.spreadMode)
             readerState.restorePageTurnStyleIfUnchanged(preferences.pageTurnStyle)
+            readerState.restoreScrollAxisIfUnchanged(preferences.scrollAxis)
             if (shouldRestoreComicReaderPosition(openMode)) {
                 readerState.restoreResumeAnchorIfUnchanged(preferences.resumeAnchorPage)
                 readerState.restoreResumeSegmentIfUnchanged(preferences.resumeSegment)
@@ -344,6 +349,7 @@ fun ComicsReaderScreen(
         readerState.pageFitMode,
         readerState.spreadMode,
         readerState.pageTurnStyle,
+        readerState.scrollAxis,
     ) {
         if (!preferencesHydrated || !preferencesRestoreCompleted) return@LaunchedEffect
         persistReaderPreferences()
@@ -445,7 +451,9 @@ fun ComicsReaderScreen(
                         pages.lastOrNull()?.id.orEmpty(),
                     )
                 }
-                key(item.id, readerState.readerMode, surfaceStateKey) {
+                // A scrolling strip that turns sideways (or back) starts again at the page in view.
+                val scrollAxisKey = readerState.scrollAxis.takeIf { readerState.readerMode == ComicReaderMode.VerticalScroll }
+                key(item.id, readerState.readerMode, scrollAxisKey, surfaceStateKey) {
                     when (readerState.readerMode) {
                         ComicReaderMode.Paged -> ComicsPagedReaderSurface(
                             item = item,
@@ -493,32 +501,26 @@ fun ComicsReaderScreen(
                 }
                 ComicsReaderChrome(
                     item = item,
-                    pages = pages,
-                    currentPage = readerState.currentPage,
-                    currentPageIndexes = currentSpread?.pageIndexes?.toSet() ?: setOf(readerState.currentPage),
-                    progress = currentPageProgress,
-                    readerMode = readerState.readerMode,
-                    readingDirection = readerState.readingDirection,
-                    pageFitMode = readerState.pageFitMode,
-                    spreadMode = readerState.spreadMode,
-                    stripSpreadMode = spreadModeForPlan,
-                    spreadPlanState = spreadPlanState,
-                    pageTurnStyle = readerState.pageTurnStyle,
+                    chromePages = ComicsChromePages(
+                        pages = pages,
+                        currentPageIndexes = currentSpread?.pageIndexes?.toSet() ?: setOf(readerState.currentPage),
+                        progress = currentPageProgress,
+                        stripSpreadMode = spreadModeForPlan,
+                        spreadPlanState = spreadPlanState,
+                    ),
+                    sources = ComicsChromeSources(
+                        pageSource = pageSource,
+                        readerWorkCoordinator = readerWorkCoordinator,
+                        stripLoadingEnabled = previewLoadingArmed && readerState.currentPage in loadedVisiblePageIndexes,
+                    ),
+                    readerState = readerState,
                     pageNumbersVisible = pageNumbersVisible,
-                    pageSource = pageSource,
-                    readerWorkCoordinator = readerWorkCoordinator,
-                    stripLoadingEnabled = previewLoadingArmed && readerState.currentPage in loadedVisiblePageIndexes,
                     overlayVisible = overlayState.isVisible,
                     onBack = closeReader,
                     onPageSelected = goToPage,
                     onProgressSelected = { selectedProgress ->
                         goToPage((selectedProgress * (pages.size - 1)).roundToInt().coerceIn(0, pages.lastIndex))
                     },
-                    onReaderModeChanged = readerState::onReaderModeChanged,
-                    onReadingDirectionChanged = readerState::onReadingDirectionChanged,
-                    onPageFitModeChanged = readerState::onPageFitModeChanged,
-                    onSpreadModeChanged = readerState::onSpreadModeChanged,
-                    onPageTurnStyleChanged = readerState::onPageTurnStyleChanged,
                     onPageNumbersVisibleChanged = pageNumberPreferences::setVisible,
                 )
             },

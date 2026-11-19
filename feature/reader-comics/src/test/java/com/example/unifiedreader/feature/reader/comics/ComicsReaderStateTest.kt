@@ -209,8 +209,23 @@ class ComicsReaderStateTest {
         val restored = restoreState(saved)
         assertEquals(PageTurnStyle.Curl, restored.pageTurnStyle)
 
-        val restoredOldPayload = restoreState(saved.dropLast(2))
+        // A payload saved before the page turn was kept (and the scroll axis after it).
+        val restoredOldPayload = restoreState(saved.dropLast(4))
         assertEquals(PageTurnStyle.Slide, restoredOldPayload.pageTurnStyle)
+    }
+
+    @Test
+    fun `state saver restores the scroll axis and older payloads scroll top to bottom`() {
+        val state = comicsReaderState(initialReaderMode = ComicReaderMode.VerticalScroll)
+        state.onScrollAxisChanged(ComicScrollAxis.Horizontal)
+        val saved = saveState(state)
+
+        val restored = restoreState(saved)
+        assertEquals(ComicScrollAxis.Horizontal, restored.scrollAxis)
+        assertFalse(restored.restoreScrollAxisIfUnchanged(ComicScrollAxis.Vertical))
+
+        val restoredOldPayload = restoreState(saved.dropLast(2))
+        assertEquals(ComicScrollAxis.Vertical, restoredOldPayload.scrollAxis)
     }
 }
 

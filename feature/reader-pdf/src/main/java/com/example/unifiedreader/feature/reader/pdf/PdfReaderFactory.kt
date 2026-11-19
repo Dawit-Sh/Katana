@@ -8,7 +8,9 @@ import com.example.unifiedreader.feature.reader.core.ReaderSessionStore
 import com.example.unifiedreader.feature.reader.core.ReaderScreenFactory
 import com.example.unifiedreader.feature.reader.core.formatReaderFactory
 import com.example.unifiedreader.feature.reader.preferences.InMemoryReaderPageNumberPreferencesStore
+import com.example.unifiedreader.feature.reader.preferences.InMemoryReaderPagesPreferencesStore
 import com.example.unifiedreader.feature.reader.preferences.ReaderPageNumberPreferencesStore
+import com.example.unifiedreader.feature.reader.preferences.ReaderPagesPreferencesStore
 import com.example.unifiedreader.journal.JournalReadingSessionRecorder
 
 fun pdfReaderFactory(
@@ -16,6 +18,8 @@ fun pdfReaderFactory(
     journalReadingSessionRecorder: JournalReadingSessionRecorder? = null,
     documentUriProvider: suspend (ReadableItem) -> Uri? = { null },
     pageNumberPreferences: ReaderPageNumberPreferencesStore = InMemoryReaderPageNumberPreferencesStore(),
+    /** Whether a PDF or DjVu book not set yet turns its pages or scrolls: the last pick in any of them. */
+    pagesPreferences: ReaderPagesPreferencesStore = InMemoryReaderPagesPreferencesStore(),
 ): ReaderScreenFactory = formatReaderFactory(
     // PDF, and DjVu scans drawn page by page the same way.
     formats = PageImageBookFormats,
@@ -27,6 +31,7 @@ fun pdfReaderFactory(
             sessionStore = sessionStore,
             journalReadingSessionRecorder = journalReadingSessionRecorder,
             pageNumberPreferences = pageNumberPreferences,
+            pagesPreferences = pagesPreferences,
             openMode = navigationActions.currentOpenMode,
             onBack = onBack,
             onCompletionRequested = navigationActions.onRequestCompletion,

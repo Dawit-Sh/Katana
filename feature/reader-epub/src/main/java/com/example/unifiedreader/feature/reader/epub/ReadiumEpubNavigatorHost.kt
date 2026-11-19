@@ -123,6 +123,10 @@ internal fun ReadiumEpubNavigatorHost(
         )
     }
     val curlTapTurner = remember(publication) { PageCurlTapTurner() }
+    val latestScrollMode = rememberUpdatedState(preferences.layoutMode == EpubReaderLayoutMode.Scroll)
+    val chapterPull = remember(publication) {
+        EpubChapterPull(scope = footnoteNavigationScope, navigator = { curlHost.navigator }, enabled = { latestScrollMode.value })
+    }
     val curlEnabled = preferences.pageTurnStyle == PageTurnStyle.Curl &&
         preferences.layoutMode != EpubReaderLayoutMode.Scroll &&
         publication.metadata.presentation.layout != EpubLayout.FIXED &&
@@ -153,6 +157,7 @@ internal fun ReadiumEpubNavigatorHost(
             modifier = Modifier
                 .fillMaxSize()
                 .observeEpubPageTouches(selectionFollower)
+                .observeEpubChapterPulls(chapterPull)
                 .testTag(EpubReaderSurfaceTag),
             factory = { context ->
                 FrameLayout(context).apply {

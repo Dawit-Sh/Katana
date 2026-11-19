@@ -13,34 +13,27 @@ import com.example.unifiedreader.feature.reader.core.ReaderPanel
 import com.example.unifiedreader.feature.reader.core.ReaderPanelSlot
 import com.example.unifiedreader.feature.reader.core.curl.PageTurnStyle
 import com.example.unifiedreader.feature.reader.preferences.ComicReaderMode
+import com.example.unifiedreader.feature.reader.preferences.ComicReadingDirection
+import com.example.unifiedreader.feature.reader.preferences.ReaderPagesLabel
 import com.example.unifiedreader.ui.components.AppChoiceRow
 import com.example.unifiedreader.ui.components.AppFloatingPanelPlacement
 import com.example.unifiedreader.ui.components.AppPanelHeader
 
 /**
- * The comics quick settings: six one-line choices in a card under the settings button (a
- * bottom sheet on phones). Rows that only apply to the paged layout stay in place but
- * disabled while scrolling, so the card never changes height.
+ * The comics quick settings, a card under the settings button (a bottom sheet on phones): Pages (Turn or
+ * Scroll) and Direction first, as in every reader, then the turn-pages rows, which stay in place but
+ * disabled while scrolling so the card never changes height, then the page number.
  */
 @Composable
 internal fun ComicsReaderPreferencesSheet(
     isOpen: Boolean,
     slot: ReaderPanelSlot,
-    readerMode: ComicReaderMode,
-    readingDirection: ComicReadingDirection,
-    pageFitMode: ComicPageFitMode,
-    spreadMode: ComicSpreadMode,
-    pageTurnStyle: PageTurnStyle,
+    readerState: ComicsReaderState,
     pageNumbersVisible: Boolean,
     onDismissRequest: () -> Unit,
-    onReaderModeChanged: (ComicReaderMode) -> Unit,
-    onReadingDirectionChanged: (ComicReadingDirection) -> Unit,
-    onPageFitModeChanged: (ComicPageFitMode) -> Unit,
-    onSpreadModeChanged: (ComicSpreadMode) -> Unit,
-    onPageTurnStyleChanged: (PageTurnStyle) -> Unit,
     onPageNumbersVisibleChanged: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val paged = readerMode == ComicReaderMode.Paged
     // A card as tall as its content, at the top of the space between the bars.
     ReaderPanel(
         visible = isOpen,
@@ -48,6 +41,7 @@ internal fun ComicsReaderPreferencesSheet(
         width = ReaderChromeDefaults.settingsWidth,
         slot = slot,
         onDismissRequest = onDismissRequest,
+        modifier = modifier,
         testTag = ComicsPreferencesSheetTag,
     ) {
         Column(
@@ -60,50 +54,75 @@ internal fun ComicsReaderPreferencesSheet(
                 title = "Reading settings",
                 onClose = onDismissRequest,
             )
-            AppChoiceRow(
-                label = "Layout",
-                options = ComicReaderMode.entries,
-                selected = readerMode,
-                onSelected = onReaderModeChanged,
-                optionLabel = { it.label },
-            )
-            AppChoiceRow(
-                label = "Direction",
-                options = ComicReadingDirection.entries,
-                selected = readingDirection,
-                onSelected = onReadingDirectionChanged,
-                optionLabel = ::comicReadingDirectionLabel,
-            )
-            AppChoiceRow(
-                label = "Pages",
-                options = ComicSpreadMode.entries,
-                selected = spreadMode,
-                onSelected = onSpreadModeChanged,
-                optionLabel = { it.label },
-                enabled = paged,
-            )
-            AppChoiceRow(
-                label = "Page turn",
-                options = PageTurnStyle.entries,
-                selected = pageTurnStyle,
-                onSelected = onPageTurnStyleChanged,
-                optionLabel = { it.label },
-                enabled = paged,
-            )
-            AppChoiceRow(
-                label = "Fit",
-                options = ComicPageFitMode.entries,
-                selected = pageFitMode,
-                onSelected = onPageFitModeChanged,
-                optionLabel = ::comicPageFitLabel,
-                enabled = paged,
-            )
+            ComicPagesAndDirectionRows(readerState)
+            ComicTurnPagesRows(readerState)
             ReaderPageNumberChoiceRow(
                 visible = pageNumbersVisible,
                 onVisibleChanged = onPageNumbersVisibleChanged,
             )
         }
     }
+}
+
+/**
+ * Pages, Turn or Scroll, then Direction: left to right or right to left when turning, and also top to
+ * bottom (webtoons) when scrolling, where left and right run the strip sideways.
+ */
+@Composable
+private fun ComicPagesAndDirectionRows(readerState: ComicsReaderState) {
+    val mode = readerState.readerMode
+    AppChoiceRow(
+        label = ReaderPagesLabel,
+        options = ComicReaderMode.entries,
+        selected = mode,
+        onSelected = readerState::onReaderModeChanged,
+        optionLabel = { it.label },
+    )
+    val choices = comicDirectionChoices(mode)
+    AppChoiceRow(
+        label = "Direction",
+        options = choices,
+        selected = comicDirectionChoice(mode, readerState.readingDirection, readerState.scrollAxis),
+        onSelected = { choice ->
+            val pick = comicDirectionPick(choice, mode)
+            pick.axis?.let(readerState::onScrollAxisChanged)
+            pick.direction?.let(readerState::onReadingDirectionChanged)
+        },
+        optionLabel = { it.label },
+        // Three choices don't fit beside the label: the control takes the full width below it, also with
+        // two, so the card keeps its height when Pages changes.
+        stacked = true,
+    )
+}
+
+/** What only applies to turning pages: two pages side by side, the page turn and the fit. */
+@Composable
+private fun ComicTurnPagesRows(readerState: ComicsReaderState) {
+    val paged = readerState.readerMode == ComicReaderMode.Paged
+    AppChoiceRow(
+        label = "Two pages",
+        options = ComicSpreadMode.entries,
+        selected = readerState.spreadMode,
+        onSelected = readerState::onSpreadModeChanged,
+        optionLabel = ::comicSpreadLabel,
+        enabled = paged,
+    )
+    AppChoiceRow(
+        label = "Page turn",
+        options = PageTurnStyle.entries,
+        selected = readerState.pageTurnStyle,
+        onSelected = readerState::onPageTurnStyleChanged,
+        optionLabel = { it.label },
+        enabled = paged,
+    )
+    AppChoiceRow(
+        label = "Fit",
+        options = ComicPageFitMode.entries,
+        selected = readerState.pageFitMode,
+        onSelected = readerState::onPageFitModeChanged,
+        optionLabel = ::comicPageFitLabel,
+        enabled = paged,
+    )
 }
 
 /** Words instead of "LTR"/"RTL": the row's label already says it is the direction. */

@@ -54,6 +54,7 @@ class EpubBookLookDescriptionTest {
                 "Margins" to "Normal",
                 "Paragraph spacing" to "Small",
                 "Paragraph indent" to "Medium",
+                "Pages" to "Turn",
                 "Page turn" to "Slide",
             ),
             description.lines.map { it.label to it.value },
@@ -67,6 +68,29 @@ class EpubBookLookDescriptionTest {
         val description = describeEpubBookLook(look)
 
         assertEquals("Book's own font and spacing", description.summary)
-        assertEquals(listOf("Typography", "Page turn"), description.lines.map { it.label })
+        assertEquals(listOf("Typography", "Pages", "Page turn"), description.lines.map { it.label })
+    }
+
+    @Test
+    fun `a look saved while scrolling opens new books scrolling, and says so`() {
+        val look = EpubReaderPreferences(layoutMode = EpubReaderLayoutMode.Scroll, layoutModeOverride = true).newBookLook()
+
+        val pages = describeEpubBookLook(look).lines.associate { it.label to it.value }
+        val opened = restoreEpubPreferences(session = null, newBookLook = look)
+
+        assertEquals("Scroll", pages["Pages"])
+        assertFalse(pages.containsKey("Two pages"))
+        assertEquals(EpubReaderLayoutMode.Scroll, opened.layoutMode)
+        assertTrue(opened.layoutModeOverride)
+    }
+
+    @Test
+    fun `two pages shows when it is set, and Auto keeps following the orientation`() {
+        val always = EpubReaderPreferences(layoutMode = EpubReaderLayoutMode.DoublePage, layoutModeOverride = true).newBookLook()
+        val auto = EpubReaderPreferences(layoutMode = EpubReaderLayoutMode.SinglePage, layoutModeOverride = false).newBookLook()
+
+        assertEquals("On", describeEpubBookLook(always).lines.single { it.label == "Two pages" }.value)
+        assertFalse(describeEpubBookLook(auto).lines.any { it.label == "Two pages" })
+        assertFalse(restoreEpubPreferences(session = null, newBookLook = auto).layoutModeOverride)
     }
 }
