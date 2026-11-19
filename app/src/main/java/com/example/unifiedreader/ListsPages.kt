@@ -33,3 +33,22 @@ internal class ListsPageFrame(
     val draft: UserListDraft?,
     val smartDraft: SmartListDraft?,
 )
+
+/** What the Lists bar draws from; bars of the same [kind] are one bar that changes in place. */
+internal class ListsBarFrame(
+    val selection: Set<String>?,
+    val smartDraft: SmartListDraft?,
+    val draft: UserListDraft?,
+    val openListId: String?,
+    val selectingBooks: Boolean,
+) {
+    val kind: Any
+        get() = when {
+            selection != null && openListId == null -> "selecting lists"
+            smartDraft != null -> "smart list editor"
+            draft != null -> "list editor"
+            openListId != null && selectingBooks -> "selecting books"
+            openListId != null -> openListId
+            else -> "lists"
+        }
+}

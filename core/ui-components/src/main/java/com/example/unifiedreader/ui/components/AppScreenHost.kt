@@ -3,6 +3,7 @@ package com.example.unifiedreader.ui.components
 import androidx.activity.BackEventCompat
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
@@ -196,18 +197,7 @@ fun <S, F> AppScreenHost(
     val seekState = remember { SeekableTransitionState(screen) }
     val latestBack by rememberUpdatedState(back)
     val gesture = remember { AppScreenBackGesture() }
-    SideEffect { gesture.hasBackTarget = back != null }
-
-    // Screens that handle back themselves (AppScreenBackHandler) sit above this one.
-    PredictiveBackHandler(enabled = back != null) { events ->
-        try {
-            events.collect { event -> gesture.onProgress(event) }
-            gesture.onEnd()
-            latestBack?.onBack?.invoke()
-        } catch (_: CancellationException) {
-            gesture.onEnd()
-        }
-    }
+    AppScreenHostBackHandler(back, gesture)
 
     LaunchedEffect(gesture.active, gesture.progress, screen) {
         val gestureBack = latestBack
@@ -235,7 +225,6 @@ fun <S, F> AppScreenHost(
     val density = LocalDensity.current
     val leavingAround = LocalAppScreenLeaving.current
     // While a change plays (or a gesture scrubs one), every screen in it is opaque.
-    val groundColor = MaterialTheme.colorScheme.background
     val changing = ground && seekState.currentState != seekState.targetState
     CompositionLocalProvider(LocalAppScreenBackGesture provides gesture) {
         screenTransition.AnimatedContent(
@@ -251,29 +240,61 @@ fun <S, F> AppScreenHost(
         ) { shown ->
             val key = contentKey(shown)
             val shownFrame = if (key == shownKey) frame else frames[key] ?: frame
-            // A screen leaving under a back gesture rounds its corners as it shrinks.
-            val corner by this.transition.animateDp(
-                transitionSpec = { tween(PredictiveBackMillis, easing = WithTheGesture) },
-                label = "AppScreenHostCorner",
-            ) { state ->
-                if (state == EnterExitState.PostExit && gesture.follows) AppMotion.predictiveBackCornerRadius else 0.dp
+            AppScreenSlot(gesture = gesture, onGround = changing, leaving = leavingAround || key != shownKey) {
+                content(shown, shownFrame)
             }
-            val leaving = leavingAround || key != shownKey
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        if (corner > 0.dp) {
-                            shape = RoundedCornerShape(corner)
-                            clip = true
-                        }
-                    }
-                    .then(if (changing) Modifier.background(groundColor).appGroundPattern() else Modifier),
-            ) {
-                CompositionLocalProvider(LocalAppScreenLeaving provides leaving) {
-                    content(shown, shownFrame)
+        }
+    }
+}
+
+/** The host's own back: a predictive gesture scrubs the change to [back]'s target, letting go goes there. */
+@Composable
+private fun <S> AppScreenHostBackHandler(back: AppScreenBack<S>?, gesture: AppScreenBackGesture) {
+    val latestBack by rememberUpdatedState(back)
+    SideEffect { gesture.hasBackTarget = back != null }
+    // Screens that handle back themselves (AppScreenBackHandler) sit above this one.
+    PredictiveBackHandler(enabled = back != null) { events ->
+        try {
+            events.collect { event -> gesture.onProgress(event) }
+            gesture.onEnd()
+            latestBack?.onBack?.invoke()
+        } catch (_: CancellationException) {
+            gesture.onEnd()
+        }
+    }
+}
+
+/**
+ * One screen in an [AppScreenHost]: it rounds its corners as it shrinks away under a back gesture,
+ * and sits [onGround] (the background colour and the theme's pattern) while a change plays.
+ */
+@Composable
+private fun AnimatedVisibilityScope.AppScreenSlot(
+    gesture: AppScreenBackGesture,
+    onGround: Boolean,
+    leaving: Boolean,
+    content: @Composable () -> Unit,
+) {
+    val corner by transition.animateDp(
+        transitionSpec = { tween(PredictiveBackMillis, easing = WithTheGesture) },
+        label = "AppScreenHostCorner",
+    ) { state ->
+        if (state == EnterExitState.PostExit && gesture.follows) AppMotion.predictiveBackCornerRadius else 0.dp
+    }
+    val groundColor = MaterialTheme.colorScheme.background
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                if (corner > 0.dp) {
+                    shape = RoundedCornerShape(corner)
+                    clip = true
                 }
             }
+            .then(if (onGround) Modifier.background(groundColor).appGroundPattern() else Modifier),
+    ) {
+        CompositionLocalProvider(LocalAppScreenLeaving provides leaving) {
+            content()
         }
     }
 }
