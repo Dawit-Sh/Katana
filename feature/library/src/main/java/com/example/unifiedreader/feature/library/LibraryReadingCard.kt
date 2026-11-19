@@ -100,16 +100,24 @@ fun LibraryReadingCard(
                 onClick = onContinue,
             ),
     ) {
+        val fontScale = LocalDensity.current.fontScale
         Row(
             modifier = Modifier
-                .then(if (tall) Modifier.fillMaxHeight() else Modifier.height(LibraryReadingCardDefaults.height))
+                .then(if (tall) Modifier.fillMaxHeight() else Modifier.height(libraryReadingCardHeight(fontScale)))
                 .padding(LibraryReadingCardDefaults.padding),
             horizontalArrangement = Arrangement.spacedBy(LibraryReadingCardDefaults.coverGap),
         ) {
             Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .aspectRatio(LibraryCoverAspectRatio, matchHeightConstraintsFirst = true),
+                modifier = if (tall) {
+                    Modifier
+                        .fillMaxHeight()
+                        .aspectRatio(LibraryCoverAspectRatio, matchHeightConstraintsFirst = true)
+                } else {
+                    // The 80 dp cover of a 160 dp card, kept when larger text makes the card taller.
+                    Modifier
+                        .width(LibraryReadingCardDefaults.coverWidth)
+                        .aspectRatio(LibraryCoverAspectRatio)
+                },
             ) {
                 VisibleResolvedLibraryCover(
                     item = item,
@@ -167,6 +175,10 @@ object LibraryReadingCardDefaults {
 
     /** On its own (above the shelves, at the top of a series): an 80 dp cover inside the inset. */
     val height: Dp = 160.dp
+    internal val coverWidth: Dp = (height - padding * 2) * LibraryCoverAspectRatio
+
+    /** What the card grows by for each step of the device's font size past 100%, so its lines are never cut. */
+    internal val heightPerFontScale: Dp = 96.dp
     val coverGap: Dp = 16.dp
 
     /** The overline and the title keep this clear of the •••. */
@@ -229,3 +241,11 @@ fun LibrarySeriesReadingCard(
         )
     }
 }
+
+/**
+ * The card's height at the device's [fontScale]: 160 dp at the normal size (the Fire 7's), taller with
+ * larger text (Settings › Display › Font size, up to 200% on Android 14 and later), so the title, the author
+ * and the progress line all fit.
+ */
+internal fun libraryReadingCardHeight(fontScale: Float): Dp =
+    LibraryReadingCardDefaults.height + LibraryReadingCardDefaults.heightPerFontScale * (fontScale - 1f).coerceAtLeast(0f)
