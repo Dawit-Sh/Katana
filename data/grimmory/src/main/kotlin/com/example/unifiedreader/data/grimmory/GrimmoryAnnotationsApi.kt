@@ -15,6 +15,8 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import java.time.LocalDateTime
+import java.time.ZoneId
 import kotlinx.serialization.Serializable
 
 /**
@@ -84,9 +86,15 @@ interface GrimmoryAnnotationsApi {
     suspend fun delete(accessToken: String, annotationId: String): Boolean
 }
 
+/**
+ * [serverZone]: the time zone of Grimmory's clock. It writes a highlight's times without one, in
+ * its own (a server on the home network keeps the same time as this device, 2026-11-19: 07:44 for
+ * 04:44 UTC in Addis Ababa), unlike its reading times, which are in UTC.
+ */
 class KtorGrimmoryAnnotationsApi(
     private val httpClient: HttpClient,
     baseUrl: String,
+    private val serverZone: ZoneId = ZoneId.systemDefault(),
 ) : GrimmoryAnnotationsApi {
     private val baseUrl = baseUrl.trimEnd('/')
 
@@ -94,7 +102,7 @@ class KtorGrimmoryAnnotationsApi(
         authenticatedRequest {
             val response = httpClient.get("$baseUrl/api/v1/annotations/book/$bookId") { bearerAuth(accessToken) }
             response.throwIfGrimmoryError()
-            response.body<List<GrimmoryAnnotationDto>>().mapNotNull(GrimmoryAnnotationDto::toAnnotation)
+            response.body<List<GrimmoryAnnotationDto>>().mapNotNull { dto -> dto.toAnnotation(serverZone) }
         }
 
     override suspend fun allHighlights(accessToken: String): List<GrimmoryAnnotation> = authenticatedRequest {
@@ -108,7 +116,7 @@ class KtorGrimmoryAnnotationsApi(
         response.throwIfGrimmoryError()
         response.body<List<GrimmoryNotebookEntryDto>>()
             .filter { entry -> entry.type == null || entry.type == NOTEBOOK_HIGHLIGHT }
-            .mapNotNull(GrimmoryNotebookEntryDto::toHighlightOrNull)
+            .mapNotNull { entry -> entry.toHighlightOrNull(serverZone) }
     }
 
     override suspend fun create(accessToken: String, highlight: GrimmoryAnnotationCreate): GrimmoryAnnotationWrite =
@@ -148,7 +156,7 @@ class KtorGrimmoryAnnotationsApi(
                 GrimmoryAnnotationWrite.Refused(response.bodyAsText().take(REFUSAL_MESSAGE_LIMIT))
             else -> {
                 response.throwIfGrimmoryError()
-                val saved = response.body<GrimmoryAnnotationDto>().toAnnotation()
+                val saved = response.body<GrimmoryAnnotationDto>().toAnnotation(serverZone)
                     ?: error("Grimmory saved the highlight without an id.")
                 GrimmoryAnnotationWrite.Saved(saved)
             }
@@ -206,7 +214,7 @@ internal data class GrimmoryUpdateAnnotationRequestDto(
     val note: String,
 )
 
-internal fun GrimmoryAnnotationDto.toAnnotation(): GrimmoryAnnotation? {
+internal fun GrimmoryAnnotationDto.toAnnotation(serverZone: ZoneId): GrimmoryAnnotation? {
     val annotationId = id ?: return null
     return GrimmoryAnnotation(
         id = annotationId.toString(),
@@ -217,12 +225,12 @@ internal fun GrimmoryAnnotationDto.toAnnotation(): GrimmoryAnnotation? {
         style = style,
         note = note?.takeIf(String::isNotBlank),
         chapterTitle = chapterTitle?.takeIf(String::isNotBlank),
-        createdAtEpochMillis = createdAt.toServerEpochMillisOrNull(),
-        updatedAtEpochMillis = updatedAt.toServerEpochMillisOrNull(),
+        createdAtEpochMillis = createdAt.toEpochMillisIn(serverZone),
+        updatedAtEpochMillis = updatedAt.toEpochMillisIn(serverZone),
     )
 }
 
-internal fun GrimmoryNotebookEntryDto.toHighlightOrNull(): GrimmoryAnnotation? {
+internal fun GrimmoryNotebookEntryDto.toHighlightOrNull(serverZone: ZoneId): GrimmoryAnnotation? {
     val entryId = id ?: return null
     return GrimmoryAnnotation(
         id = entryId.toString(),
@@ -233,9 +241,16 @@ internal fun GrimmoryNotebookEntryDto.toHighlightOrNull(): GrimmoryAnnotation? {
         style = style,
         note = note?.takeIf(String::isNotBlank),
         chapterTitle = chapterTitle?.takeIf(String::isNotBlank),
-        createdAtEpochMillis = createdAt.toServerEpochMillisOrNull(),
-        updatedAtEpochMillis = updatedAt.toServerEpochMillisOrNull(),
+        createdAtEpochMillis = createdAt.toEpochMillisIn(serverZone),
+        updatedAtEpochMillis = updatedAt.toEpochMillisIn(serverZone),
     )
+}
+
+// A time with a zone or offset as it says; one without, in the server's zone.
+internal fun String?.toEpochMillisIn(serverZone: ZoneId): Long? {
+    val text = this?.trim()?.takeIf(String::isNotEmpty) ?: return null
+    return runCatching { LocalDateTime.parse(text).atZone(serverZone).toInstant().toEpochMilli() }
+        .getOrElse { text.toServerEpochMillisOrNull() }
 }
 
 private fun GrimmoryAnnotationCreate.toRequestDto(): GrimmoryCreateAnnotationRequestDto =

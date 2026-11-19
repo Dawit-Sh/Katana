@@ -66,7 +66,19 @@ class GrimmoryAnnotationsApiTest {
         assertEquals("#4ADE80", highlight.color)
         assertEquals("underline", highlight.style)
         assertNull("a blank note is no note", highlight.note)
-        assertEquals(1_795_050_124_500L, highlight.updatedAtEpochMillis)
+        val expected = java.time.LocalDateTime.of(2026, 11, 19, 1, 2, 4, 500_000_000)
+            .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        assertEquals("a time without a zone is the server's, the home network's", expected, highlight.updatedAtEpochMillis)
+    }
+
+    // Grimmory writes a highlight's times in its own zone, without saying which.
+    @Test
+    fun `a highlight's server time is read in the server's zone`() {
+        val addisAbaba = java.time.ZoneId.of("Africa/Addis_Ababa")
+
+        assertEquals(1_795_063_484_000L, "2026-11-19T07:44:44".toEpochMillisIn(addisAbaba))
+        assertEquals(1_795_063_484_000L, "2026-11-19T04:44:44Z".toEpochMillisIn(addisAbaba))
+        assertNull("".toEpochMillisIn(addisAbaba))
     }
 
     @Test
