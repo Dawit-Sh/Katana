@@ -2,18 +2,24 @@ package com.example.unifiedreader.feature.reader.pdf
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.primaryAuthor
+import com.example.unifiedreader.feature.annotations.PageBookmarkJumpEffect
+import com.example.unifiedreader.feature.annotations.PageBookmarkRibbon
+import com.example.unifiedreader.feature.annotations.PageBookmarks
 import com.example.unifiedreader.feature.reader.core.ImmersiveReaderOverlay
 import com.example.unifiedreader.feature.reader.core.ReaderDocumentState
 import com.example.unifiedreader.feature.reader.core.ReaderPageNumber
@@ -27,8 +33,6 @@ import com.example.unifiedreader.feature.reader.preferences.ReaderPageNumberPref
 import com.example.unifiedreader.feature.reader.preferences.ReaderPagesMode
 import com.example.unifiedreader.feature.reader.preferences.ReaderPagesPreferencesStore
 import kotlin.math.abs
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 
 /**
  * The book's "Pages" choice ([mode], null until the session store and the last pick have loaded) and the
@@ -124,6 +128,8 @@ internal class PdfReaderParts(
     val pages: PdfPagesChoice,
     val actions: PdfReaderSessionActions,
     val opening: PdfOpeningState,
+    /** The book's page bookmarks; null when the reader has none. */
+    val bookmarks: PageBookmarks? = null,
 ) {
     val item: ReadableItem
         get() = book.item
@@ -199,6 +205,7 @@ internal fun PdfReaderContent(
                 )
             },
         )
+        PdfPageBookmarkLayer(parts = parts, navigation = navigation)
     }
 }
 
@@ -228,7 +235,25 @@ private fun PdfReaderBars(
         onPrevious = navigation.previous,
         onNext = navigation.next,
         onPageSelected = navigation.toPage,
+        bookmark = parts.bookmarks?.let { bookmarks ->
+            val pageIndex = place.safePageIndex(pageCount)
+            PdfBookmarkButton(
+                isPageBookmarked = bookmarks.onPage(pageIndex).isNotEmpty(),
+                onClick = { bookmarks.toggle(pageIndex, pageCount) },
+            )
+        },
     )
+}
+
+/** The ribbon on a bookmarked page, and a bookmark opened from the Bookmarks page or the book's page. */
+@Composable
+private fun BoxScope.PdfPageBookmarkLayer(parts: PdfReaderParts, navigation: PdfNavigation) {
+    val bookmarks = parts.bookmarks ?: return
+    val pageCount = parts.pageCount
+    PageBookmarkJumpEffect(bookmarks, parts.item.id, ready = parts.place.restored && pageCount > 0) { pageIndex ->
+        navigation.toPage(pageIndex.coerceIn(0, pageCount - 1))
+    }
+    PageBookmarkRibbon(visible = bookmarks.onPage(parts.place.safePageIndex(pageCount)).isNotEmpty())
 }
 
 /** The scrolling view, once the book's place is restored; it opens where it was, or at the page turned to. */

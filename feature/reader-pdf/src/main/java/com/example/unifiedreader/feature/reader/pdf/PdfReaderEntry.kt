@@ -49,7 +49,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.ReadableItem
+import com.example.unifiedreader.core.model.primaryAuthor
 import com.example.unifiedreader.core.model.runSuspendCatching
+import com.example.unifiedreader.feature.annotations.PageBookmarkSources
+import com.example.unifiedreader.feature.annotations.rememberPageBookmarks
 import com.example.unifiedreader.feature.reader.core.ReaderDocumentState
 import com.example.unifiedreader.feature.reader.core.ReaderOpenFailure
 import com.example.unifiedreader.feature.reader.core.ReaderOpenMode
@@ -94,6 +97,7 @@ fun PdfReaderScreen(
     pageNumberPreferences: ReaderPageNumberPreferencesStore = remember { InMemoryReaderPageNumberPreferencesStore() },
     pagesPreferences: ReaderPagesPreferencesStore = remember { InMemoryReaderPagesPreferencesStore() },
     comfortPreferences: ReaderComfortPreferencesStore = remember { InMemoryReaderComfortPreferencesStore() },
+    bookmarkSources: PageBookmarkSources? = null,
     openMode: ReaderOpenMode = ReaderOpenMode.Default,
     onBack: () -> Unit = {},
     onCompletionRequested: () -> Unit = {},
@@ -127,7 +131,14 @@ fun PdfReaderScreen(
         retry = { openAttempt++ },
     )
     PdfReaderContent(
-        parts = PdfReaderParts(PdfReaderBook(item, documentState, pageCount, pageRenderer), place, pages, actions, opening),
+        parts = PdfReaderParts(
+            book = PdfReaderBook(item, documentState, pageCount, pageRenderer),
+            place = place,
+            pages = pages,
+            actions = actions,
+            opening = opening,
+            bookmarks = rememberPageBookmarks(bookmarkSources, item.id, item.title, item.bookMetadata?.primaryAuthor()),
+        ),
         pageNumberPreferences = pageNumberPreferences,
         volumeKeysTurnPages = comfortPreferences.comfortFlow.collectAsStateWithLifecycle().value.volumeKeysTurnPages,
         turnPages = { navigation -> PdfTurnPages(item, documentState, pageCount, place, pageRenderer, opening, navigation) },

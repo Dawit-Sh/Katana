@@ -12,6 +12,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:djvu"))
     implementation(project(":feature:reader-core"))
+    implementation(project(":feature:annotations"))
     implementation(project(":feature:reader-preferences"))
     implementation(platform(libs.androidx.compose.bom))
     implementation("androidx.compose.foundation:foundation")

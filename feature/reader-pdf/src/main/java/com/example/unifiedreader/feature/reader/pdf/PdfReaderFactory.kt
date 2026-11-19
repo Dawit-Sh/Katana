@@ -3,6 +3,7 @@ package com.example.unifiedreader.feature.reader.pdf
 import android.net.Uri
 import com.example.unifiedreader.core.model.PageImageBookFormats
 import com.example.unifiedreader.core.model.ReadableItem
+import com.example.unifiedreader.feature.annotations.PageBookmarkSources
 import com.example.unifiedreader.feature.reader.core.ReaderChrome
 import com.example.unifiedreader.feature.reader.core.ReaderScreenFactory
 import com.example.unifiedreader.feature.reader.core.ReaderSessionStore
@@ -19,6 +20,8 @@ fun pdfReaderFactory(
      * turns its pages or scrolls (the last pick in any of them).
      */
     displayPreferences: ReaderDisplayPreferences = ReaderDisplayPreferences(),
+    /** Page bookmarks; null keeps the reader without them. */
+    bookmarks: PageBookmarkSources? = null,
 ): ReaderScreenFactory = formatReaderFactory(
     // PDF, and DjVu scans drawn page by page the same way.
     formats = PageImageBookFormats,
@@ -32,6 +35,7 @@ fun pdfReaderFactory(
             pageNumberPreferences = displayPreferences.pageNumbers,
             pagesPreferences = displayPreferences.pages,
             comfortPreferences = displayPreferences.comfort,
+            bookmarkSources = bookmarks,
             openMode = navigationActions.currentOpenMode,
             onBack = onBack,
             onCompletionRequested = navigationActions.onRequestCompletion,

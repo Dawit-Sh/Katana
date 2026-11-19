@@ -22,10 +22,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,21 +41,20 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.unifiedreader.feature.reader.core.ReaderDocumentState
+import com.example.unifiedreader.feature.annotations.PageBookmarkCopy
 import com.example.unifiedreader.feature.reader.core.ReaderBarButton
 import com.example.unifiedreader.feature.reader.core.ReaderChromeDefaults
 import com.example.unifiedreader.feature.reader.core.ReaderChromeFrame
 import com.example.unifiedreader.feature.reader.core.ReaderDock
 import com.example.unifiedreader.feature.reader.core.ReaderDockProgress
+import com.example.unifiedreader.feature.reader.core.ReaderDocumentState
 import com.example.unifiedreader.feature.reader.core.ReaderTopBar
 import com.example.unifiedreader.feature.reader.core.readerOverlayTokens
 import com.example.unifiedreader.ui.components.AppCircularProgress
 import com.example.unifiedreader.ui.components.AppIcons
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlin.math.roundToInt
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 
 /**
  * The PDF reader on the shared frame: the title over the author with previous and next and the reading
@@ -77,6 +78,8 @@ internal fun PdfReaderChrome(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onPageSelected: (Int) -> Unit,
+    // Bookmarks the page on screen, or takes its bookmark off; null when the book can't keep them.
+    bookmark: PdfBookmarkButton? = null,
 ) {
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(overlayVisible) {
@@ -99,6 +102,14 @@ internal fun PdfReaderChrome(
                     onClick = onNext,
                     enabled = canNavigateNext,
                 )
+                bookmark?.let { button ->
+                    ReaderBarButton(
+                        icon = if (button.isPageBookmarked) AppIcons.BookmarkFilled else AppIcons.Bookmark,
+                        contentDescription = if (button.isPageBookmarked) PageBookmarkCopy.RemoveBookmark else PageBookmarkCopy.Bookmark,
+                        active = button.isPageBookmarked,
+                        onClick = button.onClick,
+                    )
+                }
                 ReaderBarButton(
                     icon = AppIcons.Tune,
                     contentDescription = "Reading settings",
@@ -315,3 +326,9 @@ private const val PdfPreviewWidthRatio = 0.73f
 private const val PdfPagePreviewStripTag = "pdf-page-preview-strip"
 private const val PDF_PREVIEW_CACHE_MAX_ENTRIES = 64
 private const val PDF_PREVIEW_RENDER_LONG_EDGE_PX = 420
+
+/** The top bar's bookmark button: filled while the page on screen is bookmarked. */
+internal class PdfBookmarkButton(
+    val isPageBookmarked: Boolean,
+    val onClick: () -> Unit,
+)
