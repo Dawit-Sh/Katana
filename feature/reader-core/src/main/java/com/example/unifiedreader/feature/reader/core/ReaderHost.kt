@@ -1,9 +1,13 @@
 package com.example.unifiedreader.feature.reader.core
 
 import android.app.Activity
+import android.os.Build
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.areNavigationBarsVisible
+import androidx.compose.foundation.layout.areStatusBarsVisible
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
@@ -11,6 +15,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowInsetsCompat
@@ -18,6 +24,8 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.ui.components.LocalAppScreenLeaving
 import com.example.unifiedreader.ui.components.appSystemBars
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 
 enum class ReaderChrome {
     Immersive,
@@ -136,7 +144,13 @@ private fun ReaderWorkEffect(
  * the change to the library instead of after it. The window stays edge to edge throughout; the
  * library is laid out for the bars even while they are hidden ([appSystemBars]), so it doesn't
  * move when they return.
+ *
+ * On Android 12 and later the bars hide with the default behaviour, so with gesture navigation the
+ * back gesture leaves the book in one swipe (with transient bars the first swipe only showed them);
+ * bars swiped in from an edge hide again after [ReaderRevealedBarsHideMillis], as transient ones did.
+ * Android 9 to 11 (the Fire 7) keep the transient bars.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ReaderWindowEffect(
     isImmersive: Boolean,
@@ -145,19 +159,43 @@ private fun ReaderWindowEffect(
     val activity = view.context.findContextAncestor<Activity>() ?: return
     val hideBars = isImmersive && !LocalAppScreenLeaving.current
     val controller = remember(activity, view) { WindowInsetsControllerCompat(activity.window, view) }
+    val barsBehavior = readerSystemBarsBehavior(Build.VERSION.SDK_INT)
+    // The status and navigation bars each: "system bars" also counts the caption bar, which a phone never shows.
+    val barsVisible = rememberUpdatedState(WindowInsets.areStatusBarsVisible || WindowInsets.areNavigationBarsVisible)
 
     DisposableEffect(controller) {
-        controller.systemBarsBehavior =
-            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.systemBarsBehavior = barsBehavior
         onDispose {
             controller.show(WindowInsetsCompat.Type.systemBars())
         }
     }
     LaunchedEffect(controller, hideBars) {
-        if (hideBars) {
-            controller.hide(WindowInsetsCompat.Type.systemBars())
-        } else {
+        if (!hideBars) {
             controller.show(WindowInsetsCompat.Type.systemBars())
+            return@LaunchedEffect
+        }
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+        if (barsBehavior != WindowInsetsControllerCompat.BEHAVIOR_DEFAULT) return@LaunchedEffect
+        snapshotFlow { barsVisible.value }.collectLatest { visible ->
+            if (visible) {
+                delay(ReaderRevealedBarsHideMillis)
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+            }
         }
     }
 }
+
+/**
+ * How the hidden system bars behave in a reader: the default behaviour from Android 12 (API 31), where
+ * the system's gestures work while the bars are hidden, and transient bars before it, where the
+ * default would keep bars swiped into view for good.
+ */
+internal fun readerSystemBarsBehavior(sdkInt: Int): Int =
+    if (sdkInt >= Build.VERSION_CODES.S) {
+        WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
+    } else {
+        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    }
+
+/** How long bars swiped into view stay before the reader hides them again, as long as transient bars stay. */
+internal const val ReaderRevealedBarsHideMillis = 3_000L
