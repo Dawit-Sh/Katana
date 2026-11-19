@@ -75,10 +75,12 @@ private fun FrameLayout.LayoutParams.margins(): List<Int> = listOf(leftMargin, t
 
 /**
  * Taps on the strips around the navigator, which Readium never sees, act like taps on the page: the
- * same side zones across the whole width ([readerTapSide]) turn it, the middle opens the menu.
+ * same side zones across the whole width ([readerTapSide]) turn it, the middle opens the menu, and the
+ * top-end corner bookmarks the page when [onCornerTap] gives an action ([isEpubBookmarkCorner]).
  */
 internal fun FrameLayout.updateEpubStripTapListener(
     onTap: (ReaderTapSide) -> Unit,
+    onCornerTap: () -> (() -> Unit)? = { null },
 ) {
     var isTrackingStripTap = false
     setOnTouchListener { view, event ->
@@ -97,8 +99,15 @@ internal fun FrameLayout.updateEpubStripTapListener(
             MotionEvent.ACTION_UP -> {
                 if (!isTrackingStripTap) return@setOnTouchListener false
                 isTrackingStripTap = false
-                val maxZoneWidth = ReaderTapZoneMaxWidth.value * view.resources.displayMetrics.density
-                onTap(readerTapSide(event.x, view.width.toFloat(), maxZoneWidth))
+                val density = view.resources.displayMetrics.density
+                val pageTop = (view as? FrameLayout)?.getChildAt(0)?.top ?: 0
+                val corner = onCornerTap()
+                    ?.takeIf { isEpubBookmarkCorner(event.x, event.y - pageTop, view.width.toFloat(), density) }
+                if (corner != null) {
+                    corner()
+                } else {
+                    onTap(readerTapSide(event.x, view.width.toFloat(), ReaderTapZoneMaxWidth.value * density))
+                }
                 true
             }
 

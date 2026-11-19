@@ -41,7 +41,6 @@ to work with. That's pretty much how Katana started.
 ## Things to implement
 
 - **Highlights in PDFs.** Highlighting works in EPUBs; PDFs need a text layer first.
-- **Bookmark from the page corner.** A tap in the top-right corner of the page should bookmark it.
 
 ## Build it yourself
 

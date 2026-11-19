@@ -4,7 +4,6 @@ import android.content.res.Configuration
 import com.example.unifiedreader.feature.translation.ReaderTextSelection
 import android.view.Gravity
 import android.view.View
-import androidx.core.view.WindowInsetsCompat
 import android.widget.FrameLayout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -196,7 +195,10 @@ internal fun ReadiumEpubNavigatorHost(
                     backgroundColor = surfaceBackground.toArgb(),
                     cutout = cutout,
                 )
-                container.updateEpubStripTapListener(onTap = pageTaps::onTap)
+                container.updateEpubStripTapListener(
+                    onTap = pageTaps::onTap,
+                    onCornerTap = { latestOnBookmarkCornerTap.value },
+                )
             },
         )
     }
@@ -410,10 +412,8 @@ internal fun ReadiumEpubNavigatorHost(
                 val density = fragment.resources.displayMetrics.density
                 val x = event.point.x + strip
                 val width = viewWidth + 2 * strip
-                // The page runs up under the status bar, so the corner starts where the screen shows the page.
-                val y = event.point.y - fragment.publicationView.hiddenTopPx()
                 val onCorner = latestOnBookmarkCornerTap.value
-                    ?.takeIf { isEpubBookmarkCorner(x, y, width, EpubBookmarkCornerSize.value * density) }
+                    ?.takeIf { isEpubBookmarkCorner(x, yFromPageTop = event.point.y, width = width, density = density) }
                 return when {
                     viewWidth <= 0f -> false
                     onCorner != null -> {
@@ -503,21 +503,18 @@ internal fun ReadiumEpubNavigatorHost(
 
 /** The tap handling of the current navigator, for taps on the strips around it, which Readium never sees. */
 /** The top-end corner a tap bookmarks from: [cornerSize] square, at the right (in pixels of the page's width). */
-internal fun isEpubBookmarkCorner(x: Float, y: Float, width: Float, cornerSize: Float): Boolean =
-    width > 0f && y in 0f..cornerSize && x >= width - cornerSize
+/**
+ * Whether a tap bookmarks the page: in the top-end corner, which takes in the ribbon (it hangs 72 to 98 dp
+ * from the edge) and the strip above the text. [yFromPageTop] is negative on that strip. [x] and [width]
+ * are in pixels across the whole reader.
+ */
+internal fun isEpubBookmarkCorner(x: Float, yFromPageTop: Float, width: Float, density: Float): Boolean =
+    width > 0f && yFromPageTop <= EpubBookmarkCornerHeight.value * density &&
+        x >= width - EpubBookmarkCornerWidth.value * density
 
-private val EpubBookmarkCornerSize = 56.dp
+private val EpubBookmarkCornerWidth = 112.dp
+private val EpubBookmarkCornerHeight = 48.dp
 
-/** How much of this view's top is under the status bar or a cutout, in pixels: 0 when it starts below them. */
-private fun View.hiddenTopPx(): Float {
-    val barsTop = rootWindowInsets?.let { insets ->
-        WindowInsetsCompat.toWindowInsetsCompat(insets, this)
-            .getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
-            .top
-    } ?: 0
-    val location = IntArray(2).also(::getLocationInWindow)
-    return (barsTop - location[1]).coerceAtLeast(0).toFloat()
-}
 
 private class EpubPageTaps {
     var handler: ((ReaderTapSide) -> Boolean)? = null

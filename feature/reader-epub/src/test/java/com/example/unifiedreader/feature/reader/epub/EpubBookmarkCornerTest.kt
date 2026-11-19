@@ -5,16 +5,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EpubBookmarkCornerTest {
+    // A 1080 px wide reader at 2.625 px per dp: the corner is the last 294 px, down to 126 px below the page top.
+    private val width = 1080f
+    private val density = 2.625f
+
     @Test
-    fun `only the top-right square bookmarks`() {
-        val width = 1000f
-        val corner = 150f
-        assertTrue(isEpubBookmarkCorner(x = 990f, y = 10f, width = width, cornerSize = corner))
-        assertTrue(isEpubBookmarkCorner(x = 850f, y = 150f, width = width, cornerSize = corner))
-        // Below the corner, or left of it, a tap turns the page as before.
-        assertFalse(isEpubBookmarkCorner(x = 990f, y = 151f, width = width, cornerSize = corner))
-        assertFalse(isEpubBookmarkCorner(x = 849f, y = 10f, width = width, cornerSize = corner))
-        assertFalse(isEpubBookmarkCorner(x = 10f, y = 10f, width = width, cornerSize = corner))
-        assertFalse(isEpubBookmarkCorner(x = 0f, y = 0f, width = 0f, cornerSize = corner))
+    fun `the top-right corner bookmarks, the ribbon and the strip above the text included`() {
+        assertTrue(isEpubBookmarkCorner(x = 1060f, yFromPageTop = 10f, width = width, density = density))
+        // Where the ribbon hangs, 72 to 98 dp from the edge.
+        assertTrue(isEpubBookmarkCorner(x = 1080f - 85f * density, yFromPageTop = 40f, width = width, density = density))
+        // On the strip above the text.
+        assertTrue(isEpubBookmarkCorner(x = 1000f, yFromPageTop = -60f, width = width, density = density))
+    }
+
+    @Test
+    fun `below the corner, or left of it, a tap turns the page as before`() {
+        assertFalse(isEpubBookmarkCorner(x = 1060f, yFromPageTop = 130f, width = width, density = density))
+        assertFalse(isEpubBookmarkCorner(x = 780f, yFromPageTop = 10f, width = width, density = density))
+        assertFalse(isEpubBookmarkCorner(x = 0f, yFromPageTop = 0f, width = 0f, density = density))
     }
 }
