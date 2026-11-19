@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import com.example.unifiedreader.feature.translation.ReaderTextSelection
 import android.view.Gravity
 import android.view.View
+import androidx.core.view.WindowInsetsCompat
 import android.widget.FrameLayout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -409,8 +410,10 @@ internal fun ReadiumEpubNavigatorHost(
                 val density = fragment.resources.displayMetrics.density
                 val x = event.point.x + strip
                 val width = viewWidth + 2 * strip
+                // The page runs up under the status bar, so the corner starts where the screen shows the page.
+                val y = event.point.y - fragment.publicationView.hiddenTopPx()
                 val onCorner = latestOnBookmarkCornerTap.value
-                    ?.takeIf { isEpubBookmarkCorner(x, event.point.y, width, EpubBookmarkCornerSize.value * density) }
+                    ?.takeIf { isEpubBookmarkCorner(x, y, width, EpubBookmarkCornerSize.value * density) }
                 return when {
                     viewWidth <= 0f -> false
                     onCorner != null -> {
@@ -504,6 +507,17 @@ internal fun isEpubBookmarkCorner(x: Float, y: Float, width: Float, cornerSize: 
     width > 0f && y in 0f..cornerSize && x >= width - cornerSize
 
 private val EpubBookmarkCornerSize = 56.dp
+
+/** How much of this view's top is under the status bar or a cutout, in pixels: 0 when it starts below them. */
+private fun View.hiddenTopPx(): Float {
+    val barsTop = rootWindowInsets?.let { insets ->
+        WindowInsetsCompat.toWindowInsetsCompat(insets, this)
+            .getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            .top
+    } ?: 0
+    val location = IntArray(2).also(::getLocationInWindow)
+    return (barsTop - location[1]).coerceAtLeast(0).toFloat()
+}
 
 private class EpubPageTaps {
     var handler: ((ReaderTapSide) -> Boolean)? = null

@@ -26,8 +26,8 @@ Once it's installed, Katana updates itself from Settings › About, and an updat
   KOReader too.
 - Your reading place syncs with the server, and books download for offline reading, picking up where they stopped
   if the Wi-Fi drops.
-- Save words and go over them as flashcards, bookmark pages, search inside a book, and share a highlight as a
-  quote card.
+- Bookmarks in every format, with a name and a note, synced with Grimmory too.
+- Save words and go over them as flashcards, search inside a book, and share a highlight as a quote card.
 - Export your highlights and notes as Markdown, and back everything up to a file.
 - Works away from home too, over something like Tailscale.
 - Runs on old Amazon Fire tablets and on new phones alike.
@@ -40,9 +40,8 @@ to work with. That's pretty much how Katana started.
 
 ## Things to implement
 
-- **Bookmark sync.** Bookmarks stay on the device for now; they should sync both ways with Grimmory, like
-  highlights do.
-- **Pull down to refresh.** Drag the library down to refresh it and sync with the server.
+- **Highlights in PDFs.** Highlighting works in EPUBs; PDFs need a text layer first.
+- **Bookmark from the page corner.** A tap in the top-right corner of the page should bookmark it.
 
 ## Build it yourself
 
