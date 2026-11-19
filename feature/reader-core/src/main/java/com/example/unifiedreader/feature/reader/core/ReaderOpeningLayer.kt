@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeGestures
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -274,7 +273,7 @@ private fun ReaderErrorContent(
             subtitle = null,
             onBack = onBack,
             modifier = Modifier
-                .windowInsetsPadding(WindowInsets.safeGestures.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top))
+                .windowInsetsPadding(WindowInsets.readerChromeSafe.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top))
                 .padding(ReaderChromeDefaults.inset),
         )
         // The kit's empty state, in the page's colours.

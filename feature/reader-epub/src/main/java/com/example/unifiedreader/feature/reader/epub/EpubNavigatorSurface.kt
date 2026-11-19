@@ -19,30 +19,51 @@ import org.readium.r2.shared.publication.epub.EpubLayout
 import org.readium.r2.shared.publication.presentation.presentation
 import java.util.Locale
 
-/** The navigator inside the page's strips: [verticalInsetPx] above and below the text, [sideInsetPx] beside a spread. */
+/**
+ * The display cutout (a phone's camera hole or notch) in pixels on each side, from
+ * `WindowInsets.displayCutout`. The page keeps its text and strips clear of it; the page colour still
+ * fills the space under it. None on the Fire 7 and other screens without a cutout.
+ */
+internal data class EpubCutoutInsets(
+    val left: Int = 0,
+    val top: Int = 0,
+    val right: Int = 0,
+    val bottom: Int = 0,
+) {
+    companion object {
+        val None = EpubCutoutInsets()
+    }
+}
+
+/**
+ * The navigator inside the page's strips: [verticalInsetPx] above and below the text, [sideInsetPx] beside a
+ * spread, each strip moved in past the display [cutout] on its side.
+ */
 internal fun epubNavigatorContainerLayoutParams(
     verticalInsetPx: Int,
     sideInsetPx: Int,
+    cutout: EpubCutoutInsets = EpubCutoutInsets.None,
 ): FrameLayout.LayoutParams = FrameLayout.LayoutParams(
     FrameLayout.LayoutParams.MATCH_PARENT,
     FrameLayout.LayoutParams.MATCH_PARENT,
     Gravity.CENTER,
 ).apply {
-    topMargin = verticalInsetPx
-    bottomMargin = verticalInsetPx
-    leftMargin = sideInsetPx
-    rightMargin = sideInsetPx
+    topMargin = verticalInsetPx + cutout.top
+    bottomMargin = verticalInsetPx + cutout.bottom
+    leftMargin = sideInsetPx + cutout.left
+    rightMargin = sideInsetPx + cutout.right
 }
 
 internal fun FrameLayout.updateEpubNavigatorContainer(
     verticalInsetPx: Int,
     sideInsetPx: Int,
     backgroundColor: Int,
+    cutout: EpubCutoutInsets = EpubCutoutInsets.None,
 ) {
     val child = getChildAt(0) ?: return
     child.setBackgroundColor(backgroundColor)
     val current = child.layoutParams as? FrameLayout.LayoutParams
-    val updated = epubNavigatorContainerLayoutParams(verticalInsetPx, sideInsetPx)
+    val updated = epubNavigatorContainerLayoutParams(verticalInsetPx, sideInsetPx, cutout)
     if (current?.margins() != updated.margins()) {
         child.layoutParams = updated
     }
