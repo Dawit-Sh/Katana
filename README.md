@@ -42,6 +42,7 @@ to work with. That's pretty much how Katana started.
 
 - **Bookmark sync.** Bookmarks stay on the device for now; they should sync both ways with Grimmory, like
   highlights do.
+- **Pull down to refresh.** Drag the library down to refresh it and sync with the server.
 
 ## Build it yourself
 
