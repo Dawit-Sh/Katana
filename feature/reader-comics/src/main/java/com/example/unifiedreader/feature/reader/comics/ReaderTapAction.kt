@@ -26,3 +26,16 @@ internal fun resolveReaderTapAction(
         ReaderTapSide.Middle -> ReaderTapAction.ToggleOverlay
     }
 }
+
+/** What a volume key does in a paged comic: the side it stands for, turned the way a tap there turns. */
+internal fun comicVolumeKeyAction(
+    side: ReaderTapSide,
+    readingDirection: ComicReadingDirection,
+): ReaderTapAction? {
+    val rightToLeft = readingDirection == ComicReadingDirection.RTL
+    return when (side) {
+        ReaderTapSide.Left -> if (rightToLeft) ReaderTapAction.Next else ReaderTapAction.Previous
+        ReaderTapSide.Right -> if (rightToLeft) ReaderTapAction.Previous else ReaderTapAction.Next
+        ReaderTapSide.Middle -> null
+    }
+}

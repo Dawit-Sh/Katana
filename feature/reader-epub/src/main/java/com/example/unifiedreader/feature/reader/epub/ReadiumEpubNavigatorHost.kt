@@ -72,6 +72,8 @@ internal fun ReadiumEpubNavigatorHost(
     // The search matches' tint (EpubSearchDecorations.kt), and whether the volume keys turn pages.
     searchMatches: List<Decoration> = emptyList(),
     volumeKeysTurnPages: Boolean = false,
+    // A tap in the page's top-end corner bookmarks the page (or takes its bookmark off), KOReader style.
+    onBookmarkCornerTap: (() -> Unit)? = null,
 ) {
     val containerId = remember(item.id) { View.generateViewId() }
     val fragmentTag = remember(item.id) { epubNavigatorTag(item.id) }
@@ -80,6 +82,7 @@ internal fun ReadiumEpubNavigatorHost(
     val latestOnSurfaceTap = rememberUpdatedState(onSurfaceTap)
     val latestOnEndNavigationRequested = rememberUpdatedState(onEndNavigationRequested)
     val latestOnFootnoteActivated = rememberUpdatedState(onFootnoteActivated)
+    val latestOnBookmarkCornerTap = rememberUpdatedState(onBookmarkCornerTap)
     val footnoteNavigationScope = rememberCoroutineScope()
     val latestAnnotations = rememberUpdatedState(annotations)
     val highlightLayer = remember(publication) { EpubHighlightLayer(footnoteNavigationScope) }
@@ -401,11 +404,21 @@ internal fun ReadiumEpubNavigatorHost(
         val tapZoneListener = object : InputListener {
             override fun onTap(event: TapEvent): Boolean {
                 val viewWidth = fragment.publicationView.width.toFloat()
-                if (viewWidth <= 0f) return false
                 // Readium's point is in its own view; the zones span the strips beside it too.
                 val strip = latestSideStripPx.value
-                val maxZoneWidth = ReaderTapZoneMaxWidth.value * fragment.resources.displayMetrics.density
-                return handlePageTap(readerTapSide(event.point.x + strip, viewWidth + 2 * strip, maxZoneWidth))
+                val density = fragment.resources.displayMetrics.density
+                val x = event.point.x + strip
+                val width = viewWidth + 2 * strip
+                val onCorner = latestOnBookmarkCornerTap.value
+                    ?.takeIf { isEpubBookmarkCorner(x, event.point.y, width, EpubBookmarkCornerSize.value * density) }
+                return when {
+                    viewWidth <= 0f -> false
+                    onCorner != null -> {
+                        onCorner()
+                        true
+                    }
+                    else -> handlePageTap(readerTapSide(x, width, ReaderTapZoneMaxWidth.value * density))
+                }
             }
         }
         fragment.addInputListener(tapZoneListener)
@@ -486,6 +499,12 @@ internal fun ReadiumEpubNavigatorHost(
 }
 
 /** The tap handling of the current navigator, for taps on the strips around it, which Readium never sees. */
+/** The top-end corner a tap bookmarks from: [cornerSize] square, at the right (in pixels of the page's width). */
+internal fun isEpubBookmarkCorner(x: Float, y: Float, width: Float, cornerSize: Float): Boolean =
+    width > 0f && y in 0f..cornerSize && x >= width - cornerSize
+
+private val EpubBookmarkCornerSize = 56.dp
+
 private class EpubPageTaps {
     var handler: ((ReaderTapSide) -> Boolean)? = null
 

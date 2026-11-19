@@ -27,6 +27,7 @@ internal fun ComicsPagedReaderSurface(
     onVisiblePagesLoaded: (Collection<Int>) -> Unit,
     onToggleOverlay: () -> Unit,
     onNavigatePastEnd: () -> Unit,
+    volumeKeysTurnPages: Boolean = false,
 ) {
     val coroutineScope = rememberCoroutineScope()
     var lastPrefetchedPageIndex by remember(item.id) { mutableStateOf<Int?>(null) }
@@ -82,6 +83,34 @@ internal fun ComicsPagedReaderSurface(
             )
         }
 
+        val navigatePrevious: (Int) -> Unit = { spreadIndex ->
+            if (spreadIndex > 0) {
+                coroutineScope.launch {
+                    if (!curlTapTurner.turn(PageCurlTarget.Previous)) {
+                        pagerState.animateScrollToPage(spreadIndex - 1)
+                    }
+                }
+            }
+        }
+        val navigateNext: (Int) -> Unit = { spreadIndex ->
+            if (spreadIndex < spreads.lastIndex) {
+                coroutineScope.launch {
+                    if (!curlTapTurner.turn(PageCurlTarget.Next)) {
+                        pagerState.animateScrollToPage(spreadIndex + 1)
+                    }
+                }
+            } else {
+                onNavigatePastEnd()
+            }
+        }
+        ComicPagedVolumeKeys(
+            enabled = volumeKeysTurnPages,
+            readingDirection = readerState.readingDirection,
+            currentSpread = { pagerState.currentPage },
+            onPrevious = navigatePrevious,
+            onNext = navigateNext,
+        )
+
         val spreadPagerContent: @Composable (Boolean) -> Unit = {
             ComicSpreadPager(
                 item = item,
@@ -97,26 +126,8 @@ internal fun ComicsPagedReaderSurface(
                 onZoomStateChanged = readerState::onCurrentPageZoomChanged,
                 onInteraction = {},
                 onToggleOverlay = onToggleOverlay,
-                onNavigatePrevious = { spreadIndex ->
-                    if (spreadIndex > 0) {
-                        coroutineScope.launch {
-                            if (!curlTapTurner.turn(PageCurlTarget.Previous)) {
-                                pagerState.animateScrollToPage(spreadIndex - 1)
-                            }
-                        }
-                    }
-                },
-                onNavigateNext = { spreadIndex ->
-                    if (spreadIndex < spreads.lastIndex) {
-                        coroutineScope.launch {
-                            if (!curlTapTurner.turn(PageCurlTarget.Next)) {
-                                pagerState.animateScrollToPage(spreadIndex + 1)
-                            }
-                        }
-                    } else {
-                        onNavigatePastEnd()
-                    }
-                },
+                onNavigatePrevious = navigatePrevious,
+                onNavigateNext = navigateNext,
             )
         }
         if (shouldUseComicPageCurlPagerLayer(

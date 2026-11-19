@@ -29,6 +29,7 @@ internal const val EpubPageMarginsKey = "epub.pageMargins"
 internal const val EpubParagraphSpacingKey = "epub.paragraphSpacing"
 internal const val EpubParagraphIndentKey = "epub.paragraphIndent"
 internal const val EpubTextAlignKey = "epub.textAlign"
+internal const val EpubHyphensKey = "epub.hyphens"
 internal const val EpubThemeKey = "epub.theme"
 internal const val EpubThemeOverrideKey = "epub.themeOverride"
 internal const val EpubLayoutModeKey = "epub.layoutMode"
@@ -44,6 +45,8 @@ internal data class EpubReaderPreferences(
     val paragraphSpacing: Double = 0.0,
     val paragraphIndent: Double = 1.0,
     val textAlign: EpubReaderTextAlign = EpubReaderTextAlign.Default,
+    // Words break at the line's end with a hyphen; off keeps the book's look as before.
+    val hyphens: Boolean = false,
     val theme: ReaderPageColor = ReaderPageColor.Paper,
     // Whether the book has its own page colour; without, it opens on the last one picked in any book.
     val themeOverride: Boolean = false,
@@ -88,6 +91,9 @@ internal fun restoreEpubPreferences(
         textAlign = preferences[EpubTextAlignKey]
             ?.enumValueOrNull<EpubReaderTextAlign>()
             ?: EpubReaderTextAlign.Default,
+        hyphens = preferences[EpubHyphensKey]
+            ?.toBooleanStrictOrNull()
+            ?: false,
         theme = preferences[EpubThemeKey]
             ?.let(::readerPageColorOrNull)
             ?: ReaderPageColor.Paper,
@@ -117,6 +123,7 @@ internal fun buildEpubPreferencesMap(
     EpubParagraphSpacingKey to preferences.paragraphSpacing.toString(),
     EpubParagraphIndentKey to preferences.paragraphIndent.toString(),
     EpubTextAlignKey to preferences.textAlign.name,
+    EpubHyphensKey to preferences.hyphens.toString(),
     EpubThemeKey to preferences.theme.name,
     EpubThemeOverrideKey to preferences.themeOverride.toString(),
     EpubLayoutModeKey to preferences.layoutMode.name,
@@ -136,6 +143,7 @@ internal fun EpubReaderPreferences.toNavigatorPreferences(): EpubPreferences = E
     paragraphSpacing = paragraphSpacing.takeIf { typographyMode == EpubTypographyMode.Custom },
     paragraphIndent = paragraphIndent.takeIf { typographyMode == EpubTypographyMode.Custom },
     textAlign = textAlign.toReadiumTextAlign().takeIf { typographyMode == EpubTypographyMode.Custom },
+    hyphens = hyphens.takeIf { typographyMode == EpubTypographyMode.Custom },
     scroll = layoutMode == EpubReaderLayoutMode.Scroll,
     columnCount = when (layoutMode) {
         EpubReaderLayoutMode.Scroll -> ColumnCount.AUTO

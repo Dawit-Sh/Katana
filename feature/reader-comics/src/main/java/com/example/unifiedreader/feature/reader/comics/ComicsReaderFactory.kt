@@ -6,8 +6,7 @@ import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.feature.reader.core.ReaderChrome
 import com.example.unifiedreader.feature.reader.core.ReaderNavigationActions
 import com.example.unifiedreader.feature.reader.core.ReaderScreenFactory
-import com.example.unifiedreader.feature.reader.preferences.InMemoryReaderPageNumberPreferencesStore
-import com.example.unifiedreader.feature.reader.preferences.ReaderPageNumberPreferencesStore
+import com.example.unifiedreader.feature.reader.preferences.ReaderDisplayPreferences
 import com.example.unifiedreader.journal.JournalReadingSessionRecorder
 
 fun comicsReaderFactory(
@@ -15,7 +14,8 @@ fun comicsReaderFactory(
     progressStore: ComicReaderProgressStore,
     preferencesStore: ComicReaderPreferencesStore,
     journalReadingSessionRecorder: JournalReadingSessionRecorder? = null,
-    pageNumberPreferences: ReaderPageNumberPreferencesStore = InMemoryReaderPageNumberPreferencesStore(),
+    /** The page number, and Settings › Reading's volume keys. */
+    displayPreferences: ReaderDisplayPreferences = ReaderDisplayPreferences(),
 ): ReaderScreenFactory {
     val supportedFormats = setOf(FormatType.CBZ, FormatType.CBR)
     return object : ReaderScreenFactory {
@@ -36,7 +36,8 @@ fun comicsReaderFactory(
                 progressStore = progressStore,
                 preferencesStore = preferencesStore,
                 journalReadingSessionRecorder = journalReadingSessionRecorder,
-                pageNumberPreferences = pageNumberPreferences,
+                pageNumberPreferences = displayPreferences.pageNumbers,
+                comfortPreferences = displayPreferences.comfort,
                 onBack = onBack,
                 openMode = navigationActions.currentOpenMode,
                 readerWorkCoordinator = navigationActions.readerWorkCoordinator,

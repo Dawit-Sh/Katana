@@ -77,6 +77,7 @@ internal fun ColumnScope.EpubPreferencesPaneContent(
     paragraphSpacing: Double,
     paragraphIndent: Double,
     textAlign: EpubReaderTextAlign,
+    hyphens: Boolean,
     theme: ReaderPageColor,
     layoutMode: EpubReaderLayoutMode,
     useOrientationLayoutDefault: Boolean,
@@ -95,6 +96,7 @@ internal fun ColumnScope.EpubPreferencesPaneContent(
     onParagraphSpacingChanged: (Double) -> Unit,
     onParagraphIndentChanged: (Double) -> Unit,
     onTextAlignChanged: (EpubReaderTextAlign) -> Unit,
+    onHyphensChanged: (Boolean) -> Unit,
     onThemeChanged: (ReaderPageColor) -> Unit,
     onLayoutModeChanged: (EpubReaderLayoutMode) -> Unit,
     onUseOrientationLayoutDefault: () -> Unit,
@@ -183,11 +185,13 @@ internal fun ColumnScope.EpubPreferencesPaneContent(
                                 fontSize = fontSize,
                                 lineHeight = lineHeight,
                                 textAlign = textAlign,
+                                hyphens = hyphens,
                                 onTypographyModeChanged = onTypographyModeChanged,
                                 onFontPickerRequested = { onFontPickerOpenChanged(true) },
                                 onFontSizeChanged = onFontSizeChanged,
                                 onLineHeightChanged = onLineHeightChanged,
                                 onTextAlignChanged = onTextAlignChanged,
+                                onHyphensChanged = onHyphensChanged,
                             )
                         }
                         if (!compact || tab == EpubPreferencesTab.Page) {
@@ -244,11 +248,13 @@ private fun EpubTextSection(
     fontSize: Double,
     lineHeight: Double,
     textAlign: EpubReaderTextAlign,
+    hyphens: Boolean,
     onTypographyModeChanged: (EpubTypographyMode) -> Unit,
     onFontPickerRequested: () -> Unit,
     onFontSizeChanged: (Double) -> Unit,
     onLineHeightChanged: (Double) -> Unit,
     onTextAlignChanged: (EpubReaderTextAlign) -> Unit,
+    onHyphensChanged: (Boolean) -> Unit,
 ) {
     AppChoiceRow(
         label = "Typography",
@@ -290,6 +296,13 @@ private fun EpubTextSection(
         selected = textAlign,
         onSelected = onTextAlignChanged,
         optionLabel = ::epubTextAlignLabel,
+    )
+    AppChoiceRow(
+        label = "Hyphenation",
+        options = EpubHyphensChoices,
+        selected = hyphens,
+        onSelected = onHyphensChanged,
+        optionLabel = ::epubHyphensLabel,
     )
 }
 

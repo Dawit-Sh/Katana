@@ -21,8 +21,6 @@ import androidx.lifecycle.lifecycleScope
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.feature.reader.core.ImmersiveReaderOverlay
 import com.example.unifiedreader.feature.reader.core.ReaderLeave
-import com.example.unifiedreader.feature.reader.core.rememberReaderActiveSessionTracker
-import com.example.unifiedreader.feature.reader.core.rememberReaderSessionLifecycle
 import com.example.unifiedreader.feature.reader.core.ReaderOpenMode
 import com.example.unifiedreader.feature.reader.core.ReaderOpenStatus
 import com.example.unifiedreader.feature.reader.core.ReaderOpeningStep
@@ -30,9 +28,13 @@ import com.example.unifiedreader.feature.reader.core.ReaderPageNumber
 import com.example.unifiedreader.feature.reader.core.ReaderPageNumberPills
 import com.example.unifiedreader.feature.reader.core.ReaderWorkCoordinator
 import com.example.unifiedreader.feature.reader.core.ReportReaderOpening
+import com.example.unifiedreader.feature.reader.core.rememberReaderActiveSessionTracker
 import com.example.unifiedreader.feature.reader.core.rememberReaderOverlayState
+import com.example.unifiedreader.feature.reader.core.rememberReaderSessionLifecycle
 import com.example.unifiedreader.feature.reader.preferences.ComicReaderMode
+import com.example.unifiedreader.feature.reader.preferences.InMemoryReaderComfortPreferencesStore
 import com.example.unifiedreader.feature.reader.preferences.InMemoryReaderPageNumberPreferencesStore
+import com.example.unifiedreader.feature.reader.preferences.ReaderComfortPreferencesStore
 import com.example.unifiedreader.feature.reader.preferences.ReaderPageNumberPreferencesStore
 import com.example.unifiedreader.journal.JournalReadingSessionRecorder
 import com.example.unifiedreader.ui.theme.UnifiedReaderThemeTokens
@@ -47,6 +49,7 @@ fun ComicsReaderScreen(
     preferencesStore: ComicReaderPreferencesStore,
     journalReadingSessionRecorder: JournalReadingSessionRecorder? = null,
     pageNumberPreferences: ReaderPageNumberPreferencesStore = remember { InMemoryReaderPageNumberPreferencesStore() },
+    comfortPreferences: ReaderComfortPreferencesStore = remember { InMemoryReaderComfortPreferencesStore() },
     onBack: () -> Unit,
     openMode: ReaderOpenMode = ReaderOpenMode.Default,
     readerWorkCoordinator: ReaderWorkCoordinator? = null,
@@ -63,6 +66,7 @@ fun ComicsReaderScreen(
     val preferencesHydrated by preferencesStore.isHydratedFlow.collectAsStateWithLifecycle()
     val savedPagesByItemId by progressStore.savedPagesFlow.collectAsStateWithLifecycle()
     val pageNumbersVisible by pageNumberPreferences.isVisibleFlow.collectAsStateWithLifecycle()
+    val volumeKeysTurnPages = comfortPreferences.comfortFlow.collectAsStateWithLifecycle().value.volumeKeysTurnPages
     val restoredPreferences by preferencesStore.observePreferences(item).collectAsStateWithLifecycle(initialValue = null)
 
     if (pages.isEmpty()) {
@@ -468,22 +472,26 @@ fun ComicsReaderScreen(
                                 persistCompletedProgress()
                                 onNextItemRequested()
                             },
+                            volumeKeysTurnPages = volumeKeysTurnPages,
                         )
 
-                        ComicReaderMode.VerticalScroll -> ComicsContinuousReaderSurface(
-                            item = item,
-                            pages = pages,
-                            pageSource = pageSource,
-                            readerState = readerState,
-                            loadedVisiblePageIndexes = loadedVisiblePageIndexes,
-                            metadataLoadingEnabled = readerState.currentPage in loadedVisiblePageIndexes,
-                            onVisiblePagesLoaded = onVisiblePagesLoaded,
-                            onToggleOverlay = overlayState::toggle,
-                            onNavigatePastEnd = {
-                                persistCompletedProgress()
-                                onNextItemRequested()
-                            },
-                        )
+                        ComicReaderMode.VerticalScroll -> {
+                            ComicStripVolumeKeys(enabled = volumeKeysTurnPages, readerState = readerState, pageCount = pages.size)
+                            ComicsContinuousReaderSurface(
+                                item = item,
+                                pages = pages,
+                                pageSource = pageSource,
+                                readerState = readerState,
+                                loadedVisiblePageIndexes = loadedVisiblePageIndexes,
+                                metadataLoadingEnabled = readerState.currentPage in loadedVisiblePageIndexes,
+                                onVisiblePagesLoaded = onVisiblePagesLoaded,
+                                onToggleOverlay = overlayState::toggle,
+                                onNavigatePastEnd = {
+                                    persistCompletedProgress()
+                                    onNextItemRequested()
+                                },
+                            )
+                        }
                     }
                 }
             },

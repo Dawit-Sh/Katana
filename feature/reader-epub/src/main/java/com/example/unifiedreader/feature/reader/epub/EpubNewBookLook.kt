@@ -29,6 +29,7 @@ internal val EpubNewBookLookKeys: Set<String> = setOf(
     EpubParagraphSpacingKey,
     EpubParagraphIndentKey,
     EpubTextAlignKey,
+    EpubHyphensKey,
     EpubPageTurnStyleKey,
     EpubLayoutModeKey,
     EpubLayoutOverrideKey,

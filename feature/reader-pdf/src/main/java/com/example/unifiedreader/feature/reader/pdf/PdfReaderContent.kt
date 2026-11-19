@@ -19,6 +19,8 @@ import com.example.unifiedreader.feature.reader.core.ReaderDocumentState
 import com.example.unifiedreader.feature.reader.core.ReaderPageNumber
 import com.example.unifiedreader.feature.reader.core.ReaderPageNumberPills
 import com.example.unifiedreader.feature.reader.core.ReaderSessionStore
+import com.example.unifiedreader.feature.reader.core.ReaderTapSide
+import com.example.unifiedreader.feature.reader.core.ReaderVolumeKeys
 import com.example.unifiedreader.feature.reader.core.readerOverlayTokens
 import com.example.unifiedreader.feature.reader.core.rememberReaderOverlayState
 import com.example.unifiedreader.feature.reader.preferences.ReaderPageNumberPreferencesStore
@@ -138,6 +140,7 @@ internal class PdfReaderParts(
 internal fun PdfReaderContent(
     parts: PdfReaderParts,
     pageNumberPreferences: ReaderPageNumberPreferencesStore,
+    volumeKeysTurnPages: Boolean,
     turnPages: @Composable (PdfNavigation) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -162,6 +165,7 @@ internal fun PdfReaderContent(
             toggleOverlay = overlayState::toggle,
         )
     }
+    PdfVolumeKeys(enabled = volumeKeysTurnPages && pageCount > 0, navigation = navigation)
     val safePageIndex = place.safePageIndex(pageCount)
     val pageNumbersVisible by pageNumberPreferences.isVisibleFlow.collectAsStateWithLifecycle()
     Box(modifier = modifier.fillMaxSize().background(readerOverlayTokens().colors.fallbackPage)) {
@@ -256,4 +260,16 @@ private fun PdfScrollPages(
         },
         modifier = Modifier.fillMaxSize(),
     )
+}
+
+/** Settings › Reading › "Volume keys turn pages": down for the next page, up for the one before, turning or scrolling. */
+@Composable
+private fun PdfVolumeKeys(enabled: Boolean, navigation: PdfNavigation) {
+    ReaderVolumeKeys(enabled = enabled) { side ->
+        when (side) {
+            ReaderTapSide.Left -> navigation.previous()
+            ReaderTapSide.Right -> navigation.next()
+            ReaderTapSide.Middle -> Unit
+        }
+    }
 }

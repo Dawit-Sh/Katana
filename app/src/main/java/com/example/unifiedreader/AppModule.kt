@@ -841,7 +841,7 @@ object AppModule {
             ),
             preferencesStore = adapter,
             journalReadingSessionRecorder = journalReadingSessionRecorder,
-            pageNumberPreferences = readerDisplay.pageNumbers,
+            displayPreferences = readerDisplay,
         ),
         epubReaderFactory(
             sessionStore = JournalRecordingReaderSessionStore(
@@ -881,8 +881,7 @@ object AppModule {
                     }?.storedDocumentUri(item)
                     ?: remoteDocumentReadCache.documentUriForReading(item)
             },
-            pageNumberPreferences = readerDisplay.pageNumbers,
-            pagesPreferences = readerDisplay.pages,
+            displayPreferences = readerDisplay,
         ),
     )
 }

@@ -39,6 +39,7 @@ class EpubBookLookDescriptionTest {
             paragraphSpacing = 0.5,
             paragraphIndent = 2.0,
             textAlign = EpubReaderTextAlign.Justify,
+            hyphens = true,
         ).newBookLook()
 
         val description = describeEpubBookLook(look)
@@ -51,6 +52,7 @@ class EpubBookLookDescriptionTest {
                 "Text size" to "110%",
                 "Line height" to "1.6×",
                 "Alignment" to "Justify",
+                "Hyphenation" to "On",
                 "Margins" to "Normal",
                 "Paragraph spacing" to "Small",
                 "Paragraph indent" to "Medium",

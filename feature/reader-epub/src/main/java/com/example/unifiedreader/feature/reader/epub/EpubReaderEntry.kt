@@ -148,6 +148,7 @@ fun EpubReaderScreen(
     var paragraphSpacing by rememberSaveable(item.id) { mutableDoubleStateOf(restoredPreferences.paragraphSpacing) }
     var paragraphIndent by rememberSaveable(item.id) { mutableDoubleStateOf(restoredPreferences.paragraphIndent) }
     var textAlign by rememberSaveable(item.id) { mutableStateOf(restoredPreferences.textAlign) }
+    var hyphens by rememberSaveable(item.id) { mutableStateOf(restoredPreferences.hyphens) }
     var pageTurnStyle by rememberSaveable(item.id) { mutableStateOf(restoredPreferences.pageTurnStyle) }
     var theme by rememberSaveable(item.id) { mutableStateOf(restoredThemeSelection.color) }
     var layoutMode by rememberSaveable(item.id) {
@@ -214,6 +215,7 @@ fun EpubReaderScreen(
         paragraphSpacing = paragraphSpacing,
         paragraphIndent = paragraphIndent,
         textAlign = textAlign,
+        hyphens = hyphens,
         theme = theme,
         themeOverride = !pageColorFollowsDefault,
         layoutMode = layoutMode,
@@ -248,6 +250,7 @@ fun EpubReaderScreen(
         paragraphSpacing = restoredPreferences.paragraphSpacing
         paragraphIndent = restoredPreferences.paragraphIndent
         textAlign = restoredPreferences.textAlign
+        hyphens = restoredPreferences.hyphens
         pageTurnStyle = restoredPreferences.pageTurnStyle
         pageColorFollowsDefault = restoredThemeUsesDefault
         useOrientationLayoutDefault = restoredLayoutUsesDefault
@@ -458,6 +461,14 @@ fun EpubReaderScreen(
                 },
             )
             val pageBookmarks = rememberPageBookmarks(bookBookmarks, currentLocator, framePage, currentPage)
+            // The bar's bookmark button and a tap in the page's top-end corner.
+            val toggleBookmark: (() -> Unit)? = annotationController?.let { controller ->
+                {
+                    controller.bookmarks.toggle(pageBookmarks, currentLocator, currentPage, pageCount) {
+                        activity.epubFirstVisibleText(item.id)
+                    }
+                }
+            }
             // A bookmark or highlight opened from the Bookmarks page: go there once the book shows.
             EpubPendingJumpEffect(annotationJumps, item.id, ready = initialRestoreLocked) { locator ->
                 readerTouched = true
@@ -651,6 +662,7 @@ fun EpubReaderScreen(
                         },
                         searchMatches = bookSearch.decorations,
                         volumeKeysTurnPages = comfort.comfort.volumeKeysTurnPages,
+                        onBookmarkCornerTap = toggleBookmark,
                     )
                     EpubBookmarkRibbon(visible = pageBookmarks.isNotEmpty())
                     EpubWarmthTint(comfort)
@@ -675,13 +687,7 @@ fun EpubReaderScreen(
                             isAnnotationsOpen = openPanel == EpubReaderPanel.Annotations,
                             onAnnotationsClick = annotationController?.let { { togglePanel(EpubReaderPanel.Annotations) } },
                             isPageBookmarked = pageBookmarks.isNotEmpty(),
-                            onBookmarkClick = annotationController?.let { controller ->
-                                {
-                                    controller.bookmarks.toggle(pageBookmarks, currentLocator, currentPage, pageCount) {
-                                        activity.epubFirstVisibleText(item.id)
-                                    }
-                                }
-                            },
+                            onBookmarkClick = toggleBookmark,
                             isSearchOpen = openPanel == EpubReaderPanel.Search,
                             onSearchClick = { togglePanel(EpubReaderPanel.Search) },
                             dockStrip = if (bookSearch.isActive && openPanel != EpubReaderPanel.Search) {
@@ -733,6 +739,7 @@ fun EpubReaderScreen(
                                 paragraphSpacing = paragraphSpacing,
                                 paragraphIndent = paragraphIndent,
                                 textAlign = textAlign,
+                                hyphens = hyphens,
                                 theme = theme,
                                 layoutMode = layoutMode,
                                 useOrientationLayoutDefault = useOrientationLayoutDefault,
@@ -762,6 +769,9 @@ fun EpubReaderScreen(
                                 },
                                 onTextAlignChanged = {
                                     textAlign = it
+                                },
+                                onHyphensChanged = {
+                                    hyphens = it
                                 },
                                 onThemeChanged = {
                                     pageColorFollowsDefault = false

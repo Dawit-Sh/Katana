@@ -50,6 +50,7 @@ private fun customLookDescription(
             ReaderBookLookLine("Text size", size),
             ReaderBookLookLine("Line height", formatEpubLineHeight(preferences.lineHeight)),
             ReaderBookLookLine("Alignment", epubTextAlignLabel(preferences.textAlign)),
+            ReaderBookLookLine("Hyphenation", epubHyphensLabel(preferences.hyphens)),
             ReaderBookLookLine("Margins", margins),
             ReaderBookLookLine("Paragraph spacing", EpubParagraphSpacingSteps.nearest(preferences.paragraphSpacing).label),
             ReaderBookLookLine("Paragraph indent", EpubParagraphIndentSteps.nearest(preferences.paragraphIndent).label),

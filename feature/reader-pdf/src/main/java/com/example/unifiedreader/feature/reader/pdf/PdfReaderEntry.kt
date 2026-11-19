@@ -19,11 +19,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -43,6 +46,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.runSuspendCatching
@@ -59,8 +63,12 @@ import com.example.unifiedreader.feature.reader.core.readerFileMissingFailure
 import com.example.unifiedreader.feature.reader.core.readerOpenFailureOf
 import com.example.unifiedreader.feature.reader.core.readerTapSide
 import com.example.unifiedreader.feature.reader.core.rememberReaderDocument
+import com.example.unifiedreader.feature.reader.preferences.InMemoryReaderComfortPreferencesStore
 import com.example.unifiedreader.feature.reader.preferences.InMemoryReaderPageNumberPreferencesStore
+import com.example.unifiedreader.feature.reader.preferences.InMemoryReaderPagesPreferencesStore
+import com.example.unifiedreader.feature.reader.preferences.ReaderComfortPreferencesStore
 import com.example.unifiedreader.feature.reader.preferences.ReaderPageNumberPreferencesStore
+import com.example.unifiedreader.feature.reader.preferences.ReaderPagesPreferencesStore
 import com.example.unifiedreader.journal.JournalReadingSessionRecorder
 import com.example.unifiedreader.ui.components.AppCircularProgress
 import java.util.LinkedHashMap
@@ -71,11 +79,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
-import androidx.compose.runtime.State
-import com.example.unifiedreader.feature.reader.preferences.InMemoryReaderPagesPreferencesStore
-import com.example.unifiedreader.feature.reader.preferences.ReaderPagesPreferencesStore
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 
 /**
  * The PDF and DjVu reader. Its pages turn one at a time or scroll as one strip ("Pages" in its settings,
@@ -90,6 +93,7 @@ fun PdfReaderScreen(
     journalReadingSessionRecorder: JournalReadingSessionRecorder? = null,
     pageNumberPreferences: ReaderPageNumberPreferencesStore = remember { InMemoryReaderPageNumberPreferencesStore() },
     pagesPreferences: ReaderPagesPreferencesStore = remember { InMemoryReaderPagesPreferencesStore() },
+    comfortPreferences: ReaderComfortPreferencesStore = remember { InMemoryReaderComfortPreferencesStore() },
     openMode: ReaderOpenMode = ReaderOpenMode.Default,
     onBack: () -> Unit = {},
     onCompletionRequested: () -> Unit = {},
@@ -125,6 +129,7 @@ fun PdfReaderScreen(
     PdfReaderContent(
         parts = PdfReaderParts(PdfReaderBook(item, documentState, pageCount, pageRenderer), place, pages, actions, opening),
         pageNumberPreferences = pageNumberPreferences,
+        volumeKeysTurnPages = comfortPreferences.comfortFlow.collectAsStateWithLifecycle().value.volumeKeysTurnPages,
         turnPages = { navigation -> PdfTurnPages(item, documentState, pageCount, place, pageRenderer, opening, navigation) },
     )
 }

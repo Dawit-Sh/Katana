@@ -54,6 +54,11 @@ internal fun epubTextAlignLabel(align: EpubReaderTextAlign): String = when (alig
     EpubReaderTextAlign.Justify -> "Justify"
 }
 
+/** The Hyphenation row's two segments. */
+internal fun epubHyphensLabel(on: Boolean): String = if (on) "On" else "Off"
+
+internal val EpubHyphensChoices = listOf(true, false)
+
 internal const val EpubFontSizeMin = 0.8
 internal const val EpubFontSizeMax = 2.4
 internal const val EpubFontSizeStep = 0.1
