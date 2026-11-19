@@ -4,13 +4,16 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.utils.io.readAvailable
 import java.io.File
+import java.io.FileOutputStream
 
+/** Writes the answer's body to [destination], after what is there when [append]. */
 suspend fun HttpResponse.writeBodyTo(
     destination: File,
+    append: Boolean = false,
 ) {
     val channel = bodyAsChannel()
     val buffer = ByteArray(DEFAULT_DOWNLOAD_BUFFER_SIZE)
-    destination.outputStream().use { output ->
+    FileOutputStream(destination, append).use { output ->
         while (true) {
             val bytesRead = channel.readAvailable(buffer, 0, buffer.size)
             if (bytesRead == -1) break
