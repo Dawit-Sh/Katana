@@ -15,6 +15,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +41,7 @@ import com.example.unifiedreader.ui.components.AppBookRow
 import com.example.unifiedreader.ui.components.AppBookRowDefaults
 import com.example.unifiedreader.ui.components.AppBookRowLine
 import com.example.unifiedreader.ui.components.AppChip
+import com.example.unifiedreader.ui.components.AppListRowDefaults
 import com.example.unifiedreader.ui.theme.UnifiedReaderThemeTokens
 
 /**
@@ -112,68 +114,78 @@ internal fun LibrarySearchResultRow(
         snippet?.marked(SpanStyle(background = marked.primaryContainer, color = marked.onPrimaryContainer, fontWeight = FontWeight.SemiBold))
     }
     val colors = UnifiedReaderThemeTokens.colors
-    AppBookRow(
-        title = title,
-        modifier = modifier.then(
-            if (highlighted) {
-                Modifier.background(colors.surfaceSelected, RoundedCornerShape(AppBookRowDefaults.cornerRadius))
-            } else {
-                Modifier
+    // The highlighted row sits on the selected container, so its words take that container's own
+    // text colour; with Android's wallpaper colours the container can be light, and the usual
+    // on-surface text (white in a dark theme) would all but vanish on it.
+    val textColor = if (highlighted) colors.onSurfaceSelected else MaterialTheme.colorScheme.onSurface
+    val quietColor = if (highlighted) {
+        colors.onSurfaceSelected.copy(alpha = AppListRowDefaults.selectedSecondaryAlpha)
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    CompositionLocalProvider(LocalContentColor provides textColor) {
+        AppBookRow(
+            title = title,
+            modifier = modifier.then(
+                if (highlighted) {
+                    Modifier.background(colors.surfaceSelected, RoundedCornerShape(AppBookRowDefaults.cornerRadius))
+                } else {
+                    Modifier
+                },
+            ),
+            onClick = onClick,
+            contentPadding = contentPadding,
+            cover = {
+                ResolvedLibraryCover(
+                    item = item,
+                    coverImageUrlProvider = coverImageUrlProvider,
+                    isDownloaded = isDownloaded,
+                    isRead = progress?.isComplete == true,
+                    showReadBadge = false,
+                    modifier = Modifier
+                        .width(AppBookRowDefaults.coverWidth)
+                        .aspectRatio(2f / 3f),
+                )
             },
-        ),
-        onClick = onClick,
-        contentPadding = contentPadding,
-        cover = {
-            ResolvedLibraryCover(
-                item = item,
-                coverImageUrlProvider = coverImageUrlProvider,
-                isDownloaded = isDownloaded,
-                isRead = progress?.isComplete == true,
-                showReadBadge = false,
-                modifier = Modifier
-                    .width(AppBookRowDefaults.coverWidth)
-                    .aspectRatio(2f / 3f),
-            )
-        },
-        supporting = {
-            item.librarySecondaryText()?.let { line -> AppBookRowLine(text = line) }
-            if (snippet != null && snippetText != null) {
-                if (snippet.source == LibrarySearchMatchSource.DESCRIPTION) {
-                    Column(verticalArrangement = Arrangement.spacedBy(SnippetGap)) {
+            supporting = {
+                item.librarySecondaryText()?.let { line -> AppBookRowLine(text = line, color = quietColor) }
+                if (snippet != null && snippetText != null) {
+                    if (snippet.source == LibrarySearchMatchSource.DESCRIPTION) {
+                        Column(verticalArrangement = Arrangement.spacedBy(SnippetGap)) {
+                            Text(
+                                text = snippetText,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = textColor,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            AppBookRowLine(text = snippet.source.label, color = quietColor)
+                        }
+                    } else {
+                        // A tag or genre, named the way Filters names it: "Set in Japan".
                         Text(
-                            text = snippetText,
+                            text = buildAnnotatedString {
+                                withStyle(SpanStyle(color = quietColor)) { append(snippet.browseRowLabel(sorting)) }
+                                append(" ")
+                                append(snippetText)
+                            },
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 2,
+                            color = textColor,
+                            maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        AppBookRowLine(text = snippet.source.label)
                     }
-                } else {
-                    // A tag or genre, named the way Filters names it: "Set in Japan".
-                    val quiet = MaterialTheme.colorScheme.onSurfaceVariant
-                    Text(
-                        text = buildAnnotatedString {
-                            withStyle(SpanStyle(color = quiet)) { append(snippet.browseRowLabel(sorting)) }
-                            append(" ")
-                            append(snippetText)
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
                 }
+            },
+        ) {
+            librarySearchReadState(progress)?.let { state ->
+                Text(
+                    text = state,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = quietColor,
+                    maxLines = 1,
+                )
             }
-        },
-    ) {
-        librarySearchReadState(progress)?.let { state ->
-            Text(
-                text = state,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
         }
     }
 }
