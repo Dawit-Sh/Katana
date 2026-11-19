@@ -46,7 +46,9 @@ internal fun epubNavigatorContainerLayoutParams(
 ): FrameLayout.LayoutParams = FrameLayout.LayoutParams(
     FrameLayout.LayoutParams.MATCH_PARENT,
     FrameLayout.LayoutParams.MATCH_PARENT,
-    Gravity.CENTER,
+    // Placed from the top and start edges: a centred child would shift by half the difference when a
+    // cutout makes the top and bottom margins differ.
+    Gravity.TOP or Gravity.START,
 ).apply {
     topMargin = verticalInsetPx + cutout.top
     bottomMargin = verticalInsetPx + cutout.bottom
