@@ -202,7 +202,7 @@ Connected, top to bottom:
 - **Server.** One row: the address as the title, "account · backup address" under it, then the `AppStatusPill` (Connected, Offline, Checking) and a tonal Edit that opens the form in place (Done closes it). A connection or sync error shows as one `error` line above the group. There is no second Server group at the bottom.
 - **Library.** Sync: "Synced today, 09:12" (the step and an `AppProgressBar` while it runs), a filled **Sync now**, and on Kavita a ••• with Fast sync. Cached covers: its line, a tonal **Preload** (Cancel while it runs), and a ••• with Remove cached covers. One button per row; the destructive one only in •••.
 - **Failed covers** are one row under Cached covers, `error` icon: "3 covers didn't download", the first two titles "and 1 more", and a text **Retry**. No raw error lines.
-- **Reading defaults.** One row per library: Left to right / Right to left, then Paged / Scroll (`AppSegmentedRow`s beside the name from 640 wide, stacked under it below). One line under the group, flush with the panel's edge like the group label: "Comics in each library open this way, unless you picked something else for a book or a series in the reader."
+- **Reading defaults.** One row per library: Left to right / Right to left, then Turn / Scroll (`AppSegmentedRow`s beside the name from 640 wide, stacked under it below). One line under the group, flush with the panel's edge like the group label: "Comics in each library open this way, unless you picked something else for a book or a series in the reader."
 
 Not connected, the page is the sign-in form alone.
 
@@ -1678,5 +1678,57 @@ The EPUB reader's comfort features (Katana, 2026-11-18): search in the book, bri
     <div class="yb-caption" style="margin:24px 0 8px">The Light card, a brightness swipe at the left edge, warmth on Paper</div>{light_card}
   </div>
 </div>""", width=632, page=True, script=TOGGLE_SCRIPT)
+
+
+def pages_row(label, options, selected, stacked=False, disabled=False):
+    seg = "".join(f'<span class="is-selected">{o}</span>' if o == selected else f"<span>{o}</span>" for o in options)
+    tone = "color:var(--on-surface-variant);opacity:.38;" if disabled else ""
+    if stacked:
+        return (f'<div style="padding:6px 20px;{tone}"><div style="font:500 16px/24px var(--font-sans);margin-bottom:6px">{label}</div>'
+                f'<div class="yb-seg">{seg}</div></div>')
+    return (f'<div style="display:flex;align-items:center;gap:16px;padding:6px 20px;{tone}"><span style="flex:1;font:500 16px/24px var(--font-sans)">{label}</span>'
+            f'<div class="yb-seg" style="width:220px">{seg}</div></div>')
+
+
+def pages_card(title_rows):
+    return (f'<div style="width:400px;box-sizing:border-box;border-radius:var(--radius-container);background:var(--surface-container-high);color:var(--on-surface);padding-bottom:12px">'
+            f'<div style="display:flex;align-items:center;padding:16px 8px 8px 20px;font:600 20px/28px var(--font-sans)"><span style="flex:1">Reading settings</span>{ic("close")}</div>'
+            f'{title_rows}</div>')
+
+
+pages_pdf = pages_card(pages_row("Pages", ["Turn", "Scroll"], "Scroll") + pages_row("Page number", ["Show", "Hide"], "Show"))
+pages_comic = pages_card(
+    pages_row("Pages", ["Turn", "Scroll"], "Scroll")
+    + pages_row("Direction", ["Top to bottom", "Left to right", "Right to left"], "Right to left", stacked=True)
+    + pages_row("Two pages", ["Auto", "Off", "On"], "Auto", disabled=True)
+    + pages_row("Page turn", ["Slide", "Curl"], "Slide", disabled=True)
+    + pages_row("Fit", ["Screen", "Width", "Height"], "Screen", disabled=True)
+    + pages_row("Page number", ["Show", "Hide"], "Show")
+)
+pages_epub = pages_card(
+    pages_row("Pages", ["Turn", "Scroll"], "Turn")
+    + pages_row("Two pages", ["Auto", "Off", "On"], "Auto")
+    + '<div style="padding:0 20px 4px;font:12px/16px var(--font-sans);color:var(--on-surface-variant)">Auto: two in landscape</div>'
+    + pages_row("Page turn", ["Slide", "Curl"], "Slide")
+)
+
+comp("ReaderPages", "Screens", 1200, """
+# Pages: turn or scroll
+
+Every reader offers both ways of reading, as the first row of its settings (Katana, 2026-11-19): **Pages**, an `AppChoiceRow` with **Turn** and **Scroll** (`ReaderPagesMode`, label `ReaderPagesLabel`). Turn is one page, or a spread, at a time; Scroll is the book as one strip.
+
+- **PDF and DjVu** get the reading settings card the comics reader has (the `tune` button after Previous and Next in the top bar, `settings-width` 400, a bottom sheet on phones): Pages, then Page number. Scrolling, the pages run top to bottom as wide as the view, 6 apart on `surface-container-high`; a page not drawn yet is a plain page-coloured box. Pinch zoom works (up to 4×); zoomed, a drag pans sideways as well as down the strip, and a double tap zooms to 2.5× and back. The page number, the slider and the page strip follow the page across the middle of the screen; a tap shows or hides the bars; a pull past the last page finishes the book, as Next on the last page does.
+- **Comics:** Pages, then **Direction**: Left to right or Right to left when turning, and also **Top to bottom** (webtoons) when scrolling, where left and right run the strip sideways with each page shown whole. Direction is always stacked under its label, so the card keeps its height. Then the rows that only apply to turning pages, disabled while scrolling: **Two pages** (Auto, Off, On), Page turn, Fit. The slider fills the way the pages go.
+- **EPUB** (and MOBI, AZW, AZW3, FB2): Layout's first row is Pages; then, where a spread fits (Readium needs a page area 960 wide), **Two pages** (Auto, Off, On, "Auto: two in landscape"), and Page turn, both disabled while scrolling. Scrolling is Readium's: each chapter scrolls, and a drag up that starts at a chapter's end goes on into the next (down at its top, back to the one before).
+- **Kept per book**, in the book's reader session. A book not set yet: a PDF or DjVu book opens the way you last picked in any of them; an EPUB with the look "Use these for new books" saved (it now keeps Pages and Two pages too, and Settings › Default look for new books lists them); a comic with its library's reading defaults (Settings › a server › Reading defaults: Turn or Scroll), its series' choice, then its own. A comic's scroll direction is its own, top to bottom until picked.
+- **The place carries over:** switching keeps the page you are on (scrolling, the page across the middle of the screen); a scrolling book reopens where it was left, down to the spot in the page, unless the saved page has moved since (another device, or turning pages).
+""", f"""
+<div class="yb" style="padding:16px">
+  <div id="screens" style="display:flex;flex-direction:column;gap:12px">
+    <div class="yb-caption">PDF and DjVu: the reading settings card</div>{pages_pdf}
+    <div class="yb-caption" style="margin-top:12px">A comic, scrolling right to left</div>{pages_comic}
+    <div class="yb-caption" style="margin-top:12px">An EPUB, Layout, on a device a spread fits</div>{pages_epub}
+  </div>
+</div>""", width=432, page=True)
 
 print("screens written")
