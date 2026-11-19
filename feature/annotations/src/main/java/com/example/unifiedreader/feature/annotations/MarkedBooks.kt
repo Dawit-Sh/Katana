@@ -32,8 +32,19 @@ data class MarkedBook(
 
     /** Whether the book's name, its author or one of its marks of [kind] holds [query]. */
     fun matches(query: String, kind: MarkKind = MarkKind.All): Boolean {
-        val needle = query.trim().lowercase(Locale.ROOT)
+        val needle = MarkSearch.needle(query)
         return needle.isEmpty() || book.title.holds(needle) || book.author.holds(needle) || marksHold(needle, kind)
+    }
+
+    /** This book with only its marks that hold [query]; all of them for a blank one. */
+    fun only(query: String): MarkedBook {
+        val needle = MarkSearch.needle(query)
+        if (needle.isEmpty()) return this
+        return copy(
+            highlights = highlights.filter { it.holds(needle) },
+            bookmarks = bookmarks.filter { it.holds(needle) },
+            words = words.filter { it.holds(needle) },
+        )
     }
 
     private fun marksHold(needle: String, kind: MarkKind): Boolean =
@@ -104,12 +115,3 @@ data class MarkedLibrary(val books: List<MarkedBook>) {
         }
     }
 }
-
-private fun String?.holds(needle: String): Boolean = this?.lowercase(Locale.ROOT)?.contains(needle) == true
-
-private fun ReaderHighlight.holds(needle: String): Boolean =
-    text.holds(needle) || note.holds(needle) || place.chapterTitle.holds(needle)
-
-private fun ReaderBookmark.holds(needle: String): Boolean = text.holds(needle) || place.chapterTitle.holds(needle)
-
-private fun SavedWord.holds(needle: String): Boolean = word.holds(needle) || sentence.holds(needle) || note.holds(needle)

@@ -1,6 +1,7 @@
 package com.example.unifiedreader
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import com.example.unifiedreader.core.model.filterPanel
@@ -16,6 +17,7 @@ import com.example.unifiedreader.core.model.stumpSeriesGroupKey
 import com.example.unifiedreader.feature.library.LibraryBookPage
 import com.example.unifiedreader.feature.library.LibraryCoverImageVariant
 import com.example.unifiedreader.feature.library.LibraryItemActionContext
+import com.example.unifiedreader.feature.library.LocalLibraryBookPageBookmarks
 
 /**
  * The book page over the library for [itemId], opened by the "•••" under a cover or the reading
@@ -59,33 +61,36 @@ internal fun LibraryBookPageHost(
             ?: item.stumpSeriesGroupKey()?.let(::stumpSeriesContainerId)
         containerId?.let { id -> uiState.sourceItems.firstOrNull { it.id == id } }
     }
-    LibraryBookPage(
-        item = item,
-        relatedPool = pool,
-        actionContext = actionContext,
-        coverImageUrlProvider = coverImageUrlProvider,
-        onOpen = onItemSelected,
-        onShowBook = onShowItem,
-        onBack = onBack,
-        onDeleteImported = onDeleteImportedItem,
-        onDismiss = onDismiss,
-        // A tag filters the library by it and the page makes way; one Filters doesn't show stays put.
-        onFilterByTag = { chip ->
-            if (chip.filterPanel in panels) {
-                onFilterByTag()
-                onFilterStateChanged(filters.filteringBy(chip))
-                onDismiss()
-            }
-        },
-        // On Kavita and Stump the series is a screen of its own; elsewhere it is a filter.
-        onSeeAllInSeries = when {
-            seriesContainer != null -> { _: ReadableItem -> onItemSelected(seriesContainer) }
-            LibraryFilterPanel.Series in panels && !uiState.isSeriesBrowseActive -> { book: ReadableItem ->
-                book.facetMetadata().series.firstOrNull()?.let { series ->
-                    onFilterStateChanged(filters.copy(series = setOf(series)))
+    // The book's bookmarks after its progress (feature:annotations' rows, a tap opens the book there).
+    CompositionLocalProvider(LocalLibraryBookPageBookmarks provides rememberBookPageBookmarks(item, onItemSelected)) {
+        LibraryBookPage(
+            item = item,
+            relatedPool = pool,
+            actionContext = actionContext,
+            coverImageUrlProvider = coverImageUrlProvider,
+            onOpen = onItemSelected,
+            onShowBook = onShowItem,
+            onBack = onBack,
+            onDeleteImported = onDeleteImportedItem,
+            onDismiss = onDismiss,
+            // A tag filters the library by it and the page makes way; one Filters doesn't show stays put.
+            onFilterByTag = { chip ->
+                if (chip.filterPanel in panels) {
+                    onFilterByTag()
+                    onFilterStateChanged(filters.filteringBy(chip))
+                    onDismiss()
                 }
-            }
-            else -> null
-        },
-    )
+            },
+            // On Kavita and Stump the series is a screen of its own; elsewhere it is a filter.
+            onSeeAllInSeries = when {
+                seriesContainer != null -> { _: ReadableItem -> onItemSelected(seriesContainer) }
+                LibraryFilterPanel.Series in panels && !uiState.isSeriesBrowseActive -> { book: ReadableItem ->
+                    book.facetMetadata().series.firstOrNull()?.let { series ->
+                        onFilterStateChanged(filters.copy(series = setOf(series)))
+                    }
+                }
+                else -> null
+            },
+        )
+    }
 }

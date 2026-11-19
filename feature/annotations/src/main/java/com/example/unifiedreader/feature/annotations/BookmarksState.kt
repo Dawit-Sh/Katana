@@ -30,6 +30,9 @@ class BookmarksState {
     var order: MarkedBookOrder by mutableStateOf(MarkedBookOrder.LastMarked)
     var bookKind: MarkKind by mutableStateOf(MarkKind.All)
 
+    /** The search on a book's page; it starts as the books' search, so a book found by it shows what matched. */
+    var bookQuery: String by mutableStateOf("")
+
     /** The word review under way, if any. */
     var round: WordReviewRound? by mutableStateOf(null)
 
@@ -38,6 +41,7 @@ class BookmarksState {
 
     fun openBook(itemId: String) {
         bookKind = MarkKind.All
+        bookQuery = query
         scrolled = false
         page = BookmarksPage.Book(itemId)
     }

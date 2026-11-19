@@ -460,7 +460,8 @@ fun EpubReaderScreen(
                     )
                 },
             )
-            val pageBookmarks = rememberPageBookmarks(bookBookmarks, currentLocator, framePage, currentPage)
+            val bookmarkView = EpubBookmarkView(currentLocator, framePage, currentPage, shownPreferences.layoutMode)
+            val pageBookmarks = activity.rememberPageBookmarks(bookBookmarks, item.id, bookmarkView)
             // The bar's bookmark button and a tap in the page's top-end corner.
             val toggleBookmark: (() -> Unit)? = annotationController?.let { controller ->
                 {
