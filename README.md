@@ -90,7 +90,7 @@ The Kotlin package is still `com.example.unifiedreader`, same as yabai.
 ## License
 
 Katana is free software under the [GNU GPL, version 3 or later](LICENSE). DjVu support uses DjVuLibre, which
-is GPL, so the whole app is shared that way, and bostannnn is fine with yabai's code going out under it.
+is GPL, so the whole app is shared that way.
 
 ## Credits
 
