@@ -1,27 +1,44 @@
 package com.example.unifiedreader.feature.reader.epub
 
+import com.example.unifiedreader.feature.reader.preferences.ReaderPagesMode
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** The "Pages" choice: the orientation default plus the three fixed layouts. */
-internal enum class EpubPagesChoice(
+/**
+ * "Pages", as in every reader: Scroll when the book is laid out as one scrolling column, Turn otherwise
+ * (one page or a spread at a time, Auto included).
+ */
+internal fun epubPagesMode(
+    useOrientationLayoutDefault: Boolean,
+    layoutMode: EpubReaderLayoutMode,
+): ReaderPagesMode = if (!useOrientationLayoutDefault && layoutMode == EpubReaderLayoutMode.Scroll) {
+    ReaderPagesMode.Scroll
+} else {
+    ReaderPagesMode.Turn
+}
+
+/**
+ * "Two pages" while turning pages: [Auto] follows the orientation (a spread in landscape where one fits), [Off]
+ * is always one page, [On] always a spread. Saved as the layout mode and its override, as before.
+ */
+internal enum class EpubSpreadChoice(
     val label: String,
     val layoutMode: EpubReaderLayoutMode?,
 ) {
     Auto("Auto", null),
-    Scroll("Scroll", EpubReaderLayoutMode.Scroll),
-    Page("Page", EpubReaderLayoutMode.SinglePage),
-    Spread("Spread", EpubReaderLayoutMode.DoublePage),
+    Off("Off", EpubReaderLayoutMode.SinglePage),
+    On("On", EpubReaderLayoutMode.DoublePage),
 }
 
-internal fun epubPagesChoice(
+/** The "Two pages" choice a layout shows; null while scrolling, where it doesn't apply. */
+internal fun epubSpreadChoice(
     useOrientationLayoutDefault: Boolean,
     layoutMode: EpubReaderLayoutMode,
-): EpubPagesChoice = if (useOrientationLayoutDefault) {
-    EpubPagesChoice.Auto
-} else {
-    EpubPagesChoice.entries.first { it.layoutMode == layoutMode }
+): EpubSpreadChoice? = when {
+    useOrientationLayoutDefault -> EpubSpreadChoice.Auto
+    layoutMode == EpubReaderLayoutMode.Scroll -> null
+    else -> EpubSpreadChoice.entries.first { it.layoutMode == layoutMode }
 }
 
 /** Panel wording for the typography mode: "Original" reads better as what it is, the book's own styling. */

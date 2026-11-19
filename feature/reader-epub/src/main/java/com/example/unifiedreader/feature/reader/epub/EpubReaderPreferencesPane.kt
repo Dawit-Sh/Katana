@@ -31,7 +31,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,6 +48,8 @@ import androidx.compose.ui.unit.sp
 import com.example.unifiedreader.feature.reader.core.ReaderPageNumberChoiceRow
 import com.example.unifiedreader.feature.reader.core.curl.PageTurnStyle
 import com.example.unifiedreader.feature.reader.core.readerOverlayTokens
+import com.example.unifiedreader.feature.reader.preferences.ReaderPagesLabel
+import com.example.unifiedreader.feature.reader.preferences.ReaderPagesMode
 import com.example.unifiedreader.ui.components.AppChoiceRow
 import com.example.unifiedreader.ui.components.AppFormRow
 import com.example.unifiedreader.ui.components.AppIcons
@@ -303,35 +309,13 @@ private fun EpubLayoutSection(
     onUseOrientationLayoutDefault: () -> Unit,
     onPageTurnStyleChanged: (PageTurnStyle) -> Unit,
 ) {
-    // Readium needs a page area 960 dp wide for a spread: a phone is narrower even in landscape, so it isn't offered.
-    val deviceFitsSpread = epubShowsSpread(currentEpubWidestPageAreaDp())
-    val pagesChoice = epubPagesChoice(useOrientationLayoutDefault, layoutMode)
-    AppChoiceRow(
-        label = "Pages",
-        supportingText = if (deviceFitsSpread) {
-            "Auto: page in portrait, spread in landscape"
-        } else {
-            "Auto: one page at a time on this device"
-        },
-        options = EpubPagesChoice.entries.filter { choice ->
-            choice != EpubPagesChoice.Spread || deviceFitsSpread || choice == pagesChoice
-        },
-        selected = pagesChoice,
-        onSelected = { choice ->
-            val mode = choice.layoutMode
-            if (mode == null) onUseOrientationLayoutDefault() else onLayoutModeChanged(mode)
-        },
-        optionLabel = { it.label },
-        // Four segments do not fit beside a label; the control takes the full width below it.
-        stacked = true,
-    )
-    AppChoiceRow(
-        label = "Page turn",
-        options = PageTurnStyle.entries,
-        selected = pageTurnStyle,
-        onSelected = onPageTurnStyleChanged,
-        optionLabel = { it.label },
-        enabled = layoutMode != EpubReaderLayoutMode.Scroll,
+    EpubPagesRows(
+        layoutMode = layoutMode,
+        useOrientationLayoutDefault = useOrientationLayoutDefault,
+        pageTurnStyle = pageTurnStyle,
+        onLayoutModeChanged = onLayoutModeChanged,
+        onUseOrientationLayoutDefault = onUseOrientationLayoutDefault,
+        onPageTurnStyleChanged = onPageTurnStyleChanged,
     )
     if (typographyMode == EpubTypographyMode.Original) {
         Box(modifier = Modifier.padding(horizontal = AppLayout.inset, vertical = 6.dp)) {
@@ -342,6 +326,59 @@ private fun EpubLayoutSection(
     EpubStepRow(label = "Margins", steps = EpubMarginSteps, value = pageMargins, onSelected = onPageMarginsChanged)
     EpubStepRow(label = "Paragraph spacing", steps = EpubParagraphSpacingSteps, value = paragraphSpacing, onSelected = onParagraphSpacingChanged)
     EpubStepRow(label = "Paragraph indent", steps = EpubParagraphIndentSteps, value = paragraphIndent, onSelected = onParagraphIndentChanged)
+}
+
+/**
+ * Pages, Turn or Scroll, as in every reader; then, while turning, Two pages (Auto, Off, On, only where a
+ * spread fits) and the page turn. Both stay in place but disabled while scrolling, so the pane keeps its height.
+ */
+@Composable
+private fun EpubPagesRows(
+    layoutMode: EpubReaderLayoutMode,
+    useOrientationLayoutDefault: Boolean,
+    pageTurnStyle: PageTurnStyle,
+    onLayoutModeChanged: (EpubReaderLayoutMode) -> Unit,
+    onUseOrientationLayoutDefault: () -> Unit,
+    onPageTurnStyleChanged: (PageTurnStyle) -> Unit,
+) {
+    val pagesMode = epubPagesMode(useOrientationLayoutDefault, layoutMode)
+    val spread = epubSpreadChoice(useOrientationLayoutDefault, layoutMode)
+    // The Two pages choice to come back to after scrolling: scrolling saves no spread of its own.
+    var lastSpread by rememberSaveable { mutableStateOf(spread ?: EpubSpreadChoice.Auto) }
+    val applySpread = { choice: EpubSpreadChoice ->
+        lastSpread = choice
+        choice.layoutMode?.let(onLayoutModeChanged) ?: onUseOrientationLayoutDefault()
+    }
+    val turning = pagesMode == ReaderPagesMode.Turn
+    AppChoiceRow(
+        label = ReaderPagesLabel,
+        options = ReaderPagesMode.entries,
+        selected = pagesMode,
+        onSelected = { mode ->
+            if (mode == ReaderPagesMode.Scroll) onLayoutModeChanged(EpubReaderLayoutMode.Scroll) else applySpread(lastSpread)
+        },
+        optionLabel = { it.label },
+    )
+    // Readium needs a page area 960 dp wide for a spread: a phone is narrower even in landscape, so it isn't offered.
+    if (epubShowsSpread(currentEpubWidestPageAreaDp()) || spread == EpubSpreadChoice.On) {
+        AppChoiceRow(
+            label = "Two pages",
+            supportingText = "Auto: two in landscape",
+            options = EpubSpreadChoice.entries,
+            selected = spread ?: lastSpread,
+            onSelected = applySpread,
+            optionLabel = { it.label },
+            enabled = turning,
+        )
+    }
+    AppChoiceRow(
+        label = "Page turn",
+        options = PageTurnStyle.entries,
+        selected = pageTurnStyle,
+        onSelected = onPageTurnStyleChanged,
+        optionLabel = { it.label },
+        enabled = turning,
+    )
 }
 
 /** A spacing setting as named steps under its label; a value between steps shows as the nearest. */
