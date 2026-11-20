@@ -27,6 +27,18 @@ interface ReaderBookmarkStore {
 
     suspend fun deleteBookmark(id: String)
 
+    /**
+     * Removes a bookmark like [deleteBookmark] and keeps it whole, so [restoreBookmark] can bring it
+     * back exactly; null when there was no such bookmark. A store that can't restore just removes it.
+     */
+    suspend fun removeBookmark(id: String): RemovedBookmark? {
+        deleteBookmark(id)
+        return null
+    }
+
+    /** Brings back a bookmark [removeBookmark] took away: the same id, place, name and note. */
+    suspend fun restoreBookmark(removed: RemovedBookmark) = Unit
+
     /** The reader's name and note for a bookmark; a blank one removes it. */
     suspend fun nameBookmark(id: String, title: String, note: String)
 }
@@ -84,6 +96,18 @@ internal class RoomReaderBookmarkStore(
 
     override suspend fun deleteBookmark(id: String) = withContext(ioDispatcher) {
         dao.markBookmarkDeleted(id, syncState = SYNC_DIRTY, atEpochMillis = now())
+    }
+
+    override suspend fun removeBookmark(id: String): RemovedBookmark? = withContext(ioDispatcher) {
+        val stored = dao.getBookmarkRow(id)?.takeUnless(ReaderBookmarkEntity::deleted) ?: return@withContext null
+        dao.markBookmarkDeleted(id, syncState = SYNC_DIRTY, atEpochMillis = now())
+        RemovedBookmark(stored)
+    }
+
+    override suspend fun restoreBookmark(removed: RemovedBookmark) = withContext(ioDispatcher) {
+        restoredBookmarkRow(removed.row, current = dao.getBookmarkRow(removed.id), nowEpochMillis = now())
+            ?.let(dao::upsertBookmark)
+        Unit
     }
 
     override suspend fun nameBookmark(id: String, title: String, note: String) = withContext(ioDispatcher) {

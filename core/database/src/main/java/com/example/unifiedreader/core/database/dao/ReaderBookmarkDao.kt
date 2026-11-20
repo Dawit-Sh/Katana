@@ -27,6 +27,10 @@ abstract class ReaderBookmarkDao {
     @Query("SELECT * FROM reader_bookmarks WHERE deleted = 0 ORDER BY createdAtEpochMillis DESC")
     abstract fun observeAllBookmarks(): Flow<List<ReaderBookmarkEntity>>
 
+    /** One bookmark as stored, a removed one too (until a sync clears it); null when there is none. */
+    @Query("SELECT * FROM reader_bookmarks WHERE id = :id")
+    abstract fun getBookmarkRow(id: String): ReaderBookmarkEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract fun upsertBookmark(bookmark: ReaderBookmarkEntity)
 

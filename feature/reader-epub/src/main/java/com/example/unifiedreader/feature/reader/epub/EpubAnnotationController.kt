@@ -16,6 +16,7 @@ import com.example.unifiedreader.feature.annotations.HighlightColor
 import com.example.unifiedreader.feature.annotations.HighlightStyle
 import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
 import com.example.unifiedreader.feature.annotations.ReaderHighlight
+import com.example.unifiedreader.feature.annotations.removeHighlightWithUndo
 import com.example.unifiedreader.feature.translation.ReaderTextSelection
 import com.example.unifiedreader.ui.components.AppToastIcon
 import com.example.unifiedreader.ui.components.AppToastMessage
@@ -113,12 +114,10 @@ internal class EpubAnnotationController(
         editingNoteOf = null
     }
 
+    /** Removes a highlight; the toast's Undo brings it back as it was. */
     fun delete(highlight: ReaderHighlight) {
         card = null
-        scope.launch {
-            store.deleteHighlight(highlight.id)
-            toasts()?.show(AppToastMessage(text = EpubAnnotationCopy.Removed, icon = AppToastIcon.Removed))
-        }
+        scope.launch { store.removeHighlightWithUndo(highlight.id, toasts(), scope, EpubAnnotationCopy.Removed) }
     }
 
     fun deleteWord(wordId: String) {

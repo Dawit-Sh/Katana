@@ -82,8 +82,7 @@ class PageBookmarks internal constructor(
         scope.launch {
             try {
                 if (onPage.isNotEmpty()) {
-                    onPage.forEach { bookmark -> store.deleteBookmark(bookmark.id) }
-                    toasts()?.show(AppToastMessage(text = PageBookmarkCopy.Removed, icon = AppToastIcon.Removed))
+                    store.removeBookmarksWithUndo(onPage.map(ReaderBookmark::id), toasts(), scope, PageBookmarkCopy.Removed)
                 } else {
                     store.addBookmark(
                         book = book,
