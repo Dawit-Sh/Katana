@@ -247,8 +247,11 @@ object ReaderDockDefaults {
     /** Between the percentage, the slider and the position (the dock row's own spacing). */
     val labelGap: Dp = 12.dp
 
-    /** Narrower than this beside its labels, the slider gets a row of its own under them. */
-    val minSliderWidth: Dp = 120.dp
+    /**
+     * Narrower than this beside its labels, the slider gets a row of its own under them. At normal text a 384 dp
+     * phone leaves it about 114 dp ("p. 10 / 357"), a 360 dp one about 90; 200% text leaves it nothing.
+     */
+    val minSliderWidth: Dp = 64.dp
 }
 
 internal fun orientReaderProgress(

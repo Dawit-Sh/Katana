@@ -56,11 +56,16 @@ class ReaderDockProgressTest {
     }
 
     @Test
-    fun `the labels stay beside the slider while it keeps 120 dp`() {
-        // A 320 dp row at 2.25 px per dp: "3%" and "p. 11 / 357" at normal size leave the slider most of it.
+    fun `the labels stay beside the slider at normal sizes`() {
+        // The 384 dp phone at 1.875 px per dp: 226 dp beside the dock button, "3%" and "p. 10 / 357" leave 114 dp.
         assertEquals(
             false,
-            readerDockLabelsAboveSlider(width = 600, percentWidth = 60, positionWidth = 180, gap = 27, minSliderWidth = 270),
+            readerDockLabelsAboveSlider(width = 424, percentWidth = 34, positionWidth = 131, gap = 23, minSliderWidth = 120),
+        )
+        // A 360 dp phone leaves about 90 dp.
+        assertEquals(
+            false,
+            readerDockLabelsAboveSlider(width = 379, percentWidth = 34, positionWidth = 131, gap = 23, minSliderWidth = 120),
         )
     }
 
@@ -69,8 +74,8 @@ class ReaderDockProgressTest {
         // 200% text: the labels take nearly all the row, as on the phone that crashed.
         assertEquals(
             true,
-            readerDockLabelsAboveSlider(width = 540, percentWidth = 120, positionWidth = 380, gap = 27, minSliderWidth = 270),
+            readerDockLabelsAboveSlider(width = 540, percentWidth = 120, positionWidth = 380, gap = 27, minSliderWidth = 144),
         )
-        assertEquals(true, readerDockLabelsAboveSlider(width = 400, percentWidth = 60, positionWidth = 50, gap = 27, minSliderWidth = 270))
+        assertEquals(true, readerDockLabelsAboveSlider(width = 300, percentWidth = 60, positionWidth = 50, gap = 27, minSliderWidth = 144))
     }
 }
