@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -65,7 +66,12 @@ internal fun SettingsHub(
                 supporting = themeMode.label,
                 selected = selectedPage == SettingsPage.Theme,
                 onClick = { onOpenPage(SettingsPage.Theme) },
-                trailing = { ThemeCoverPreview() },
+                // With very large text the little preview would squeeze "Theme" until it breaks mid-word; it goes.
+                trailing = if (showsThemePreview(LocalDensity.current.fontScale)) {
+                    { ThemeCoverPreview() }
+                } else {
+                    null
+                },
             )
         }
         ReadingSettingsGroup(
@@ -201,6 +207,11 @@ private fun ThemeCoverPreview() {
         )
     }
 }
+
+/** The Theme row's preview fits beside its words up to 150% text; past that the words need the room. */
+internal fun showsThemePreview(fontScale: Float): Boolean = fontScale < LargeTextScale
+
+private const val LargeTextScale = 1.5f
 
 /** The order itself: "Kavita, Grimmory, Local". Launch restores where you were, so no source is "first to open". */
 internal fun drawerOrderSummary(sourceOrder: List<SourceType>): String =
