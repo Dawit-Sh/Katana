@@ -133,6 +133,7 @@ dependencies {
     implementation(project(":feature:updates"))
     implementation(project(":feature:translation"))
     implementation(project(":feature:annotations"))
+    implementation(project(":feature:dictionary"))
 
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)

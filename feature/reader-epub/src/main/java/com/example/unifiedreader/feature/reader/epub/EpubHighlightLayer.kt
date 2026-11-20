@@ -21,6 +21,8 @@ internal class EpubSelectionAnnotations(
     /** [withNote]: the selection's Note, which opens the note editor on the new highlight. */
     val onHighlight: (selection: Selection, anchor: Rect?, withNote: Boolean) -> Unit,
     val onSaveWord: (selection: Selection) -> Unit,
+    /** The toolbar's Dictionary: the card with the selected word's definition. */
+    val onDictionary: (selection: Selection) -> Unit,
     /** A highlight was tapped; [anchor] is where it is, in window pixels. */
     val onHighlightActivated: (highlightId: String, anchor: Rect?) -> Unit,
 )
@@ -110,7 +112,7 @@ internal fun CoroutineScope.withSelectionForAnnotation(
     }
 }
 
-/** The toolbar's Highlight, Note and Add to dictionary, reading the selection when tapped. */
+/** The toolbar's Highlight, Note, Add to dictionary and Dictionary, reading the selection when tapped. */
 internal fun epubSelectionAnnotationActions(
     scope: CoroutineScope,
     navigator: () -> EpubNavigatorFragment?,
@@ -130,6 +132,11 @@ internal fun epubSelectionAnnotationActions(
     onSaveWord = {
         scope.withSelectionForAnnotation(navigator()) { selection, _ ->
             annotations()?.onSaveWord?.invoke(selection)
+        }
+    },
+    onDictionary = {
+        scope.withSelectionForAnnotation(navigator()) { selection, _ ->
+            annotations()?.onDictionary?.invoke(selection)
         }
     },
 )

@@ -49,7 +49,7 @@ internal class PdfHighlightMark(val highlight: ReaderHighlight, val spot: PageTe
  */
 @Stable
 internal class PdfTextMarks(
-    private val book: AnnotatedBook,
+    val book: AnnotatedBook,
     private val text: PageTextSource,
     val editor: HighlightEditor,
     private val scope: CoroutineScope,
@@ -180,6 +180,9 @@ internal class PdfTextMarks(
         clear()
     }
 
+    /** The selection menu's Dictionary; null leaves it out (a book that can't keep saved words). */
+    var dictionary: PdfSelectionDictionary? = null
+
     fun copySelection(context: Context) {
         selection?.text?.takeIf(String::isNotBlank)?.let(context::copyToClipboard)
         clear()
@@ -223,7 +226,9 @@ internal fun rememberPdfTextMarks(
             scope = scope,
             highlightsState = { highlights.value },
             pageCount = { latestPageCount },
-        )
+        ).also { marks ->
+            marks.dictionary = PdfSelectionDictionary(marks.book, store, scope) { latestPageCount }
+        }
     }
 }
 

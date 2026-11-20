@@ -59,7 +59,7 @@ internal fun epubSelectionTranslation(
 
 /**
  * The toolbar over selected text. Readium hands the whole menu to the app, so without this the
- * toolbar is empty: it holds Highlight, Note and Add to dictionary (when the book can keep
+ * toolbar is empty: it holds Highlight, Note, Add to dictionary and Dictionary (when the book can keep
  * highlights), Translate (when the app has translation and doesn't open it by itself) and Copy.
  * [onSelectionChanged] runs when the toolbar opens and each time the WebView refreshes it, which
  * it does as a handle moves the selection. [delegate] is the page curl's callback, which needs to
@@ -73,7 +73,7 @@ internal class EpubSelectionActionModeCallback(
     private val onSelectionChanged: () -> Unit,
     private val onSelectionCleared: () -> Unit,
 ) : ActionMode.Callback {
-    /** Highlight, Note and Add to dictionary; null leaves them out of the toolbar. */
+    /** Highlight, Note, Add to dictionary and Dictionary; null leaves them out of the toolbar. */
     var annotationActions: EpubSelectionAnnotationActions? = null
 
     override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
@@ -82,6 +82,7 @@ internal class EpubSelectionActionModeCallback(
             menu.add(Menu.NONE, HighlightItemId, HighlightOrder, EpubAnnotationCopy.Highlight)
             menu.add(Menu.NONE, NoteItemId, NoteOrder, EpubAnnotationCopy.Note)
             menu.add(Menu.NONE, SaveWordItemId, SaveWordOrder, EpubAnnotationCopy.AddToDictionary)
+            menu.add(Menu.NONE, DictionaryItemId, DictionaryOrder, EpubAnnotationCopy.Dictionary)
         }
         if (canTranslate()) menu.add(Menu.NONE, TranslateItemId, TranslateOrder, TranslateLabel)
         menu.add(Menu.NONE, CopyItemId, CopyOrder, android.R.string.copy)
@@ -99,6 +100,7 @@ internal class EpubSelectionActionModeCallback(
             HighlightItemId -> annotationActions?.onHighlight?.invoke()
             NoteItemId -> annotationActions?.onNote?.invoke()
             SaveWordItemId -> annotationActions?.onSaveWord?.invoke()
+            DictionaryItemId -> annotationActions?.onDictionary?.invoke()
             TranslateItemId -> onTranslate()
             CopyItemId -> onCopy()
             else -> return delegate.onActionItemClicked(mode, item)
@@ -118,12 +120,16 @@ internal class EpubSelectionActionModeCallback(
         const val HighlightItemId = 0x7EAD03
         const val NoteItemId = 0x7EAD04
         const val SaveWordItemId = 0x7EAD05
+        const val DictionaryItemId = 0x7EAD06
         const val TranslateLabel = "Translate"
         const val HighlightOrder = 0
-        const val NoteOrder = 1
-        const val SaveWordOrder = 2
-        const val TranslateOrder = 3
-        const val CopyOrder = 4
+
+        // Second, so a phone's toolbar shows it without the overflow; its card has Add to My words too.
+        const val DictionaryOrder = 1
+        const val NoteOrder = 2
+        const val SaveWordOrder = 3
+        const val TranslateOrder = 4
+        const val CopyOrder = 5
     }
 }
 
@@ -133,6 +139,7 @@ internal class EpubSelectionAnnotationActions(
     val onHighlight: () -> Unit,
     val onNote: () -> Unit,
     val onSaveWord: () -> Unit,
+    val onDictionary: () -> Unit = {},
 )
 
 /**

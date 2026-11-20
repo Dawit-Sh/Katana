@@ -50,4 +50,5 @@ include(
     ":feature:updates",
     ":feature:translation",
     ":feature:annotations",
+    ":feature:dictionary",
 )

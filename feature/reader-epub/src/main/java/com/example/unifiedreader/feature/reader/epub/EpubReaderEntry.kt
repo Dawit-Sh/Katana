@@ -37,6 +37,7 @@ import com.example.unifiedreader.feature.annotations.HighlightCardOverlay
 import com.example.unifiedreader.feature.annotations.HighlightNoteDialog
 import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
 import com.example.unifiedreader.feature.annotations.rememberMarkSteps
+import com.example.unifiedreader.feature.dictionary.ReaderDictionaryOverlay
 import com.example.unifiedreader.feature.reader.core.ImmersiveReaderOverlay
 import com.example.unifiedreader.feature.reader.core.rememberReaderActiveSessionTracker
 import com.example.unifiedreader.feature.reader.core.rememberReaderSessionLifecycle
@@ -590,6 +591,10 @@ fun EpubReaderScreen(
                     annotationController?.let { controller ->
                         HighlightCardOverlay(editor = controller.editor, highlights = bookHighlights)
                         HighlightNoteDialog(editor = controller.editor, highlights = bookHighlights)
+                        ReaderDictionaryOverlay(
+                            request = controller.dictionaryRequest,
+                            onDismiss = { controller.dictionaryRequest = null },
+                        )
                     }
                 },
                 content = {
@@ -678,6 +683,7 @@ fun EpubReaderScreen(
                                     highlights = bookHighlights,
                                     onHighlight = controller::highlight,
                                     onSaveWord = controller::saveWord,
+                                    onDictionary = controller::lookUp,
                                     onHighlightActivated = controller::open,
                                 )
                             }
