@@ -35,7 +35,7 @@ internal data class PdfSearchResult(
  */
 @Stable
 internal class PdfBookSearch(
-    private val text: PdfTextSource,
+    private val text: PageTextSource,
     private val pageCount: () -> Int,
     private val scope: CoroutineScope,
 ) : ReaderBookSearch {

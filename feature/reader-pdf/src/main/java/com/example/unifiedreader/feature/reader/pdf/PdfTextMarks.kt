@@ -50,7 +50,7 @@ internal class PdfHighlightMark(val highlight: ReaderHighlight, val spot: PageTe
 @Stable
 internal class PdfTextMarks(
     private val book: AnnotatedBook,
-    private val text: PdfTextSource,
+    private val text: PageTextSource,
     val editor: HighlightEditor,
     private val scope: CoroutineScope,
     private val highlightsState: () -> List<ReaderHighlight>,
@@ -181,9 +181,9 @@ internal class PdfTextMarks(
 }
 
 /**
- * The open PDF's highlights and text, or null when it can't keep highlights: no store, a DjVu book (its pages
- * carry no text layer here), or the file not here yet. The PDFium text source opens with the book, reads nothing
- * until a long press, and closes when the book does.
+ * The open PDF's or DjVu book's highlights and text, or null when it can't keep highlights: no store, or the file
+ * not here yet. The text source (PDFium for a PDF, the hidden text layer for a DjVu book) opens with the book, reads
+ * nothing until a long press or a search, and closes when the book does.
  */
 @Composable
 internal fun rememberPdfTextMarks(
@@ -193,12 +193,19 @@ internal fun rememberPdfTextMarks(
     pageCount: Int,
 ): PdfTextMarks? {
     val uri = (documentState as? ReaderDocumentState.Ready)?.uri
-    if (store == null || uri == null || item.format != FormatType.PDF) return null
+    val format = item.format
+    if (store == null || uri == null || format !in TextFormats) return null
     val context = LocalContext.current
     val editor = rememberHighlightEditor(store)
     val scope = rememberCoroutineScope()
     val latestPageCount by rememberUpdatedState(pageCount)
-    val source = remember(documentState.cacheKey) { PdfTextSource(context, uri) }
+    val source: PageTextSource = remember(documentState.cacheKey) {
+        if (format == FormatType.DJVU) {
+            DjvuTextSource { page -> readDjvuPageText(context.applicationContext, item, uri, page) }
+        } else {
+            PdfTextSource(context, uri)
+        }
+    }
     DisposableEffect(source) { onDispose(source::close) }
     val highlights: State<List<ReaderHighlight>> =
         remember(store, item.id) { store.highlights(item.id) }.collectAsStateWithLifecycle(initialValue = emptyList())
@@ -213,3 +220,6 @@ internal fun rememberPdfTextMarks(
         )
     }
 }
+
+/** The page books whose words can be selected: a PDF's text, a DjVu book's hidden text layer. */
+private val TextFormats = setOf(FormatType.PDF, FormatType.DJVU)

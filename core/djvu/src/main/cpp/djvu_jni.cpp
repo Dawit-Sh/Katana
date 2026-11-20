@@ -25,8 +25,10 @@
 
 #include <new>
 #include <string>
+#include <vector>
 
 #include "ddjvuapi.h"
+#include "miniexp.h"
 
 namespace {
 
@@ -347,6 +349,108 @@ void renderPage(JNIEnv *env, DjvuHandle *handle, jint pageIndex, jobject bitmap)
   ddjvu_page_release(page);
 }
 
+// ---------------------------------------------------------------------------------------------------
+// Hidden text (the OCR layer many scanned DjVu books carry)
+
+// Per word (seven numbers): the line it is on, its first and past-last byte in the text, and its box (xmin,
+// ymin, xmax, ymax: pixels from the stored page's bottom left, before the page's own rotation).
+// Ahead of the words: the stored page's width and height, and its rotation (quarter turns anticlockwise).
+const int kNumbersAhead = 3;
+// page > column > region > para > line > word is six deep; anything deeper is a damaged file.
+const int kMaxZoneDepth = 16;
+
+struct PageText {
+  std::string utf8;
+  std::vector<jint> numbers;
+  int lines = 0;
+};
+
+bool isZone(miniexp_t type, const char *name) {
+  return miniexp_symbolp(type) && strcmp(miniexp_to_name(type), name) == 0;
+}
+
+// One zone of DjVuLibre's s-expression: (type xmin ymin xmax ymax "text") at the finest level asked for,
+// else (type xmin ymin xmax ymax zone...). Text coarser than a line (a paragraph's) counts as a line of its own.
+void collectZone(miniexp_t zone, int line, PageText &out, int depth) {
+  if (!miniexp_consp(zone) || depth > kMaxZoneDepth) return;
+  miniexp_t type = miniexp_car(zone);
+  if (!miniexp_symbolp(type)) return;
+  jint box[4];
+  miniexp_t rest = miniexp_cdr(zone);
+  for (int i = 0; i < 4; i++) {
+    miniexp_t number = miniexp_car(rest);
+    if (!miniexp_numberp(number)) return;
+    box[i] = miniexp_to_int(number);
+    rest = miniexp_cdr(rest);
+  }
+  if (isZone(type, "line")) line = out.lines++;
+  miniexp_t first = miniexp_car(rest);
+  if (miniexp_stringp(first)) {
+    const char *text = miniexp_to_str(first);
+    if (text == nullptr || *text == '\0') return;
+    if (line < 0) line = out.lines++;
+    jint start = static_cast<jint>(out.utf8.size());
+    out.utf8 += text;
+    out.numbers.push_back(line);
+    out.numbers.push_back(start);
+    out.numbers.push_back(static_cast<jint>(out.utf8.size()));
+    for (int i = 0; i < 4; i++) out.numbers.push_back(box[i]);
+    return;
+  }
+  for (; miniexp_consp(rest); rest = miniexp_cdr(rest)) collectZone(miniexp_car(rest), line, out, depth + 1);
+}
+
+// {byte[] words, int[] numbers} for Java, or null (with an exception pending) when Java is out of memory.
+jobjectArray toJava(JNIEnv *env, const PageText &text) {
+  jclass objectClass = env->FindClass("java/lang/Object");
+  if (objectClass == nullptr) return nullptr;
+  jobjectArray result = env->NewObjectArray(2, objectClass, nullptr);
+  env->DeleteLocalRef(objectClass);
+  if (result == nullptr) return nullptr;
+  jsize byteCount = static_cast<jsize>(text.utf8.size());
+  jbyteArray bytes = env->NewByteArray(byteCount);
+  if (bytes == nullptr) return nullptr;
+  env->SetByteArrayRegion(bytes, 0, byteCount, reinterpret_cast<const jbyte *>(text.utf8.data()));
+  jsize numberCount = static_cast<jsize>(text.numbers.size());
+  jintArray numbers = env->NewIntArray(numberCount);
+  if (numbers == nullptr) return nullptr;
+  env->SetIntArrayRegion(numbers, 0, numberCount, text.numbers.data());
+  env->SetObjectArrayElement(result, 0, bytes);
+  env->SetObjectArrayElement(result, 1, numbers);
+  return result;
+}
+
+// The words of a page's hidden text, or null when the page has none (or it can't be read).
+jobjectArray pageText(JNIEnv *env, DjvuHandle *handle, jint pageIndex) {
+  startOperation(handle);
+  ddjvu_document_t *document = handle->document;
+  ddjvu_pageinfo_t info;
+  memset(&info, 0, sizeof(info));
+  ddjvu_status_t status = waitForJob(handle, [document, pageIndex, &info] {
+    return ddjvu_document_get_pageinfo(document, pageIndex, &info);
+  });
+  if (status != DDJVU_JOB_OK || info.width <= 0 || info.height <= 0) return nullptr;
+  miniexp_t text = miniexp_dummy;
+  status = waitForJob(handle, [document, pageIndex, &text] {
+    text = ddjvu_document_get_pagetext(document, pageIndex, "word");
+    return text == miniexp_dummy ? DDJVU_JOB_STARTED : DDJVU_JOB_OK;
+  });
+  if (status != DDJVU_JOB_OK || !miniexp_consp(text)) {
+    // The empty list (no hidden text on this page), or the symbol failed or stopped.
+    if (text != miniexp_dummy) ddjvu_miniexp_release(document, text);
+    return nullptr;
+  }
+  PageText out;
+  int rotation = info.rotation & 3;
+  out.numbers.push_back((rotation & 1) ? info.height : info.width);
+  out.numbers.push_back((rotation & 1) ? info.width : info.height);
+  out.numbers.push_back(rotation);
+  collectZone(text, -1, out, 0);
+  ddjvu_miniexp_release(document, text);
+  if (out.numbers.size() <= static_cast<size_t>(kNumbersAhead)) return nullptr;
+  return toJava(env, out);
+}
+
 }  // namespace
 
 // -----------------------------------------------------------------------------------------------------
@@ -429,6 +533,21 @@ JNIEXPORT void JNICALL DJVU_JNI(nativeRenderPage)(JNIEnv *env, jclass, jlong val
   } catch (...) {
     throwJava(env, kDjvuException, "Unexpected error while rendering the page");
   }
+}
+
+// Returns {byte[] utf8, int[] numbers} for a page's hidden text, or null when it has none. numbers holds the
+// stored page's width, height and rotation, then per word: line, byte start, byte end, xmin, ymin, xmax, ymax.
+JNIEXPORT jobjectArray JNICALL DJVU_JNI(nativePageText)(JNIEnv *env, jclass, jlong value, jint pageIndex) {
+  try {
+    DjvuHandle *handle = fromJava(env, value);
+    if (handle == nullptr || !checkPageIndex(env, handle, pageIndex)) return nullptr;
+    return pageText(env, handle, pageIndex);
+  } catch (const std::bad_alloc &) {
+    throwJava(env, kDjvuException, "Out of memory while reading the page's text");
+  } catch (...) {
+    throwJava(env, kDjvuException, "Unexpected error while reading the page's text");
+  }
+  return nullptr;
 }
 
 JNIEXPORT void JNICALL DJVU_JNI(nativeClose)(JNIEnv *, jclass, jlong value) {

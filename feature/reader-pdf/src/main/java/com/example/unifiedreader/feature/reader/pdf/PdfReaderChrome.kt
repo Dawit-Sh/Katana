@@ -98,7 +98,7 @@ internal fun PdfReaderChrome(
     bookmark: PdfBookmarkButton? = null,
     // The book's marks panel (bookmarks, highlights, export); null when the book can't keep marks.
     marksPanel: PdfMarksPanel? = null,
-    // Search in the book; null for a book without text (DjVu).
+    // Search in the book; null for a book that can't keep highlights (no marks store).
     search: PdfSearchControls? = null,
     // Previous and Next through the marks, over the page strip, after one was opened from a list.
     markStrip: (@Composable () -> Unit)? = null,
@@ -483,13 +483,13 @@ private fun PdfSearchPanel(
     )
 }
 
-/** The marks panel's contents: the page bookmarks, the highlights (none in a DjVu book), the export, and going to a page. */
+/** The marks panel's contents: the page bookmarks, the highlights, the export, and going to a page. */
 internal class PdfMarksPanel(
     val bookmarks: PageBookmarks,
     val export: BookMarksExport,
     val highlights: List<ReaderHighlight>,
     val onJumpToPage: (Int) -> Unit,
-    /** The pages have text to highlight (a PDF, not a DjVu book). */
+    /** The pages may have text to highlight (a PDF or a DjVu book, not a comic). */
     val hasText: Boolean,
 )
 

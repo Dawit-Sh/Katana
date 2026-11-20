@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import com.example.unifiedreader.core.djvu.DjvuDocument
+import com.example.unifiedreader.core.djvu.DjvuPageText
 import com.example.unifiedreader.core.djvu.djvuRenderSize
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.runSuspendCatching
@@ -107,6 +108,19 @@ private fun Bitmap.recycleAndFalse(): Boolean {
     return false
 }
 
+/**
+ * Page [pageIndex]'s hidden text, from the document the reader has open; null when the page has none, or the
+ * reader has closed the book (reading the text never opens it again).
+ */
+internal fun readDjvuPageText(
+    context: Context,
+    item: ReadableItem,
+    documentUri: Uri,
+    pageIndex: Int,
+): DjvuPageText? = OpenDjvuDocument.useIfOpen(djvuFile(context, item, documentUri)) { document ->
+    if (pageIndex in 0 until document.pageCount) document.pageText(pageIndex) else null
+}
+
 /** Closes the DjVu document a closed reader leaves open. */
 internal fun releaseDjvuDocument() {
     OpenDjvuDocument.close()
@@ -163,6 +177,13 @@ private object OpenDjvuDocument {
         }
         return block(open)
     }
+
+    /** [block] on the open document when it is [file]'s; null when no document or another one is open. */
+    @Synchronized
+    fun <T> useIfOpen(
+        file: File,
+        block: (DjvuDocument) -> T,
+    ): T? = document?.takeIf { path == file.path }?.let(block)
 
     @Synchronized
     fun isOpen(file: File): Boolean = document != null && path == file.path
