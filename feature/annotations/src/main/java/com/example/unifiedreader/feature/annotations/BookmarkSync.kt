@@ -325,8 +325,12 @@ class BookmarkSyncEngine(
         server: BookmarkServer,
         places: BookmarkPlaces = BookmarkPlaces.EpubCfi,
     ): BookmarkSync {
-        val plan = planBookmarkSync(book, store.rowsOf(book.itemId), remote, now(), newId, places)
-        if (plan.writes.isNotEmpty() || plan.purges.isNotEmpty()) store.apply(plan.writes, plan.purges)
+        val rows = store.rowsOf(book.itemId)
+        val plan = planBookmarkSync(book, rows, remote, now(), newId, places)
+        // Many gone from the server at once is held for the reader to answer, not removed here.
+        val kept = rows.filterNot(ReaderBookmarkEntity::deleted).mapTo(mutableSetOf(), ReaderBookmarkEntity::id)
+        val purges = holdingMassRemoval(book, HeldMarkKind.Bookmark, kept, plan.purges) { HeldMark(it.id, it.expectedUpdatedAt) }
+        if (plan.writes.isNotEmpty() || purges.isNotEmpty()) store.apply(plan.writes, purges)
         val serverChanged = plan.uploads.map { upload -> send(upload, server) }.any { it }
         return if (serverChanged) BookmarkSync.ServerChangedMeanwhile else BookmarkSync.Done
     }

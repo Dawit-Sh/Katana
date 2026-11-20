@@ -19,10 +19,13 @@ import com.example.unifiedreader.data.grimmory.GrimmoryBookmarkWrite
 import com.example.unifiedreader.data.grimmory.GrimmoryBookmarksApi
 import com.example.unifiedreader.data.grimmory.GrimmorySession
 import com.example.unifiedreader.feature.annotations.AnnotatedBook
+import com.example.unifiedreader.feature.annotations.MarkRemovalHolds
 import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
 import com.example.unifiedreader.feature.annotations.RoomBookmarkSyncStore
+import com.example.unifiedreader.feature.annotations.RoomHighlightSyncStore
 import com.example.unifiedreader.feature.annotations.RoomReaderAnnotationStore
 import com.example.unifiedreader.feature.annotations.pageBookmarkPlace
+import com.example.unifiedreader.feature.annotations.settleMarkRemovalHold
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -56,6 +59,7 @@ class GrimmoryPageBookmarkSyncTest {
 
     @Before
     fun setUp() {
+        MarkRemovalHolds.clear()
         database = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), UnifiedReaderDatabase::class.java)
             .allowMainThreadQueries()
             .build()
@@ -121,6 +125,48 @@ class GrimmoryPageBookmarkSyncTest {
         server.bookmarks.clear()
         assertTrue(sync.syncBooks(listOf(pdf)))
         assertTrue(annotations.bookmarks(pdf.id).first().isEmpty())
+    }
+
+    @Test
+    fun `a server that lost a book's six bookmarks is asked about, and Put back sends them again`() = runBlocking {
+        bookmarkSixPages()
+        assertTrue(sync.syncBooks(listOf(pdf)))
+        server.bookmarks.clear()
+        server.created.clear()
+
+        assertTrue(sync.syncBooks(listOf(pdf)))
+        assertEquals("nothing removed here", 6, annotations.bookmarks(pdf.id).first().size)
+        val hold = MarkRemovalHolds.current(pdf.id)!!
+        assertEquals(6, hold.count)
+
+        val highlights = RoomHighlightSyncStore(database, Dispatchers.Unconfined)
+        settleMarkRemovalHold(hold, removeHere = false, highlights = highlights, bookmarks = syncStore)
+        assertTrue(sync.syncBooks(listOf(pdf)))
+
+        assertEquals(6, server.created.size)
+        assertEquals(6, annotations.bookmarks(pdf.id).first().size)
+        assertEquals(null, MarkRemovalHolds.current(pdf.id))
+    }
+
+    @Test
+    fun `Remove here removes the bookmarks the server lost`() = runBlocking {
+        bookmarkSixPages()
+        assertTrue(sync.syncBooks(listOf(pdf)))
+        server.bookmarks.clear()
+        assertTrue(sync.syncBooks(listOf(pdf)))
+
+        settleMarkRemovalHold(
+            MarkRemovalHolds.current(pdf.id)!!,
+            removeHere = true,
+            highlights = RoomHighlightSyncStore(database, Dispatchers.Unconfined),
+            bookmarks = syncStore,
+        )
+
+        assertTrue(annotations.bookmarks(pdf.id).first().isEmpty())
+    }
+
+    private suspend fun bookmarkSixPages() = repeat(6) { page ->
+        annotations.addBookmark(pdf.book(), pageBookmarkPlace(page, 41), page = page + 1, pageCount = 41, text = null)
     }
 
     private fun serverBookmark(id: String, bookId: String, cfi: String?, pageNumber: Int?, notes: String?) =

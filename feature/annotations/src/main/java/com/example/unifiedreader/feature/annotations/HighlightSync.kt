@@ -89,9 +89,13 @@ class HighlightSyncEngine(
         remote: List<RemoteHighlight>,
         server: HighlightServer,
     ): HighlightBookSync {
-        val plan = planHighlightSync(book, store.rowsOf(book.itemId), remote, now(), newId)
+        val rows = store.rowsOf(book.itemId)
+        val plan = planHighlightSync(book, rows, remote, now(), newId)
         if (plan.needsPlaces) return HighlightBookSync.NeedsPlaces
-        if (plan.writes.isNotEmpty() || plan.purges.isNotEmpty()) store.apply(plan.writes, plan.purges)
+        // Many gone from the server at once is held for the reader to answer, not removed here.
+        val kept = rows.filterNot(ReaderHighlightEntity::deleted).mapTo(mutableSetOf(), ReaderHighlightEntity::id)
+        val purges = holdingMassRemoval(book, HeldMarkKind.Highlight, kept, plan.purges) { HeldMark(it.id, it.expectedUpdatedAt) }
+        if (plan.writes.isNotEmpty() || purges.isNotEmpty()) store.apply(plan.writes, purges)
         val serverChanged = plan.uploads.map { upload -> send(upload, server) }.any { alreadyThere -> alreadyThere }
         return if (serverChanged) HighlightBookSync.ServerChangedMeanwhile else HighlightBookSync.Done
     }

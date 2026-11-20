@@ -9,6 +9,8 @@ import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.data.repository.ReadableItemRepository
 import com.example.unifiedreader.feature.annotations.BookmarkSyncStore
 import com.example.unifiedreader.feature.annotations.HighlightSyncStore
+import com.example.unifiedreader.feature.annotations.MarkRemovalHolds
+import com.example.unifiedreader.feature.annotations.settleMarkRemovalHold
 import com.example.unifiedreader.feature.reader.core.ReaderWorkCoordinator
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
@@ -113,6 +115,18 @@ class AppHighlightSyncCoordinator @Inject constructor(
             val copies = localCopies.copiesAmong(localCopies.localItems().filter { it.id in candidates })
             sync.syncLibrary(items, highlightBooks, copies)
             bookmarkSync.syncLibrary(items, bookmarkBooks, copies)
+        }
+    }
+
+    /**
+     * The reader's answer to a book's marks held because Grimmory lost many at once ([MarkRemovalHolds]):
+     * remove them here too, or put them back on Grimmory (they go up as new at once).
+     */
+    fun answerRemovalHold(itemId: String, removeHere: Boolean) {
+        val hold = MarkRemovalHolds.current(itemId) ?: return
+        scope.launch {
+            settleMarkRemovalHold(hold, removeHere, highlights = store, bookmarks = bookmarkStore)
+            if (!removeHere) syncWaitingBooks()
         }
     }
 
