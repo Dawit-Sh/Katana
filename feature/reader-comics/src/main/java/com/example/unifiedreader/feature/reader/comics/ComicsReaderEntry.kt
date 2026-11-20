@@ -556,6 +556,7 @@ fun ComicsReaderScreen(
                             onClick = { bookmarks.toggle(pageIndex, pages.size) },
                         )
                     },
+                    marks = pageBookmarks,
                 )
             },
         )

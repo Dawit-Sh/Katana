@@ -36,6 +36,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -55,7 +56,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.unit.dp
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.feature.reader.core.readerOverlayTokens
@@ -106,6 +109,8 @@ internal fun PdfScrollViewport(
     jump: PdfScrollJump?,
     callbacks: PdfScrollCallbacks,
     modifier: Modifier = Modifier,
+    // The book's highlights and selectable text; null for a book without them.
+    marks: PdfTextMarks? = null,
 ) {
     val images = rememberPdfScrollPageImages(LocalContext.current, item, documentUri)
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = start.pageIndex.coerceIn(0, (pageCount - 1).coerceAtLeast(0)))
@@ -119,7 +124,7 @@ internal fun PdfScrollViewport(
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .clipToBounds()
             .onSizeChanged { zoom.viewportSize = it }
-            .pointerInput(zoom) { detectPdfScrollZoom(zoom, scope) }
+            .pointerInput(zoom, marks) { detectPdfScrollZoom(zoom, scope, selecting = { marks?.selecting == true }) }
             .pointerInput(zoom) {
                 detectTapGestures(
                     onTap = { latestCallbacks.onToggleOverlay() },
@@ -152,19 +157,24 @@ internal fun PdfScrollViewport(
                     heightPx = pdfPageHeightPx(layoutWidthPx, images.aspects[index] ?: images.typicalAspect),
                     renderWidthPx = pages.renderWidthFor(index),
                     images = images,
+                    marks = marks,
                 )
             }
         }
     }
 }
 
-/** One page: its drawing once there is one, a plain page until then. */
+/**
+ * One page: its drawing once there is one, a plain page until then. With [marks], its highlights over it, and a
+ * long press on it selects its words, as on a turned-to page.
+ */
 @Composable
 private fun PdfScrollPageItem(
     pageIndex: Int,
     heightPx: Int,
     renderWidthPx: Int,
     images: PdfScrollPageImages,
+    marks: PdfTextMarks?,
     modifier: Modifier = Modifier,
 ) {
     val shown = remember(pageIndex, images) { PdfShownPage(images) }
@@ -173,11 +183,18 @@ private fun PdfScrollPageItem(
         if (shown.current?.key?.widthPx != renderWidthPx) shown.show(images.load(pageIndex, renderWidthPx))
     }
     val height = with(LocalDensity.current) { heightPx.toDp() }
+    // The page fills its item, so its words sit at fractions of the item's own size, zoomed with the strip.
+    var size by remember { mutableStateOf(IntSize.Zero) }
+    val words = marks?.let { rememberPdfPageWords(it, pageIndex) { Rect(Offset.Zero, size.toSize()) } }
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(height)
             .background(readerOverlayTokens().colors.fallbackPage)
+            .onSizeChanged { size = it }
+            .then(words?.placeTracking() ?: Modifier)
+            .then(words?.tapping() ?: Modifier)
+            .then(words?.selecting() ?: Modifier)
             .semantics { contentDescription = "Page ${pageIndex + 1}" },
     ) {
         shown.current?.let { page ->
@@ -188,6 +205,8 @@ private fun PdfScrollPageItem(
                 modifier = Modifier.fillMaxSize(),
             )
         }
+        words?.Layer(Modifier.fillMaxSize())
+        words?.Menu()
     }
 }
 
@@ -362,12 +381,13 @@ internal fun pdfPullsPastEnd(canScrollForward: Boolean, availableY: Float, byTou
 private suspend fun PointerInputScope.detectPdfScrollZoom(
     zoom: PdfScrollZoomState,
     scope: CoroutineScope,
+    selecting: () -> Boolean,
 ) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         zoom.touched = true
         zoom.stopAnimation()
-        val gesture = PdfZoomGesture(zoom, viewConfiguration.touchSlop, down)
+        val gesture = PdfZoomGesture(zoom, viewConfiguration.touchSlop, down, selecting)
         do {
             val event = awaitPointerEvent(PointerEventPass.Initial)
             gesture.onEvent(event)
@@ -389,6 +409,8 @@ private class PdfZoomGesture(
     private val zoom: PdfScrollZoomState,
     private val touchSlop: Float,
     down: PointerInputChange,
+    // A finger selecting words moves the selection, never the strip.
+    private val selecting: () -> Boolean,
 ) {
     val velocity = VelocityTracker().apply { addPointerInputChange(down) }
     private var dragged = Offset.Zero
@@ -401,9 +423,10 @@ private class PdfZoomGesture(
 
     fun onEvent(event: PointerEvent) {
         val pressed = event.changes.filter { it.pressed }
+        val movesStrip = zoom.isZoomed && !pinched && !selecting()
         when {
             pressed.size >= 2 -> pinch(event)
-            pressed.size == 1 && zoom.isZoomed && !pinched -> drag(pressed.first())
+            pressed.size == 1 && movesStrip -> drag(pressed.first())
         }
     }
 

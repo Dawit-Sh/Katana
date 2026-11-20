@@ -75,13 +75,21 @@ private fun pageHref(pageIndex: Int): String = "page:$pageIndex"
 private fun PageTextRect.toJson(): JSONArray =
     JSONArray().put(left.rounded()).put(top.rounded()).put(right.rounded()).put(bottom.rounded())
 
-private fun JSONArray.toRect(): PageTextRect =
-    PageTextRect(getDouble(0).toFloat(), getDouble(1).toFloat(), getDouble(2).toFloat(), getDouble(3).toFloat())
+private fun JSONArray.toRect(): PageTextRect = PageTextRect(
+    left = getDouble(RectLeft).toFloat(),
+    top = getDouble(RectTop).toFloat(),
+    right = getDouble(RectRight).toFloat(),
+    bottom = getDouble(RectBottom).toFloat(),
+)
 
 /** Five decimal places: far finer than a pixel on any screen, and the stored place stays short. */
 private fun Float.rounded(): Double = (this * RectPrecision).roundToInt() / RectPrecision
 
 private const val RectPrecision = 100_000.0
+private const val RectLeft = 0
+private const val RectTop = 1
+private const val RectRight = 2
+private const val RectBottom = 3
 private const val PageKey = "page"
 private const val StartKey = "start"
 private const val EndKey = "end"

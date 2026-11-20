@@ -47,11 +47,8 @@ internal class PdfTextSource(
     }
 
     /** Page [pageIndex]'s text, read now if it isn't kept; null when the page or the file has none to give. */
-    suspend fun page(pageIndex: Int): PdfPageText? {
-        cached(pageIndex)?.let { return it }
-        val thread = thread() ?: return null
-        return withContext(thread) { readKept(pageIndex) }
-    }
+    suspend fun page(pageIndex: Int): PdfPageText? =
+        cached(pageIndex) ?: thread()?.let { thread -> withContext(thread) { readKept(pageIndex) } }
 
     /** Page [pageIndex]'s text if it was read already. */
     fun cached(pageIndex: Int): PdfPageText? = synchronized(lock) { pages[pageIndex] }
@@ -59,10 +56,13 @@ internal class PdfTextSource(
     /** Closes the file once whatever is reading has finished. Safe to call more than once. */
     fun close() {
         val running = synchronized(lock) {
-            if (closed) return
+            val wasOpen = !closed
             closed = true
             pages.clear()
-            executor.also { executor = null; dispatcher = null }
+            val running = executor.takeIf { wasOpen }
+            executor = null
+            dispatcher = null
+            running
         } ?: return
         try {
             running.execute { closeDocument() }
@@ -73,42 +73,46 @@ internal class PdfTextSource(
     }
 
     private fun thread(): CoroutineDispatcher? = synchronized(lock) {
-        if (closed) return null
-        dispatcher ?: Executors.newSingleThreadExecutor { task -> Thread(task, ThreadName).apply { isDaemon = true } }
-            .also { executor = it }
-            .asCoroutineDispatcher()
-            .also { dispatcher = it }
+        when {
+            closed -> null
+            else -> dispatcher ?: Executors.newSingleThreadExecutor { task -> Thread(task, ThreadName).apply { isDaemon = true } }
+                .also { executor = it }
+                .asCoroutineDispatcher()
+                .also { dispatcher = it }
+        }
     }
 
     /** On the source's thread. */
     private fun readKept(pageIndex: Int): PdfPageText? {
-        cached(pageIndex)?.let { return it }
-        if (closed) return null
-        val document = openDocument() ?: return null
-        val read = runCatching { readPage(document, pageIndex) }
-            .onFailure { error -> Log.w(LogTag, "Couldn't read the text of page ${pageIndex + 1}", error) }
-            .getOrNull()
-            ?: return null
-        synchronized(lock) { if (!closed) pages[pageIndex] = read }
+        val read = cached(pageIndex) ?: openDocument()?.let { readPageQuietly(it, pageIndex) }
+        if (read != null) synchronized(lock) { if (!closed) pages[pageIndex] = read }
         return read
     }
 
+    private fun readPageQuietly(document: PdfDocument, pageIndex: Int): PdfPageText? =
+        runCatching { readPage(document, pageIndex) }
+            .onFailure { error -> Log.w(LogTag, "Couldn't read the text of page ${pageIndex + 1}", error) }
+            .getOrNull()
+
+    /** The open document, opened now if this is the first page asked for; null when closed or PDFium can't read it. */
     private fun openDocument(): PdfDocument? {
-        opened?.let { return it.document }
-        if (unreadable) return null
-        val result = runCatching {
-            val descriptor = requireNotNull(appContext.contentResolver.openFileDescriptor(uri, "r")) { "No file" }
-            val document = runCatching { PdfiumCore(appContext).newDocument(descriptor) }
-                .onFailure { descriptor.closeQuietly() }
-                .getOrThrow()
-            OpenedPdf(descriptor, document)
+        if (opened == null && !unreadable && !closed) {
+            opened = tryOpen()
+            unreadable = opened == null
         }
-        result.onFailure { error -> Log.w(LogTag, "Couldn't open the PDF for its text", error) }
-        // UnsatisfiedLinkError (no PDFium for this device) is an Error, not an Exception: runCatching takes both.
-        opened = result.getOrNull()
-        unreadable = opened == null
         return opened?.document
     }
+
+    private fun tryOpen(): OpenedPdf? = runCatching {
+        // PDFium's own loader waits forever when its library can't load (a device without it), so load it here
+        // first: that fails at once, as an UnsatisfiedLinkError, which runCatching takes too.
+        PdfiumLibraries.forEach(System::loadLibrary)
+        val descriptor = requireNotNull(appContext.contentResolver.openFileDescriptor(uri, "r")) { "No file" }
+        val document = runCatching { PdfiumCore(appContext).newDocument(descriptor) }
+            .onFailure { descriptor.closeQuietly() }
+            .getOrThrow()
+        OpenedPdf(descriptor, document)
+    }.onFailure { error -> Log.w(LogTag, "Couldn't open the PDF for its text", error) }.getOrNull()
 
     private fun closeDocument() {
         val open = opened ?: return
@@ -121,6 +125,7 @@ internal class PdfTextSource(
 
     private companion object {
         const val LogTag = "PdfText"
+        val PdfiumLibraries = listOf("pdfium", "pdfiumandroid")
         const val ThreadName = "katana-pdf-text"
 
         /** A few pages either side of the one being read: a PDF page's text and boxes are tens of kilobytes. */
@@ -149,17 +154,15 @@ private fun readText(page: PdfPage, textPage: PdfTextPage, pageIndex: Int): PdfP
         point.x to point.y
     }
     val boxes = FloatArray(count * PdfPageText.BoxSize)
+    val source = FloatArray(PdfPageText.BoxSize)
     for (index in 0 until count) {
         val box: RectF? = textPage.textPageGetCharBox(index)
         // PDFium's box is in page space: left, top (the higher y), right, bottom. Made-up characters have none.
-        mapping.writeBox(
-            left = box?.left ?: 0f,
-            top = box?.top ?: 0f,
-            right = box?.right ?: 0f,
-            bottom = box?.bottom ?: 0f,
-            into = boxes,
-            at = index * PdfPageText.BoxSize,
-        )
+        source[PdfPageText.Left] = box?.left ?: 0f
+        source[PdfPageText.Top] = box?.top ?: 0f
+        source[PdfPageText.Right] = box?.right ?: 0f
+        source[PdfPageText.Bottom] = box?.bottom ?: 0f
+        mapping.writeBox(source, into = boxes, at = index * PdfPageText.BoxSize)
     }
     return PdfPageText(pageIndex = pageIndex, text = text, boxes = boxes, aspect = height.toFloat() / width)
 }

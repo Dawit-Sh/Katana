@@ -53,22 +53,34 @@ val ReaderBookmark.pageIndex: Int?
         .takeIf { place.href.startsWith(PageHrefPrefix) }
         ?.toIntOrNull()
 
-/** What a page-image reader keeps bookmarks with: the store, and the places other pages ask it to open at. */
+/**
+ * What a page-image reader keeps marks with: the bookmark store, the places other pages ask it to open at, and the
+ * whole marks store ([annotations]: highlights on pages with text, and the marks panel's export; null keeps the
+ * reader without highlights or a marks panel).
+ */
 class PageBookmarkSources(
     val store: ReaderBookmarkStore,
     val jumps: AnnotationJumps?,
+    val annotations: ReaderAnnotationStore? = null,
 )
 
 /** The open page-image book's bookmarks: the top bar's button and the ribbon. Saved at once. */
 @Stable
 class PageBookmarks internal constructor(
-    private val store: ReaderBookmarkStore,
+    sources: PageBookmarkSources,
     private val book: AnnotatedBook,
     private val scope: CoroutineScope,
     private val toasts: () -> AppToastState?,
     val all: List<ReaderBookmark>,
-    internal val jumps: AnnotationJumps?,
 ) {
+    private val store: ReaderBookmarkStore = sources.store
+    internal val jumps: AnnotationJumps? = sources.jumps
+
+    /** This book's marks as Markdown, for its marks panel; null without the whole marks store. */
+    val export: BookMarksExport? = sources.annotations?.let { annotations ->
+        BookMarksExport(exports = AnnotationExports(annotations), book = book, toasts = toasts)
+    }
+
     private var busy = false
 
     /** The bookmarks on page [pageIndex]. */
@@ -99,6 +111,19 @@ class PageBookmarks internal constructor(
             }
         }
     }
+
+    /** The marks panel's remove. */
+    fun delete(bookmarkId: String) {
+        scope.launch {
+            store.deleteBookmark(bookmarkId)
+            toasts()?.show(AppToastMessage(text = PageBookmarkCopy.Removed, icon = AppToastIcon.Removed))
+        }
+    }
+
+    /** The reader's name and note for a bookmark; blank removes it. */
+    fun name(bookmarkId: String, title: String, note: String) {
+        scope.launch { store.nameBookmark(bookmarkId, title, note) }
+    }
 }
 
 /** A page-image book's bookmarks, or null when the reader has no bookmark store. */
@@ -118,12 +143,11 @@ fun rememberPageBookmarks(
     if (store == null) return null
     return remember(sources, itemId, title, author, all) {
         PageBookmarks(
-            store = store,
+            sources = sources,
             book = AnnotatedBook(itemId = itemId, title = title, author = author),
             scope = scope,
             toasts = { latestToasts },
             all = all,
-            jumps = sources.jumps,
         )
     }
 }

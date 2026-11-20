@@ -10,6 +10,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.example.unifiedreader.core.model.runSuspendCatching
+import com.example.unifiedreader.feature.reader.core.ReaderBookSearch
+import com.example.unifiedreader.feature.reader.core.ReaderSearchGroup
+import com.example.unifiedreader.feature.reader.core.ReaderSearchParts
+import com.example.unifiedreader.feature.reader.core.ReaderSearchRow
+import com.example.unifiedreader.feature.reader.core.ReaderSearchSnippet
+import com.example.unifiedreader.feature.reader.core.ReaderSearchStatus
+import com.example.unifiedreader.feature.reader.core.isReaderSearchQueryLongEnough
+import com.example.unifiedreader.feature.reader.core.nextReaderSearchIndex
+import com.example.unifiedreader.feature.reader.core.readerSearchGroups
+import com.example.unifiedreader.feature.reader.core.readerSearchPosition
+import com.example.unifiedreader.feature.reader.core.readerSearchSnippet
+import com.example.unifiedreader.feature.reader.core.readerSearchSummary
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -38,22 +50,9 @@ internal data class EpubSearchResult(
 }
 
 /** The match and a few words either side, cut at whole words: "…to the [bento] shop. He…". */
-internal data class EpubSearchSnippet(
-    val before: String,
-    val match: String,
-    val after: String,
-)
+internal typealias EpubSearchSnippet = ReaderSearchSnippet
 
-internal enum class EpubSearchStatus {
-    /** Nothing asked yet, or too little typed. */
-    Idle,
-    Searching,
-    Done,
-
-    /** Stopped at [EpubSearchResultLimit] matches. */
-    Capped,
-    Failed,
-}
+internal typealias EpubSearchStatus = ReaderSearchStatus
 
 /**
  * Search in the book, through Readium's search service (`publication.search`). Typing searches after a
@@ -64,15 +63,19 @@ internal enum class EpubSearchStatus {
 internal class EpubBookSearch(
     private val publication: Publication,
     private val scope: CoroutineScope,
-) {
-    var query by mutableStateOf("")
+) : ReaderBookSearch {
+    override var query by mutableStateOf("")
         private set
     var results by mutableStateOf<List<EpubSearchResult>>(emptyList())
         private set
-    var status by mutableStateOf(EpubSearchStatus.Idle)
+    override var status by mutableStateOf(EpubSearchStatus.Idle)
         private set
-    var currentIndex by mutableStateOf<Int?>(null)
+    override var currentIndex by mutableStateOf<Int?>(null)
         private set
+
+    override val resultCount: Int get() = results.size
+
+    override fun row(index: Int): ReaderSearchRow? = results.getOrNull(index)?.let { ReaderSearchRow(it.snippet, it.page) }
 
     /** The tint for every match on the page, the current one stronger. */
     val decorations: List<Decoration> by derivedStateOf { epubSearchDecorations(results, currentIndex) }
@@ -82,13 +85,13 @@ internal class EpubBookSearch(
 
     private var searchJob: Job? = null
 
-    fun onQueryChange(text: String) {
-        query = text
+    override fun onQueryChange(newQuery: String) {
+        query = newQuery
         search(delayMillis = EpubSearchTypingDelayMillis)
     }
 
     /** The keyboard's search key: no waiting for the pause. */
-    fun searchNow() = search(delayMillis = 0L)
+    override fun searchNow() = search(delayMillis = 0L)
 
     /** Makes the match at [index] the current one and returns where it is, to go there. */
     fun select(index: Int): Locator? {
@@ -193,10 +196,7 @@ internal fun epubSearchPage(
 }
 
 /** Two letters at least, or one character of a script without spaces between words (Chinese, Japanese). */
-internal fun isEpubSearchQueryLongEnough(query: String): Boolean {
-    val text = query.trim()
-    return text.length >= 2 || text.any { it.code >= CjkScriptsStart }
-}
+internal fun isEpubSearchQueryLongEnough(query: String): Boolean = isReaderSearchQueryLongEnough(query)
 
 /** The match with [before] and [after] cut to a few whole words, "…" where they were cut. */
 internal fun epubSearchSnippet(
@@ -205,99 +205,34 @@ internal fun epubSearchSnippet(
     after: String?,
     maxBefore: Int = EpubSnippetMaxBefore,
     maxAfter: Int = EpubSnippetMaxAfter,
-): EpubSearchSnippet {
-    val lead = before.orEmpty().collapseSpaces().trimStart()
-    val tail = after.orEmpty().collapseSpaces().trimEnd()
-    val shortLead = if (lead.length <= maxBefore) {
-        lead
-    } else {
-        val cut = lead.takeLast(maxBefore)
-        val wordStart = cut.indexOf(' ').takeIf { it in 0 until cut.length - 1 }
-        "…" + (wordStart?.let { cut.substring(it + 1) } ?: cut)
-    }
-    val shortTail = if (tail.length <= maxAfter) {
-        tail
-    } else {
-        val cut = tail.take(maxAfter)
-        val wordEnd = cut.lastIndexOf(' ').takeIf { it > 0 }
-        (wordEnd?.let { cut.substring(0, it) } ?: cut) + "…"
-    }
-    return EpubSearchSnippet(before = shortLead, match = match.orEmpty().collapseSpaces(), after = shortTail)
-}
+): EpubSearchSnippet = readerSearchSnippet(before, match, after, maxBefore, maxAfter)
 
-private fun String.collapseSpaces(): String = replace(Whitespace, " ")
-
-/** The matches of one chapter, in book order: [indices] into the results. */
-internal data class EpubSearchGroup(
-    val title: String,
-    val indices: List<Int>,
-)
+/** The matches of one chapter, in book order: [ReaderSearchGroup.indices] into the results. */
+internal typealias EpubSearchGroup = ReaderSearchGroup
 
 /** Matches next to each other in the same chapter go under one heading; [chapterOf] names a match's chapter. */
 internal fun epubSearchGroups(
     results: List<EpubSearchResult>,
     chapterOf: (EpubSearchResult) -> String,
-): List<EpubSearchGroup> {
-    val groups = mutableListOf<EpubSearchGroup>()
-    results.forEachIndexed { index, result ->
-        val title = chapterOf(result)
-        val last = groups.lastOrNull()
-        if (last != null && last.title == title) {
-            groups[groups.lastIndex] = last.copy(indices = last.indices + index)
-        } else {
-            groups += EpubSearchGroup(title = title, indices = listOf(index))
-        }
-    }
-    return groups
-}
+): List<EpubSearchGroup> = readerSearchGroups(results, chapterOf)
 
 /** The line under the field: "12 results in 3 chapters", "Searching…", or null before a search. */
-internal fun epubSearchSummary(
-    status: EpubSearchStatus,
-    resultCount: Int,
-    chapterCount: Int,
-): String? {
-    val results = if (resultCount == 1) "1 result" else "$resultCount results"
-    val chapters = if (chapterCount == 1) "1 chapter" else "$chapterCount chapters"
-    return when (status) {
-        EpubSearchStatus.Idle -> null
-        EpubSearchStatus.Searching -> if (resultCount == 0) "Searching…" else "$results so far"
-        EpubSearchStatus.Done -> if (resultCount == 0) "No results" else "$results in $chapters"
-        EpubSearchStatus.Capped -> "The first $resultCount results, in $chapters"
-        EpubSearchStatus.Failed -> "This book can't be searched"
-    }
-}
+internal fun epubSearchSummary(status: EpubSearchStatus, resultCount: Int, chapterCount: Int): String? =
+    readerSearchSummary(status, resultCount, chapterCount, ReaderSearchParts.Chapters)
 
 /** "3 of 12", or "12 results" before one is chosen. */
-internal fun epubSearchPosition(currentIndex: Int?, resultCount: Int): String = when {
-    currentIndex != null -> "${currentIndex + 1} of $resultCount"
-    resultCount == 1 -> "1 result"
-    else -> "$resultCount results"
-}
+internal fun epubSearchPosition(currentIndex: Int?, resultCount: Int): String = readerSearchPosition(currentIndex, resultCount)
 
-/**
- * The match to step to: the one after (or before) [currentIndex], round past the ends; before any is
- * chosen, the first match after the reader's place ([fromProgress]) or the last one before it.
- */
+/** The match to step to; see [nextReaderSearchIndex]. */
 internal fun nextEpubSearchIndex(
     progressions: List<Double?>,
     currentIndex: Int?,
     forward: Boolean,
     fromProgress: Double,
-): Int? {
-    val count = progressions.size
-    return when {
-        count == 0 -> null
-        currentIndex != null -> Math.floorMod(currentIndex + if (forward) 1 else -1, count)
-        forward -> progressions.indexOfFirst { (it ?: 0.0) >= fromProgress }.takeIf { it >= 0 } ?: 0
-        else -> progressions.indexOfLast { (it ?: 0.0) < fromProgress }.takeIf { it >= 0 } ?: (count - 1)
-    }
-}
+): Int? = nextReaderSearchIndex(progressions, currentIndex, forward, fromProgress)
 
 /** At most this many matches; a word on every page would otherwise tint thousands. */
 internal const val EpubSearchResultLimit = 500
 private const val EpubSearchTypingDelayMillis = 450L
 private const val EpubSnippetMaxBefore = 40
 private const val EpubSnippetMaxAfter = 60
-private const val CjkScriptsStart = 0x2E80
-private val Whitespace = Regex("""\s+""")

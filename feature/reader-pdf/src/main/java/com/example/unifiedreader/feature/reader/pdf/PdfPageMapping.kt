@@ -29,12 +29,16 @@ internal class PdfPageMapping private constructor(
     )
 
     /**
-     * Writes the page-space box ([left], [top], [right], [bottom]; top above bottom) as fractions of the drawn page
-     * into [into] at [at]: left, top, right, bottom. A box with no width or height (a character PDFium made up)
-     * is written as NaN, which [PdfPageText] reads as no box.
+     * Writes the page-space box [source] (left, top, right, bottom; top above bottom) as fractions of the drawn page
+     * into [into] at [at], in the same order. A box with no width or height (a character PDFium made up) is written
+     * as NaN, which [PdfPageText] reads as no box.
      */
-    fun writeBox(left: Float, top: Float, right: Float, bottom: Float, into: FloatArray, at: Int) {
-        val hasArea = right > left && top > bottom && listOf(left, top, right, bottom).all(Float::isFinite)
+    fun writeBox(source: FloatArray, into: FloatArray, at: Int) {
+        val left = source[PdfPageText.Left]
+        val top = source[PdfPageText.Top]
+        val right = source[PdfPageText.Right]
+        val bottom = source[PdfPageText.Bottom]
+        val hasArea = right > left && top > bottom && source.all(Float::isFinite)
         if (!hasArea) {
             for (offset in 0 until PdfPageText.BoxSize) into[at + offset] = Float.NaN
             return

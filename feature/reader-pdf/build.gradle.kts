@@ -18,6 +18,7 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
     // PDFium, only for the text of a PDF page: selecting words and placing highlights. PdfRenderer still draws.
     implementation(libs.pdfium.android)

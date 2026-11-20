@@ -10,6 +10,7 @@ import androidx.compose.ui.geometry.Rect
 import com.example.unifiedreader.feature.annotations.AnnotatedBook
 import com.example.unifiedreader.feature.annotations.AnnotationExports
 import com.example.unifiedreader.feature.annotations.AnnotationPlace
+import com.example.unifiedreader.feature.annotations.BookMarksExport
 import com.example.unifiedreader.feature.annotations.HighlightEditor
 import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
 import com.example.unifiedreader.feature.translation.ReaderTextSelection
@@ -42,7 +43,7 @@ internal class EpubAnnotationController(
     val bookmarks = EpubBookmarkActions(store = store, book = book, scope = scope, toasts = toasts, chapterTitleOf = chapterTitleOf)
 
     /** This book's marks as Markdown; every book's is on the Bookmarks page. */
-    val export = EpubMarkExport(exports = AnnotationExports(store), book = book, toasts = toasts)
+    val export = BookMarksExport(exports = AnnotationExports(store), book = book, toasts = toasts)
 
     fun highlight(selection: Selection, anchor: Rect?, withNote: Boolean) {
         editor.add(

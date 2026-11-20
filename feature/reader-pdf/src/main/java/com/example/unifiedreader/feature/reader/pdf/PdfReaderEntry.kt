@@ -121,6 +121,7 @@ fun PdfReaderScreen(
         onCompletionRequested = onCompletionRequested,
     )
     val pageRenderer = remember(item.id, item.format) { pageImageRenderer(context.applicationContext, item) }
+    val marks = rememberPdfTextMarks(item, documentState, bookmarkSources?.annotations, pageCount)
     if (item.format == FormatType.DJVU) {
         DisposableEffect(item.id) { onDispose(::releaseDjvuDocument) }
     }
@@ -132,7 +133,7 @@ fun PdfReaderScreen(
     )
     PdfReaderContent(
         parts = PdfReaderParts(
-            book = PdfReaderBook(item, documentState, pageCount, pageRenderer),
+            book = PdfReaderBook(item, documentState, pageCount, pageRenderer, marks),
             place = place,
             pages = pages,
             actions = actions,
@@ -141,7 +142,7 @@ fun PdfReaderScreen(
         ),
         pageNumberPreferences = pageNumberPreferences,
         volumeKeysTurnPages = comfortPreferences.comfortFlow.collectAsStateWithLifecycle().value.volumeKeysTurnPages,
-        turnPages = { navigation -> PdfTurnPages(item, documentState, pageCount, place, pageRenderer, opening, navigation) },
+        turnPages = { navigation -> PdfTurnPages(item, documentState, pageCount, place, pageRenderer, opening, navigation, marks) },
     )
 }
 
@@ -183,6 +184,7 @@ private fun PdfTurnPages(
     pageRenderer: PageImageRenderer,
     opening: PdfOpeningState,
     navigation: PdfNavigation,
+    marks: PdfTextMarks?,
     modifier: Modifier = Modifier,
 ) {
     val currentPageIndex = place.pageIndex
@@ -228,181 +230,7 @@ private fun PdfTurnPages(
                 renderLongEdgePx = requestedLongEdge
             }
         },
-    )
-}
-
-@Composable
-private fun PdfPageViewport(
-    pageState: PdfPageRenderState,
-    modifier: Modifier = Modifier,
-    onToggleOverlay: () -> Unit,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onRenderLongEdgeRequested: (pageIndex: Int, longEdgePx: Int) -> Unit,
-) {
-    val animationScope = rememberCoroutineScope()
-    val density = LocalDensity.current
-    val viewportState = remember(pageState.cacheKey) {
-        ReaderZoomViewportState(maximumScale = 5f)
-    }
-    var viewportSize by remember(pageState.cacheKey) { mutableStateOf(IntSize.Zero) }
-    val imageSize = when (pageState) {
-        is PdfPageRenderState.Ready -> IntSize(pageState.bitmap.width, pageState.bitmap.height)
-        else -> IntSize.Zero
-    }
-    val contentPaddingPx = with(density) { 12.dp.toPx() }
-    val zoomLayout = remember(viewportSize, imageSize, contentPaddingPx) {
-        pdfPageZoomLayout(
-            viewportSize = viewportSize,
-            imageSize = imageSize,
-            contentPaddingPx = contentPaddingPx,
-        )
-    }
-    LaunchedEffect(zoomLayout) {
-        viewportState.updateLayout(zoomLayout)
-    }
-    LaunchedEffect(pageState.cacheKey, zoomLayout, viewportState.scale) {
-        val readyPage = pageState as? PdfPageRenderState.Ready ?: return@LaunchedEffect
-        if (!zoomLayout.isReady) return@LaunchedEffect
-        delay(PDF_RENDER_REQUEST_DEBOUNCE_MILLIS)
-        val requiredLongEdge = (
-            maxOf(zoomLayout.contentSize.width, zoomLayout.contentSize.height) *
-                viewportState.scale
-            ).roundToInt()
-        onRenderLongEdgeRequested(
-            readyPage.pageIndex,
-            pdfRenderLongEdgeBucket(requiredLongEdge),
-        )
-    }
-    Box(
-        modifier = modifier
-            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-            .clipToBounds()
-            .onSizeChanged { viewportSize = it }
-            .pointerInput(pageState.cacheKey, viewportSize) {
-                detectTapGestures(
-                    onTap = { tapOffset ->
-                        when (if (viewportState.isZoomed) ReaderTapSide.Middle else readerTapSide(tapOffset.x, size.width.toFloat())) {
-                            ReaderTapSide.Left -> onPrevious()
-                            ReaderTapSide.Right -> onNext()
-                            ReaderTapSide.Middle -> onToggleOverlay()
-                        }
-                    },
-                    onDoubleTap = { tapOffset ->
-                        viewportState.animateZoomToggle(
-                            coroutineScope = animationScope,
-                            focalPoint = tapOffset,
-                        )
-                    },
-                )
-            }
-            .pointerInput(pageState.cacheKey, viewportSize) {
-                detectReaderZoomGestures(
-                    viewportCenter = { viewportSize.center },
-                    canPan = viewportState::canPan,
-                    onPointerDown = viewportState::stopAnimation,
-                    onTransformStart = {},
-                    onPan = viewportState::onPan,
-                    onTransform = { centroid, panChange, zoomChange ->
-                        viewportState.onGesture(
-                            centroid = centroid,
-                            zoomChange = zoomChange,
-                            panChange = panChange,
-                        )
-                    },
-                    onTransformEnd = { velocity, _ ->
-                        viewportState.launchFling(
-                            coroutineScope = animationScope,
-                            initialVelocity = velocity,
-                            density = this,
-                        )
-                    },
-                )
-            }
-            .semantics {
-                stateDescription = "${(viewportState.scale * 100f).roundToInt()}% zoom"
-                customActions = listOf(
-                    CustomAccessibilityAction(label = "Zoom in") {
-                        viewportState.animateZoomBy(
-                            coroutineScope = animationScope,
-                            zoomFactor = 1.5f,
-                            focalPoint = viewportSize.center,
-                        )
-                        true
-                    },
-                    CustomAccessibilityAction(label = "Zoom out") {
-                        viewportState.animateZoomBy(
-                            coroutineScope = animationScope,
-                            zoomFactor = 1f / 1.5f,
-                            focalPoint = viewportSize.center,
-                        )
-                        true
-                    },
-                    CustomAccessibilityAction(label = "Reset zoom") {
-                        viewportState.animateReset(
-                            coroutineScope = animationScope,
-                        )
-                        true
-                    },
-                )
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        when (pageState) {
-            PdfPageRenderState.Empty -> PdfStatus("No PDF document available.")
-            PdfPageRenderState.Loading -> AppCircularProgress()
-            is PdfPageRenderState.Error -> PdfStatus(pageState.message)
-            is PdfPageRenderState.Ready -> {
-                val bitmap = pageState.bitmap
-                DisposableEffect(bitmap) {
-                    onDispose {
-                        if (!bitmap.isRecycled) {
-                            bitmap.recycle()
-                        }
-                    }
-                }
-                Image(
-                    bitmap = bitmap.asImageBitmap(),
-                    contentDescription = pageState.contentDescription,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(12.dp)
-                        .graphicsLayer {
-                            scaleX = viewportState.scale
-                            scaleY = viewportState.scale
-                            translationX = viewportState.offset.x
-                            translationY = viewportState.offset.y
-                        },
-                )
-            }
-        }
-    }
-}
-
-internal fun pdfPageZoomLayout(
-    viewportSize: IntSize,
-    imageSize: IntSize,
-    contentPaddingPx: Float,
-): ReaderZoomLayout {
-    if (
-        viewportSize.width <= 0 || viewportSize.height <= 0 ||
-        imageSize.width <= 0 || imageSize.height <= 0
-    ) {
-        return ReaderZoomLayout.Empty
-    }
-    val availableWidth = (viewportSize.width - contentPaddingPx * 2f).coerceAtLeast(1f)
-    val availableHeight = (viewportSize.height - contentPaddingPx * 2f).coerceAtLeast(1f)
-    val baseScale = minOf(
-        availableWidth / imageSize.width,
-        availableHeight / imageSize.height,
-    )
-    return ReaderZoomLayout(
-        viewportSize = viewportSize,
-        contentSize = Size(
-            width = imageSize.width * baseScale,
-            height = imageSize.height * baseScale,
-        ),
+        marks = marks,
     )
 }
 
@@ -411,26 +239,6 @@ internal fun pdfRenderLongEdgeBucket(requiredLongEdgePx: Int): Int = when {
     requiredLongEdgePx <= PDF_RENDER_MEDIUM_LONG_EDGE_PX -> PDF_RENDER_MEDIUM_LONG_EDGE_PX
     else -> PDF_RENDER_MAX_LONG_EDGE_PX
 }
-
-private val IntSize.center: Offset
-    get() = Offset(width / 2f, height / 2f)
-
-@Composable
-private fun PdfStatus(
-    message: String,
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
 
 private suspend fun inspectPdfDocument(
     context: Context,
@@ -595,4 +403,3 @@ private fun PdfPageRenderState.Ready.recycle() {
 private const val PDF_RENDER_LONG_EDGE_PX = 2200
 private const val PDF_RENDER_MEDIUM_LONG_EDGE_PX = 3200
 private const val PDF_RENDER_MAX_LONG_EDGE_PX = 4096
-private const val PDF_RENDER_REQUEST_DEBOUNCE_MILLIS = 180L

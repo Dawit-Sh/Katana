@@ -59,11 +59,12 @@ internal class PdfPageText(
     /** The word [index] is in, as the characters from its first up to past its last; a mark alone if it isn't in one. */
     fun wordAt(index: Int): IntRange {
         if (index !in text.indices) return IntRange.EMPTY
-        if (!isWordChar(index)) return index..index
         var start = index
-        while (start > 0 && joinsWord(start - 1, step = -1)) start--
         var end = index
-        while (end < text.lastIndex && joinsWord(end + 1, step = 1)) end++
+        if (isWordChar(index)) {
+            while (start > 0 && joinsWord(start - 1, step = -1)) start--
+            while (end < text.lastIndex && joinsWord(end + 1, step = 1)) end++
+        }
         return start..end
     }
 
@@ -91,7 +92,8 @@ internal class PdfPageText(
     }
 
     /** The words [start] up to [end] (not included) as a reader would copy them: lines joined with spaces. */
-    fun textOf(start: Int, end: Int): String = cleanPdfText(text.substring(start.coerceIn(0, length), end.coerceIn(0, length)))
+    fun textOf(start: Int, end: Int, trim: Boolean = true): String =
+        cleanPdfText(text.substring(start.coerceIn(0, length), end.coerceIn(0, length)), trim)
 
     private fun isWordChar(index: Int): Boolean = text[index].isLetterOrDigit()
 
@@ -147,13 +149,13 @@ internal class PdfPageText(
  * Text as PDFium gives it, made readable: a word broken over two lines with a hyphen is joined again, other
  * line breaks become spaces, and the control characters PDFium uses for its own marks are dropped.
  */
-internal fun cleanPdfText(raw: String): String = raw
+internal fun cleanPdfText(raw: String, trim: Boolean = true): String = raw
     .replace(BrokenWord, "")
     .replace(HyphenAtLineEnd, "-")
     .replace(LineBreak, " ")
     .replace(ControlChars, "")
     .replace(Spaces, " ")
-    .trim()
+    .let { if (trim) it.trim() else it }
 
 /** PDFium's mark for a hyphen it found at a line's end (U+0002 or a soft hyphen), and the break after it. */
 private val BrokenWord = Regex("[\\u0002\\u00AD\\uFFFE][ \\t]*\\r?\\n")

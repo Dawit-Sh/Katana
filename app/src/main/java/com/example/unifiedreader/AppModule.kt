@@ -843,7 +843,7 @@ object AppModule {
             preferencesStore = adapter,
             journalReadingSessionRecorder = journalReadingSessionRecorder,
             displayPreferences = readerDisplay,
-            bookmarks = PageBookmarkSources(store = annotationStore, jumps = annotationJumps),
+            bookmarks = PageBookmarkSources(store = annotationStore, jumps = annotationJumps, annotations = annotationStore),
         ),
         epubReaderFactory(
             sessionStore = JournalRecordingReaderSessionStore(
@@ -884,7 +884,7 @@ object AppModule {
                     ?: remoteDocumentReadCache.documentUriForReading(item)
             },
             displayPreferences = readerDisplay,
-            bookmarks = PageBookmarkSources(store = annotationStore, jumps = annotationJumps),
+            bookmarks = PageBookmarkSources(store = annotationStore, jumps = annotationJumps, annotations = annotationStore),
         ),
     )
 }

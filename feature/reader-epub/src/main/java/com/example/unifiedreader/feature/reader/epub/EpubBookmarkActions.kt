@@ -2,8 +2,6 @@ package com.example.unifiedreader.feature.reader.epub
 
 import androidx.compose.runtime.Stable
 import com.example.unifiedreader.feature.annotations.AnnotatedBook
-import com.example.unifiedreader.feature.annotations.AnnotationExports
-import com.example.unifiedreader.feature.annotations.MarkdownExport
 import com.example.unifiedreader.feature.annotations.ReaderBookmark
 import com.example.unifiedreader.feature.annotations.ReaderBookmarkStore
 import com.example.unifiedreader.ui.components.AppToastIcon
@@ -68,24 +66,5 @@ internal class EpubBookmarkActions(
     /** The reader's name and note for a bookmark; blank removes it. */
     fun name(bookmarkId: String, title: String, note: String) {
         scope.launch { store.nameBookmark(bookmarkId, title, note) }
-    }
-}
-
-/** Export highlights: this book's marks as Markdown, and the toast once the file is written or not. */
-@Stable
-internal class EpubMarkExport(
-    private val exports: AnnotationExports,
-    private val book: AnnotatedBook,
-    private val toasts: () -> AppToastState?,
-) {
-    suspend fun book(): MarkdownExport = exports.book(book)
-
-    fun saved(succeeded: Boolean) {
-        val message = if (succeeded) {
-            AppToastMessage(text = EpubAnnotationCopy.Exported, icon = AppToastIcon.Done)
-        } else {
-            AppToastMessage(text = EpubAnnotationCopy.ExportFailed, icon = AppToastIcon.Error)
-        }
-        toasts()?.show(message)
     }
 }

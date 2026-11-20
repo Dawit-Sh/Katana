@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -58,19 +59,27 @@ fun HighlightCardOverlay(
     highlights: List<ReaderHighlight>,
     modifier: Modifier = Modifier,
 ) {
-    editor.sharing.highlightId?.let { sharingId ->
-        highlights.firstOrNull { it.id == sharingId }?.let { highlight ->
-            QuoteShareDialog(highlight = highlight, onDismiss = editor.sharing::close)
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    Box(modifier = modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInWindow() }) {
+        editor.sharing.highlightId?.let { sharingId ->
+            highlights.firstOrNull { it.id == sharingId }?.let { highlight ->
+                QuoteShareDialog(highlight = highlight, onDismiss = editor.sharing::close)
+            }
+        }
+        val state = editor.card
+        val highlight = state?.let { card -> highlights.firstOrNull { it.id == card.highlightId } }
+        if (state != null && highlight != null) {
+            HighlightCard(editor = editor, highlight = highlight, anchor = state.anchor?.translate(-origin.x, -origin.y))
         }
     }
-    var origin by remember { mutableStateOf(Offset.Zero) }
-    Box(modifier = Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInWindow() })
-    val state = editor.card ?: return
-    val highlight = highlights.firstOrNull { it.id == state.highlightId } ?: return
+}
+
+/** The card itself, at [anchor] (the slot's pixels). */
+@Composable
+private fun HighlightCard(editor: HighlightEditor, highlight: ReaderHighlight, anchor: Rect?) {
     AppAnchoredCard(
-        anchor = state.anchor?.translate(-origin.x, -origin.y),
+        anchor = anchor,
         onDismissRequest = editor::closeCard,
-        modifier = modifier,
     ) {
         Column(
             modifier = Modifier.padding(AppLayout.menuInset),

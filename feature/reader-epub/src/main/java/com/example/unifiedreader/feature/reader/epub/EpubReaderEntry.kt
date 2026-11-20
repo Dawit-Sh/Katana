@@ -850,6 +850,7 @@ fun EpubReaderScreen(
                                         readerTouched = true
                                         navigationRequest = EpubLocatorNavigationRequest(seekRequestId++, locator)
                                     },
+                                    here = currentProgress,
                                 )
                             }
                         }
