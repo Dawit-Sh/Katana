@@ -23,6 +23,7 @@ import com.example.unifiedreader.feature.reader.core.ReaderPanel
 import com.example.unifiedreader.feature.reader.core.ReaderPanelSlot
 import com.example.unifiedreader.feature.reader.core.ReaderTopBar
 import com.example.unifiedreader.feature.reader.core.ReaderWorkCoordinator
+import com.example.unifiedreader.feature.reader.core.stackedDockStrips
 import com.example.unifiedreader.ui.components.AppFloatingPanelPlacement
 import com.example.unifiedreader.ui.components.AppIcons
 
@@ -68,6 +69,8 @@ internal fun ComicsReaderChrome(
     bookmark: ComicBookmarkButton? = null,
     // The issue's bookmarks for its marks panel; null when the book can't keep them.
     marks: PageBookmarks? = null,
+    // Previous and Next through the bookmarks, over the page strip, after one was opened from a list.
+    markStrip: (@Composable () -> Unit)? = null,
 ) {
     val titles = remember(item) { comicReaderTitles(item) }
     var openPanel by rememberSaveable(item.id) { mutableStateOf(ComicsReaderPanel.None) }
@@ -101,6 +104,7 @@ internal fun ComicsReaderChrome(
                 onPagesClick = { toggle(ComicsReaderPanel.Pages) },
                 onPageSelected = onPageSelected,
                 onProgressSelected = onProgressSelected,
+                markStrip = markStrip,
             )
         },
     ) { slot ->
@@ -219,6 +223,7 @@ private fun ComicsReaderDock(
     onPagesClick: () -> Unit,
     onPageSelected: (Int) -> Unit,
     onProgressSelected: (Float) -> Unit,
+    markStrip: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val configuration = LocalConfiguration.current
@@ -228,7 +233,7 @@ private fun ComicsReaderDock(
     )
     ReaderDock(
         modifier = modifier,
-        strip = {
+        strip = stackedDockStrips(markStrip) {
             ComicPagePreviewStrip(
                 item = item,
                 pages = chromePages.pages,

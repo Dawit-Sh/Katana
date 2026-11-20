@@ -62,6 +62,7 @@ import com.example.unifiedreader.feature.reader.core.readerSearchGroups
 import com.example.unifiedreader.feature.reader.core.ReaderDocumentState
 import com.example.unifiedreader.feature.reader.core.ReaderTopBar
 import com.example.unifiedreader.feature.reader.core.readerOverlayTokens
+import com.example.unifiedreader.feature.reader.core.stackedDockStrips
 import com.example.unifiedreader.ui.components.AppCircularProgress
 import com.example.unifiedreader.ui.components.AppFloatingPanelPlacement
 import com.example.unifiedreader.ui.components.AppIcons
@@ -97,6 +98,8 @@ internal fun PdfReaderChrome(
     marksPanel: PdfMarksPanel? = null,
     // Search in the book; null for a book without text (DjVu).
     search: PdfSearchControls? = null,
+    // Previous and Next through the marks, over the page strip, after one was opened from a list.
+    markStrip: (@Composable () -> Unit)? = null,
 ) {
     var openPanel by rememberSaveable { mutableStateOf<PdfChromePanel?>(null) }
     LaunchedEffect(overlayVisible) {
@@ -131,6 +134,7 @@ internal fun PdfReaderChrome(
                 currentPageIndex = currentPageIndex,
                 progress = progress,
                 onPageSelected = onPageSelected,
+                markStrip = markStrip,
                 search = search?.takeIf { openPanel != PdfChromePanel.Search },
                 onOpenSearch = { openPanel = PdfChromePanel.Search },
             )
@@ -160,6 +164,7 @@ private fun PdfReaderDock(
     currentPageIndex: Int,
     progress: Float,
     onPageSelected: (Int) -> Unit,
+    markStrip: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
     // A search: while it has matches, they sit over the dock instead of the page strip.
     search: PdfSearchControls? = null,
@@ -181,19 +186,24 @@ private fun PdfReaderDock(
                     onEnd = search.search::clear,
                 )
             }
-        } else if (pageCount > 0) {
-            {
-                PdfPagePreviewStrip(
-                    pageRenderer = pageRenderer,
-                    documentState = documentState,
-                    pageCount = pageCount,
-                    currentPageIndex = currentPageIndex,
-                    thumbnailHeight = thumbnailHeight,
-                    onPageSelected = onPageSelected,
-                )
-            }
         } else {
-            null
+            stackedDockStrips(
+                markStrip,
+                if (pageCount > 0) {
+                    {
+                        PdfPagePreviewStrip(
+                            pageRenderer = pageRenderer,
+                            documentState = documentState,
+                            pageCount = pageCount,
+                            currentPageIndex = currentPageIndex,
+                            thumbnailHeight = thumbnailHeight,
+                            onPageSelected = onPageSelected,
+                        )
+                    }
+                } else {
+                    null
+                },
+            )
         },
     ) {
         ReaderDockProgress(

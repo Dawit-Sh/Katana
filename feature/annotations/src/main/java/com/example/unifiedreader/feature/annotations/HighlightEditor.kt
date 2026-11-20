@@ -12,8 +12,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
-import com.example.unifiedreader.ui.components.AppToastIcon
-import com.example.unifiedreader.ui.components.AppToastMessage
 import com.example.unifiedreader.ui.components.AppToastState
 import com.example.unifiedreader.ui.components.LocalAppToastState
 import kotlinx.coroutines.CoroutineScope
@@ -98,12 +96,10 @@ class HighlightEditor(
         editingNoteOf = null
     }
 
+    /** Removes a highlight; the toast's Undo brings it back as it was. */
     fun delete(highlight: ReaderHighlight) {
         card = null
-        scope.launch {
-            store.deleteHighlight(highlight.id)
-            toasts()?.show(AppToastMessage(text = HighlightCopy.Removed, icon = AppToastIcon.Removed))
-        }
+        scope.launch { store.removeHighlightWithUndo(highlight.id, toasts(), scope, HighlightCopy.Removed) }
     }
 }
 

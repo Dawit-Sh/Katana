@@ -25,7 +25,13 @@ fun ColumnScope.PageMarksPanelBody(
     val latestJump by rememberUpdatedState(onJumpToPage)
     val actions = remember(bookmarks, export) {
         BookMarksPanelActions(
-            onJump = { locatorJson -> pageIndexOfBookmarkLocator(locatorJson)?.let { page -> latestJump(page) } },
+            onJump = { locatorJson ->
+                pageIndexOfBookmarkLocator(locatorJson)?.let { page ->
+                    // The mark opened becomes the one the strip's Previous and Next go on from.
+                    bookmarks.steps.opened { stop -> stop.locatorJson == locatorJson }
+                    latestJump(page)
+                }
+            },
             onDeleteBookmark = { bookmark -> bookmarks.delete(bookmark.id) },
             onNameBookmark = { bookmark, title, note -> bookmarks.name(bookmark.id, title, note) },
             onDeleteWord = {},

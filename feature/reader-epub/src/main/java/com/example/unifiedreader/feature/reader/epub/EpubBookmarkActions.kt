@@ -4,6 +4,7 @@ import androidx.compose.runtime.Stable
 import com.example.unifiedreader.feature.annotations.AnnotatedBook
 import com.example.unifiedreader.feature.annotations.ReaderBookmark
 import com.example.unifiedreader.feature.annotations.ReaderBookmarkStore
+import com.example.unifiedreader.feature.annotations.removeBookmarksWithUndo
 import com.example.unifiedreader.ui.components.AppToastIcon
 import com.example.unifiedreader.ui.components.AppToastMessage
 import com.example.unifiedreader.ui.components.AppToastState
@@ -38,8 +39,7 @@ internal class EpubBookmarkActions(
         scope.launch {
             try {
                 if (onPage.isNotEmpty()) {
-                    onPage.forEach { bookmark -> store.deleteBookmark(bookmark.id) }
-                    toasts()?.show(AppToastMessage(text = EpubAnnotationCopy.BookmarkRemoved, icon = AppToastIcon.Removed))
+                    store.removeBookmarksWithUndo(onPage.map(ReaderBookmark::id), toasts(), scope, EpubAnnotationCopy.BookmarkRemoved)
                 } else if (locator != null) {
                     store.addBookmark(
                         book = book,
@@ -56,10 +56,10 @@ internal class EpubBookmarkActions(
         }
     }
 
+    /** Removes a bookmark; the toast's Undo brings it back as it was. */
     fun delete(bookmarkId: String) {
         scope.launch {
-            store.deleteBookmark(bookmarkId)
-            toasts()?.show(AppToastMessage(text = EpubAnnotationCopy.BookmarkRemoved, icon = AppToastIcon.Removed))
+            store.removeBookmarksWithUndo(listOf(bookmarkId), toasts(), scope, EpubAnnotationCopy.BookmarkRemoved)
         }
     }
 

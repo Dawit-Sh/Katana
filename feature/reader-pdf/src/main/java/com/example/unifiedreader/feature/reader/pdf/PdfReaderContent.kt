@@ -266,6 +266,7 @@ private fun PdfReaderBars(
                 )
             }
         },
+        markStrip = parts.bookmarks?.pageMarkDockStrip { page -> if (pageCount > 0) onJump(page.coerceIn(0, pageCount - 1)) },
     )
 }
 

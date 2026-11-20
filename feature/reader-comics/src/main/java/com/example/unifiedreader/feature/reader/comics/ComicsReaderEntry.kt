@@ -557,6 +557,9 @@ fun ComicsReaderScreen(
                         )
                     },
                     marks = pageBookmarks,
+                    markStrip = pageBookmarks?.pageMarkDockStrip { page ->
+                        if (pages.isNotEmpty()) jumpTo(page.coerceIn(0, pages.lastIndex))
+                    },
                 )
             },
         )

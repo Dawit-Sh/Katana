@@ -30,6 +30,7 @@ import com.example.unifiedreader.feature.reader.core.readerTapSide
 import com.example.unifiedreader.feature.reader.core.curl.PageCurlTapTurner
 import com.example.unifiedreader.feature.reader.core.curl.PageCurlTarget
 import com.example.unifiedreader.feature.reader.core.curl.PageTurnStyle
+import com.example.unifiedreader.feature.reader.core.curl.instantPageTurnGesture
 import com.example.unifiedreader.feature.reader.core.curl.isPageCurlShaderSupported
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -136,6 +137,10 @@ internal fun ReadiumEpubNavigatorHost(
         publication.metadata.presentation.layout != EpubLayout.FIXED &&
         isPageCurlShaderSupported()
     val latestCurlEnabled = rememberUpdatedState(curlEnabled)
+    // Page turn None: taps, the volume keys and swipes change the page at once, without Readium's slide.
+    val instantTurns = preferences.pageTurnStyle == PageTurnStyle.None &&
+        preferences.layoutMode != EpubReaderLayoutMode.Scroll
+    val latestInstantTurns = rememberUpdatedState(instantTurns)
     val navigatorFactory = remember(publication, preferences.layoutMode) {
         EpubNavigatorFactory(
             publication = publication,
@@ -155,7 +160,18 @@ internal fun ReadiumEpubNavigatorHost(
         rightToLeft = publication.metadata.readingProgression == ReadingProgression.RTL,
         backTint = preferences.theme.curlBack(),
         tapTurner = curlTapTurner,
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize().instantPageTurnGesture(
+            enabled = instantTurns,
+            rightToLeft = publication.metadata.readingProgression == ReadingProgression.RTL,
+            canTurn = curlHost::canTurn,
+            isSelectingText = { curlHost.isSelectingText },
+            onTurn = { target ->
+                when (target) {
+                    PageCurlTarget.Next -> curlHost.navigator?.goForward(animated = false)
+                    PageCurlTarget.Previous -> curlHost.navigator?.goBackward(animated = false)
+                }
+            },
+        ),
     ) {
         AndroidView(
             modifier = Modifier
@@ -383,22 +399,23 @@ internal fun ReadiumEpubNavigatorHost(
         ) as EpubNavigatorFragment
         navigatorFragment = fragment
         curlHost.navigator = fragment
-        fun turnByTap(target: PageCurlTarget, slide: () -> Unit) {
+        // [slide] moves the page, animated unless the page turn is None.
+        fun turnByTap(target: PageCurlTarget, slide: (animated: Boolean) -> Unit) {
             if (!latestCurlEnabled.value) {
-                slide()
+                slide(!latestInstantTurns.value)
                 return
             }
             footnoteNavigationScope.launch {
-                if (!curlTapTurner.turn(target)) slide()
+                if (!curlTapTurner.turn(target)) slide(true)
             }
         }
         fun handlePageTap(side: ReaderTapSide): Boolean {
             when (resolveEpubTapAction(side, fragment.settings.value.readingProgression)) {
-                EpubTapAction.Previous -> turnByTap(PageCurlTarget.Previous) { fragment.goBackward(animated = true) }
+                EpubTapAction.Previous -> turnByTap(PageCurlTarget.Previous) { animated -> fragment.goBackward(animated) }
                 EpubTapAction.Next -> if (isAtBookEnd) {
                     latestOnEndNavigationRequested.value()
                 } else {
-                    turnByTap(PageCurlTarget.Next) { fragment.goForward(animated = true) }
+                    turnByTap(PageCurlTarget.Next) { animated -> fragment.goForward(animated) }
                 }
                 EpubTapAction.ToggleOverlay -> latestOnSurfaceTap.value()
             }

@@ -20,6 +20,12 @@ class ComicPageCurlAvailabilityTest {
         )
         assertFalse(
             shouldUseComicPageCurlPagerLayer(
+                pageTurnStyle = PageTurnStyle.None,
+                sdkInt = 33,
+            ),
+        )
+        assertFalse(
+            shouldUseComicPageCurlPagerLayer(
                 pageTurnStyle = PageTurnStyle.Curl,
                 readerMode = ComicReaderMode.VerticalScroll,
                 sdkInt = 33,

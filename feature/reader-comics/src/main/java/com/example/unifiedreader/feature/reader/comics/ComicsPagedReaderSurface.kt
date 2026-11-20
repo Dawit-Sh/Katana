@@ -2,6 +2,7 @@ package com.example.unifiedreader.feature.reader.comics
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -14,6 +15,9 @@ import androidx.compose.ui.Modifier
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.feature.reader.core.curl.PageCurlTapTurner
 import com.example.unifiedreader.feature.reader.core.curl.PageCurlTarget
+import com.example.unifiedreader.feature.reader.core.curl.PageTurnStyle
+import com.example.unifiedreader.feature.reader.core.curl.instantPageTurnGesture
+import com.example.unifiedreader.feature.reader.preferences.ComicReaderMode
 import kotlinx.coroutines.launch
 
 @Composable
@@ -83,11 +87,13 @@ internal fun ComicsPagedReaderSurface(
             )
         }
 
+        // Page turn None: the page changes at once, from a tap, a volume key or a swipe.
+        val instantTurns = readerState.pageTurnStyle == PageTurnStyle.None
         val navigatePrevious: (Int) -> Unit = { spreadIndex ->
             if (spreadIndex > 0) {
                 coroutineScope.launch {
                     if (!curlTapTurner.turn(PageCurlTarget.Previous)) {
-                        pagerState.animateScrollToPage(spreadIndex - 1)
+                        pagerState.turnTo(spreadIndex - 1, instantly = instantTurns)
                     }
                 }
             }
@@ -96,7 +102,7 @@ internal fun ComicsPagedReaderSurface(
             if (spreadIndex < spreads.lastIndex) {
                 coroutineScope.launch {
                     if (!curlTapTurner.turn(PageCurlTarget.Next)) {
-                        pagerState.animateScrollToPage(spreadIndex + 1)
+                        pagerState.turnTo(spreadIndex + 1, instantly = instantTurns)
                     }
                 }
             } else {
@@ -146,8 +152,53 @@ internal fun ComicsPagedReaderSurface(
                 modifier = Modifier.fillMaxSize(),
                 content = spreadPagerContent,
             )
+        } else if (instantTurns) {
+            ComicInstantTurnBox(
+                readerState = readerState,
+                spreadCount = spreads.size,
+                pagerState = pagerState,
+                onPrevious = navigatePrevious,
+                onNext = navigateNext,
+            ) {
+                spreadPagerContent(false)
+            }
         } else {
             spreadPagerContent(true)
         }
     }
+}
+
+/**
+ * Page turn None: the pager doesn't slide, a swipe turns the page at once. The last spread's forward swipe
+ * stays with the pager's own end-of-book swipe (there is no page that way), and a zoomed page pans.
+ */
+@Composable
+private fun ComicInstantTurnBox(
+    readerState: ComicsReaderState,
+    spreadCount: Int,
+    pagerState: PagerState,
+    onPrevious: (Int) -> Unit,
+    onNext: (Int) -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier.fillMaxSize().instantPageTurnGesture(
+            enabled = readerState.readerMode == ComicReaderMode.Paged && !readerState.isCurrentPageZoomed,
+            rightToLeft = readerState.readingDirection == ComicReadingDirection.RTL,
+            canTurn = { target -> resolveComicPageCurlTargetSpreadIndex(pagerState.currentPage, spreadCount, target) != null },
+            onTurn = { target ->
+                when (target) {
+                    PageCurlTarget.Previous -> onPrevious(pagerState.currentPage)
+                    PageCurlTarget.Next -> onNext(pagerState.currentPage)
+                }
+            },
+        ),
+    ) {
+        content()
+    }
+}
+
+/** Moves to [spreadIndex]: at once for page turn None, otherwise the pager's slide. */
+private suspend fun PagerState.turnTo(spreadIndex: Int, instantly: Boolean) {
+    if (instantly) scrollToPage(spreadIndex) else animateScrollToPage(spreadIndex)
 }
