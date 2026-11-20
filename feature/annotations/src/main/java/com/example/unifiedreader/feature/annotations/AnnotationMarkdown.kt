@@ -7,8 +7,8 @@ import kotlin.math.roundToInt
 
 /**
  * Bookmarks, highlights, their notes and saved words as Markdown, for one book or for every book:
- * the bookmarked pages, then quotes in reading order under their chapter, each note under its
- * quote, then the words with the sentence they came from.
+ * the bookmarked pages with their names and notes, then quotes in reading order under their chapter,
+ * each note under its quote, then the words with the sentence they came from and their notes.
  */
 object AnnotationMarkdown {
     fun book(
@@ -68,16 +68,7 @@ object AnnotationMarkdown {
     ) {
         val section = "#".repeat(headingLevel)
         val chapter = "#".repeat(headingLevel + 1)
-        if (bookmarks.isNotEmpty()) {
-            appendLine()
-            appendLine("$section Bookmarks")
-            appendLine()
-            bookmarks.inReadingOrderBookmarks().forEach { bookmark ->
-                val text = bookmark.text?.oneLine()?.takeIf(String::isNotBlank)?.let { ": \"$it\"" }.orEmpty()
-                val chapterTitle = bookmark.place.chapterTitle?.oneLine()?.takeIf(String::isNotBlank)?.let { " ($it)" }.orEmpty()
-                appendLine("- ${bookmarkPlace(bookmark)}$text$chapterTitle")
-            }
-        }
+        appendBookmarks(bookmarks, section)
         if (highlights.isNotEmpty()) {
             appendLine()
             appendLine("$section Highlights")
@@ -105,7 +96,22 @@ object AnnotationMarkdown {
                 val sentence = word.sentence?.oneLine()?.takeIf(String::isNotBlank)?.let { ": \"$it\"" }.orEmpty()
                 val chapterTitle = word.place?.chapterTitle?.oneLine()?.takeIf(String::isNotBlank)?.let { " ($it)" }.orEmpty()
                 appendLine("- **${word.word.oneLine()}**$sentence$chapterTitle")
+                appendListNote(word.note)
             }
+        }
+    }
+
+    private fun StringBuilder.appendBookmarks(bookmarks: List<ReaderBookmark>, section: String) {
+        if (bookmarks.isEmpty()) return
+        appendLine()
+        appendLine("$section Bookmarks")
+        appendLine()
+        bookmarks.inReadingOrderBookmarks().forEach { bookmark ->
+            val text = bookmark.text?.oneLine()?.takeIf(String::isNotBlank)?.let { ": \"$it\"" }.orEmpty()
+            val chapterTitle = bookmark.place.chapterTitle?.oneLine()?.takeIf(String::isNotBlank)?.let { " ($it)" }.orEmpty()
+            val name = bookmark.title?.oneLine()?.takeIf(String::isNotBlank)?.let { "**$it**, " }.orEmpty()
+            appendLine("- $name${bookmarkPlace(bookmark)}$text$chapterTitle")
+            appendListNote(bookmark.note)
         }
     }
 
@@ -141,4 +147,9 @@ object AnnotationMarkdown {
 
     private const val MAX_FILE_NAME = 80
     private const val PERCENT = 100
+}
+
+/** A bookmark's or a word's own note, under its line in the list. */
+private fun StringBuilder.appendListNote(note: String?) {
+    note?.trim()?.takeIf(String::isNotEmpty)?.let { appendLine("  Note: ${it.replace("\n", "\n  ")}") }
 }

@@ -2,6 +2,7 @@ package com.example.unifiedreader.feature.annotations
 
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AnnotationMarkdownTest {
@@ -147,6 +148,33 @@ class AnnotationMarkdownTest {
             """.trimIndent(),
             markdown,
         )
+    }
+
+    @Test
+    fun `bookmark names and notes and word notes are exported, in the book and in the notebook`() {
+        val bookmarks = listOf(
+            bookmark("named", page = 11 to 357, text = "In a few days", chapter = "III", at = 0.03)
+                .copy(title = "Bingley visit", note = "QA bm note"),
+            bookmark("plain", page = 40 to 357, text = null, chapter = null, at = 0.11).copy(note = "Two lines\nof note"),
+        )
+        val words = listOf(word("Netherfield", "settled at Netherfield.", chapter = "III", at = 0.03).copy(note = "estate name"))
+
+        val book = AnnotationMarkdown.book(book = hole, highlights = emptyList(), words = words, exportedOn = day, bookmarks = bookmarks)
+        val notebook = AnnotationMarkdown.library(highlights = emptyList(), words = words, exportedOn = day, bookmarks = bookmarks)
+
+        val expectedLines = listOf(
+            "- **Bingley visit**, Page 11 of 357: \"In a few days\" (III)",
+            "  Note: QA bm note",
+            "- Page 40 of 357",
+            "  Note: Two lines",
+            "  of note",
+            "- **Netherfield**: \"settled at Netherfield.\" (III)",
+            "  Note: estate name",
+        )
+        expectedLines.forEach { line ->
+            assertTrue("book export misses <$line>:\n$book", book.lines().contains(line))
+            assertTrue("notebook misses <$line>:\n$notebook", notebook.lines().contains(line))
+        }
     }
 
     @Test

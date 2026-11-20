@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.example.unifiedreader.core.database.entity.ReaderHighlightEntity
 import com.example.unifiedreader.core.database.entity.SavedWordEntity
 import kotlinx.coroutines.flow.Flow
@@ -69,6 +70,23 @@ abstract class ReaderAnnotationDao {
 
     @Query("UPDATE reader_bookmarks SET chapterTitle = :chapterTitle WHERE id = :id")
     abstract fun setBookmarkChapter(id: String, chapterTitle: String?)
+
+    @Query("UPDATE reader_highlights SET itemId = :toItemId WHERE itemId = :fromItemId")
+    abstract fun moveHighlights(fromItemId: String, toItemId: String): Int
+
+    @Query("UPDATE saved_words SET itemId = :toItemId WHERE itemId = :fromItemId")
+    abstract fun moveWords(fromItemId: String, toItemId: String): Int
+
+    @Query("UPDATE reader_bookmarks SET itemId = :toItemId WHERE itemId = :fromItemId")
+    abstract fun moveBookmarks(fromItemId: String, toItemId: String): Int
+
+    /**
+     * Gives every highlight, word and bookmark of [fromItemId] to [toItemId] (a book from a file that came back
+     * under another id); how many moved.
+     */
+    @Transaction
+    open fun moveMarks(fromItemId: String, toItemId: String): Int =
+        moveHighlights(fromItemId, toItemId) + moveWords(fromItemId, toItemId) + moveBookmarks(fromItemId, toItemId)
 }
 
 /** A highlight's or bookmark's place and the chapter name saved with it. */

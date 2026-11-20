@@ -1,5 +1,6 @@
 package com.example.unifiedreader.feature.journal
 
+import com.example.unifiedreader.core.model.DeviceClock
 import com.example.unifiedreader.core.model.SourceType
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -39,9 +40,10 @@ internal fun formatShortDate(
     epochMillis: Long,
 ): String = SimpleDateFormat("d MMM", Locale.US).format(Date(epochMillis))
 
+/** "Nov 20, 9:04 PM", or "Nov 20, 21:04" when this device's clock is 24-hour ([DeviceClock]). */
 internal fun formatDateTime(
     epochMillis: Long,
-): String = SimpleDateFormat("MMM d, h:mm a", Locale.US).format(Date(epochMillis))
+): String = SimpleDateFormat("MMM d", Locale.US).format(Date(epochMillis)) + ", " + DeviceClock.format(epochMillis)
 
 internal fun localDateKey(
     epochMillis: Long,

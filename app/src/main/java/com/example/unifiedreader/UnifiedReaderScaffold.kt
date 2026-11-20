@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.unifiedreader.core.model.DeviceClock
 import com.example.unifiedreader.core.model.LibraryTagKind
 import com.example.unifiedreader.core.model.LibraryFilterPanel
 import com.example.unifiedreader.core.model.LibraryFilterState
@@ -1001,4 +1002,4 @@ private fun AppPendingRemoteSyncItemState.settingsLabel(): String = when (this) 
 }
 
 private fun Long.toSettingsDateTimeLabel(): String =
-    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(this))
+    DateFormat.getDateInstance(DateFormat.SHORT).format(Date(this)) + ", " + DeviceClock.format(this)

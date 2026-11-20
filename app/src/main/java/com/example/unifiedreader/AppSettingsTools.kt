@@ -1,6 +1,7 @@
 package com.example.unifiedreader
 
 import android.content.Context
+import android.content.Intent
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,6 +11,8 @@ import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.core.model.runSuspendCatching
 import com.example.unifiedreader.feature.annotations.AnnotationBackupStore
 import com.example.unifiedreader.feature.annotations.AnnotationMarkdown
+import com.example.unifiedreader.feature.annotations.LocalBookMarksMover
+import com.example.unifiedreader.feature.annotations.LocalBooksInBackup
 import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
 import com.example.unifiedreader.feature.downloads.DownloadEntryStatus
 import com.example.unifiedreader.feature.downloads.KeptBookActions
@@ -61,11 +64,55 @@ object AppSettingsToolsModule {
     @Provides
     @Singleton
     fun provideAnnotationBackupStore(
+        @ApplicationContext context: Context,
         database: UnifiedReaderDatabase,
+        localBooks: LocalBookImports,
+        sessions: RoomReaderSessionStore,
     ): AnnotationBackupStore = AnnotationBackupStore(
         dao = database.readerAnnotationDao(),
         bookmarkDao = database.readerBookmarkDao(),
+        local = LocalBooksInBackup(
+            directory = localBooks,
+            pendingMarks = PendingLocalMarksStore(context),
+            readingPlaces = LocalReadingPlaceBackup(
+                sessions = sessions,
+                hydrate = sessions::hydrate,
+                localItems = { localBooks.getImportedItems() },
+            ),
+            marksMover = localMarksMover(database),
+        ),
     )
+
+    /** Imports of books from files that know a file already here, and give a new book its waiting marks. */
+    @Provides
+    @Singleton
+    fun provideLocalBookImports(
+        @ApplicationContext context: Context,
+        database: UnifiedReaderDatabase,
+        repository: LocalDocumentRepository,
+    ): LocalBookImports = LocalBookImports(
+        documents = repository,
+        hydrator = repository,
+        fingerprints = LocalFileFingerprints(context),
+        marksHoming = LocalMarksHoming(
+            pending = PendingLocalMarksStore(context),
+            mover = localMarksMover(database),
+        ),
+        releaseRead = { uri ->
+            runCatching { context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        },
+    )
+
+    /** Moves a book from a file's marks to its new id, its Grimmory link along with them, in one transaction. */
+    private fun localMarksMover(database: UnifiedReaderDatabase) = LocalBookMarksMover { fromItemId, toItemId ->
+        withContext(Dispatchers.IO) {
+            database.runInTransaction<Int> {
+                database.readerAnnotationDao().moveMarks(fromItemId, toItemId).also {
+                    database.localServerLinkDao().carryLink(fromItemId, toItemId, System.currentTimeMillis())
+                }
+            }
+        }
+    }
 }
 
 /** The Downloads sheet's "On this device": the books and what Remove does; no actions without the tools. */
