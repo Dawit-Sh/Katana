@@ -23,6 +23,7 @@ import com.example.unifiedreader.feature.annotations.PageTextRect
 import com.example.unifiedreader.feature.reader.core.ReaderSearchTint
 import com.example.unifiedreader.feature.reader.core.ReaderSelectionHighlight
 import kotlin.math.max
+import kotlin.math.min
 
 /**
  * Page [pageIndex]'s highlights in their style and colour, and its selected words with their two handles, drawn
@@ -55,50 +56,60 @@ internal fun PdfPageMarksLayer(
                 drawRect(ReaderSelectionHighlight.color, onScreen.topLeft, onScreen.size)
             }
             pdfSelectionHandles(selection, page)?.let { handles ->
-                drawHandle(handles.start, PdfSelectionDrag.Start, HandleRadius.toPx())
-                drawHandle(handles.end, PdfSelectionDrag.End, HandleRadius.toPx())
+                drawHandle(handles, PdfSelectionDrag.Start, HandleRadius.toPx())
+                drawHandle(handles, PdfSelectionDrag.End, HandleRadius.toPx())
             }
         }
     }
 }
 
-/** Where a selection's handles hang on screen: under its first line's start and its last line's end. */
-internal class PdfSelectionHandles(val start: Offset, val end: Offset) {
+/**
+ * Where a selection's handles hang on screen: from its first line's start and its last line's end, on the side
+ * of the next line, turned with the words ([turn], see [PdfPageText.turn]) so they keep to the lines' ends.
+ */
+internal class PdfSelectionHandles(val start: Offset, val end: Offset, val turn: Int = 0) {
     /** The handle a finger down at [position] takes, within [reach] pixels of its round part; null for neither. */
     fun at(position: Offset, radius: Float, reach: Float): PdfSelectionDrag? {
-        val startCentre = handleCentre(start, PdfSelectionDrag.Start, radius)
-        val endCentre = handleCentre(end, PdfSelectionDrag.End, radius)
-        val toStart = (position - startCentre).getDistance()
-        val toEnd = (position - endCentre).getDistance()
+        val toStart = (position - centre(PdfSelectionDrag.Start, radius)).getDistance()
+        val toEnd = (position - centre(PdfSelectionDrag.End, radius)).getDistance()
         return when {
             toStart > reach && toEnd > reach -> null
             toStart <= toEnd -> PdfSelectionDrag.Start
             else -> PdfSelectionDrag.End
         }
     }
+
+    /** [handle]'s round part: past the line's foot, before the start's corner and after the end's. */
+    fun centre(handle: PdfSelectionDrag, radius: Float): Offset {
+        val corner = if (handle == PdfSelectionDrag.Start) start else end
+        val along = alongLine(turn) * if (handle == PdfSelectionDrag.Start) -radius else radius
+        return corner + along + acrossLines(turn) * radius
+    }
 }
 
 /** The handles of [selection] for a page drawn at [page], or null when it has no lines. */
 internal fun pdfSelectionHandles(selection: PdfTextSelection, page: Rect): PdfSelectionHandles? {
-    val first = selection.rects.firstOrNull() ?: return null
-    val last = selection.rects.last()
-    return PdfSelectionHandles(
-        start = pageToScreen(page, first.left, first.bottom),
-        end = pageToScreen(page, last.right, last.bottom),
-    )
+    val start = selection.startCorner
+    val end = selection.endCorner
+    return if (start == null || end == null) {
+        null
+    } else {
+        PdfSelectionHandles(
+            start = pageToScreen(page, start.x, start.y),
+            end = pageToScreen(page, end.x, end.y),
+            turn = selection.page.turn,
+        )
+    }
 }
 
-/** A handle's round part: below the line, to the left of the start's corner and to the right of the end's. */
-private fun handleCentre(corner: Offset, handle: PdfSelectionDrag, radius: Float): Offset =
-    Offset(if (handle == PdfSelectionDrag.Start) corner.x - radius else corner.x + radius, corner.y + radius)
-
 /** A teardrop whose sharp corner touches the selection's corner, as Android's own text handles. */
-private fun DrawScope.drawHandle(corner: Offset, handle: PdfSelectionDrag, radius: Float) {
+private fun DrawScope.drawHandle(handles: PdfSelectionHandles, handle: PdfSelectionDrag, radius: Float) {
     val colour = ReaderSelectionHighlight.color.copy(alpha = 1f)
-    val centre = handleCentre(corner, handle, radius)
+    val corner = if (handle == PdfSelectionDrag.Start) handles.start else handles.end
+    val centre = handles.centre(handle, radius)
     drawCircle(colour, radius, centre)
-    val squareLeft = if (handle == PdfSelectionDrag.Start) corner.x - radius else corner.x
-    drawRect(colour, Offset(squareLeft, corner.y), Size(radius, radius))
+    // The square between the corner and the round part's centre makes the point.
+    drawRect(colour, Offset(min(corner.x, centre.x), min(corner.y, centre.y)), Size(radius, radius))
 }
 
 /** A search match: the amber behind its words, stronger with a line under them when it is the [current] one. */

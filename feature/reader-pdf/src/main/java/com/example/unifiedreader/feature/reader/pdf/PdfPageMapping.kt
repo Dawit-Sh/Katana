@@ -5,6 +5,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.IntSize
 import com.example.unifiedreader.feature.annotations.PageTextRect
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
@@ -22,6 +23,13 @@ internal class PdfPageMapping private constructor(
     private val xFromY: Double,
     private val yFromY: Double,
 ) {
+    /** How the page is drawn turned (its /Rotate), in quarter turns clockwise: where its x axis points when drawn. */
+    val turn: Int
+        get() = when {
+            abs(xFromX) >= abs(yFromX) -> if (xFromX >= 0.0) 0 else 2
+            else -> if (yFromX > 0.0) 1 else 3
+        }
+
     /** Where the page-space point ([x], [y]) is on the drawn page, as fractions. */
     fun map(x: Double, y: Double): Offset = Offset(
         x = (originX + xFromX * x + xFromY * y).toFloat(),

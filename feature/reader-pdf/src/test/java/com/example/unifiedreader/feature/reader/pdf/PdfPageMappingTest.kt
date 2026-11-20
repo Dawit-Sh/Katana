@@ -51,6 +51,13 @@ class PdfPageMappingTest {
     }
 
     @Test
+    fun `the mapping knows how the page is turned`() {
+        val turns = listOf(0, 90, 180, 270).map { rotation -> PdfPageMapping.of(placer(rotation)).turn }
+
+        assertEquals(listOf(0, 1, 2, 3), turns)
+    }
+
+    @Test
     fun `a character with no box has none`() {
         val mapping = PdfPageMapping.of(placer(rotation = 0))
         val into = FloatArray(PdfPageText.BoxSize)

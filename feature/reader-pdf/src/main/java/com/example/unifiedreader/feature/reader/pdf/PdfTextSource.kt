@@ -164,7 +164,7 @@ private fun readText(page: PdfPage, textPage: PdfTextPage, pageIndex: Int): PdfP
         source[PdfPageText.Bottom] = box?.bottom ?: 0f
         mapping.writeBox(source, into = boxes, at = index * PdfPageText.BoxSize)
     }
-    return PdfPageText(pageIndex = pageIndex, text = text, boxes = boxes, aspect = height.toFloat() / width)
+    return PdfPageText(pageIndex = pageIndex, text = text, boxes = boxes, aspect = height.toFloat() / width, pageTurn = mapping.turn)
 }
 
 private fun ParcelFileDescriptor.closeQuietly() {
