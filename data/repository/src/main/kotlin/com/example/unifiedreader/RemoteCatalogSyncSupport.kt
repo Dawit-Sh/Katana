@@ -180,18 +180,21 @@ fun <Entry> applyRemoteCatalogProgress(
     val store = progressSyncStore ?: return
     entries.forEach { entry ->
         val item = itemOf(entry)
+        val local = store.getProgress(item)
+        // A server place behind this device's is never applied by a library sync: the place stays, and the
+        // book's own sync asks before going back when it is opened (askingBeforeGoingBack).
         applyRemoteProgressSyncDecision(
             store = store,
             item = item,
             pageCount = item.pageCount,
             decision = decideRemoteProgressSync(
-                local = store.getProgress(item),
+                local = local,
                 remote = progressOf(entry),
                 nowEpochMillis = nowEpochMillis,
                 missingRemoteClearsLocal = missingRemoteClearsLocal(entry),
                 remoteClearOverridesLocal = remoteClearOverridesLocal(entry),
                 localRefinesRemote = localRefinesRemote,
-            ),
+            ).askingBeforeGoingBack(local),
         )
     }
 }

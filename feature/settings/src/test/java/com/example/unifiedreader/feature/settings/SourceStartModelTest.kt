@@ -1,12 +1,26 @@
 package com.example.unifiedreader.feature.settings
 
+import com.example.unifiedreader.core.model.DeviceClock
 import com.example.unifiedreader.core.model.SourceType
 import java.util.Calendar
 import java.util.Locale
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Test
 
 class SourceStartModelTest {
+    // These read times the 24-hour way; DeviceClockTest covers the 12-hour default.
+    @Before
+    fun useTwentyFourHourClock() {
+        DeviceClock.uses24Hour = true
+    }
+
+    @After
+    fun restoreClock() {
+        DeviceClock.uses24Hour = false
+    }
+
     private val now = Calendar.getInstance(Locale.US).apply { set(2026, Calendar.OCTOBER, 23, 15, 0) }.timeInMillis
 
     @Test

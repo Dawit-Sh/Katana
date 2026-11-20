@@ -1,5 +1,8 @@
 package com.example.unifiedreader
 
+import com.example.unifiedreader.core.model.progress.ProgressSyncLocator
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import com.example.unifiedreader.core.model.LocatorType
 import com.example.unifiedreader.core.model.ReadingProgress
 import com.example.unifiedreader.core.model.SyncState
@@ -259,5 +262,14 @@ class RemoteProgressSyncPolicyTest {
             RemoteProgressSyncDecision.OfferRemote::class,
             decideRemoteProgressSync(local, newerNotFinished, nowEpochMillis = 700L).askingBeforeGoingBack(local)::class,
         )
+    }
+
+    @Test
+    fun `a book read by the page compares pages, not a stale percentage`() {
+        val local = ProgressSyncSnapshot(itemId = "comic", locatorType = LocatorType.PAGE, page = 10, percent = 0.37)
+        // Grimmory kept the old 37% when only the page went back to 3.
+        assertTrue(isBehind(ProgressSyncLocator(LocatorType.PAGE, page = 3, percent = 0.37), isFinished = false, local = local))
+        assertFalse(isBehind(ProgressSyncLocator(LocatorType.PAGE, page = 10, percent = 0.37), isFinished = false, local = local))
+        assertFalse(isBehind(ProgressSyncLocator(LocatorType.PAGE, page = 12, percent = 0.2), isFinished = false, local = local))
     }
 }

@@ -55,4 +55,27 @@ abstract class ReaderAnnotationDao {
 
     @Query("DELETE FROM saved_words WHERE id = :id")
     abstract fun deleteWord(id: String)
+
+    /** Where this book's highlights and bookmarks sit, with the chapter name each was saved with. */
+    @Query("SELECT id, href, progression, chapterTitle FROM reader_highlights WHERE itemId = :itemId AND deleted = 0")
+    abstract fun highlightChapterPlaces(itemId: String): List<MarkChapterPlace>
+
+    @Query("SELECT id, href, progression, chapterTitle FROM reader_bookmarks WHERE itemId = :itemId AND deleted = 0")
+    abstract fun bookmarkChapterPlaces(itemId: String): List<MarkChapterPlace>
+
+    /** Only the chapter name: not a change the reader made, so it isn't marked for sync. */
+    @Query("UPDATE reader_highlights SET chapterTitle = :chapterTitle WHERE id = :id")
+    abstract fun setHighlightChapter(id: String, chapterTitle: String?)
+
+    @Query("UPDATE reader_bookmarks SET chapterTitle = :chapterTitle WHERE id = :id")
+    abstract fun setBookmarkChapter(id: String, chapterTitle: String?)
 }
+
+/** A highlight's or bookmark's place and the chapter name saved with it. */
+data class MarkChapterPlace(
+    val id: String,
+    val href: String,
+    val progression: Double?,
+    val chapterTitle: String?,
+)
+

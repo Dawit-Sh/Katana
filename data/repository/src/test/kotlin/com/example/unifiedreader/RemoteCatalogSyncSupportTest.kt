@@ -98,6 +98,41 @@ class RemoteCatalogSyncSupportTest {
     }
 
     @Test
+    fun `a library sync never moves the place back, it leaves that to the book's own sync to ask`() {
+        val behind = remoteItem(id = "behind")
+        val ahead = remoteItem(id = "ahead")
+        val store = RecordingProgressSyncStore().apply {
+            listOf(behind, ahead).forEach { item ->
+                saveProgress(
+                    item = item,
+                    locator = ProgressSyncLocator(locatorType = LocatorType.PERCENT, percent = 0.37),
+                    syncState = SyncState.CLEAN,
+                    pageCount = item.pageCount,
+                    updatedAtEpochMillis = 100L,
+                )
+            }
+        }
+
+        applyRemoteCatalogProgress(
+            entries = listOf(
+                TestRemoteEntry(behind, ReadingProgress(behind.id, LocatorType.PERCENT, percent = 0.11, updatedAtEpochMillis = 200L)),
+                TestRemoteEntry(ahead, ReadingProgress(ahead.id, LocatorType.PERCENT, percent = 0.6, updatedAtEpochMillis = 200L)),
+            ),
+            progressSyncStore = store,
+            nowEpochMillis = 999L,
+            itemOf = TestRemoteEntry::item,
+            progressOf = TestRemoteEntry::progress,
+            missingRemoteClearsLocal = { false },
+            remoteClearOverridesLocal = { false },
+        )
+
+        // Newer on the server but behind: this device keeps its place.
+        assertEquals(0.37, store.getProgress(behind)?.percent)
+        // Ahead on the server: applied as before.
+        assertEquals(0.6, store.getProgress(ahead)?.percent)
+    }
+
+    @Test
     fun `finalize remote catalog sync propagates missing remote clear rules`() = runTest {
         val cleanItem = remoteItem(id = "issue-clean")
         val dirtyItem = remoteItem(id = "issue-dirty")

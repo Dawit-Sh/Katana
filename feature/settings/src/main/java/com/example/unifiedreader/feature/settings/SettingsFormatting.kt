@@ -1,5 +1,6 @@
 package com.example.unifiedreader.feature.settings
 
+import com.example.unifiedreader.core.model.DeviceClock
 import com.example.unifiedreader.core.model.shortDayLabel
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -13,7 +14,7 @@ fun formatSettingsMoment(
 ): String {
     val then = Calendar.getInstance(Locale.US).apply { timeInMillis = epochMillis }
     val now = Calendar.getInstance(Locale.US).apply { timeInMillis = nowEpochMillis }
-    val time = SimpleDateFormat("HH:mm", Locale.US).format(Date(epochMillis))
+    val time = DeviceClock.format(epochMillis)
     val sameYear = then.get(Calendar.YEAR) == now.get(Calendar.YEAR)
     val dayDifference = now.get(Calendar.DAY_OF_YEAR) - then.get(Calendar.DAY_OF_YEAR)
     return when {
@@ -24,7 +25,7 @@ fun formatSettingsMoment(
     }
 }
 
-/** A hub line's short moment: "09:12" today, "yesterday", "20 Oct", or "20 Oct 2025" in another year. */
+/** A hub line's short moment: "9:12 AM" today, "yesterday", "20 Oct", or "20 Oct 2025" in another year. */
 fun formatSettingsShortMoment(
     epochMillis: Long,
     nowEpochMillis: Long = System.currentTimeMillis(),
@@ -34,7 +35,7 @@ fun formatSettingsShortMoment(
     val sameYear = then.get(Calendar.YEAR) == now.get(Calendar.YEAR)
     val dayDifference = now.get(Calendar.DAY_OF_YEAR) - then.get(Calendar.DAY_OF_YEAR)
     return when {
-        sameYear && dayDifference == 0 -> SimpleDateFormat("HH:mm", Locale.US).format(Date(epochMillis))
+        sameYear && dayDifference == 0 -> DeviceClock.format(epochMillis)
         sameYear && dayDifference == 1 -> "yesterday"
         else -> shortDayLabel(epochMillis, nowEpochMillis)
     }

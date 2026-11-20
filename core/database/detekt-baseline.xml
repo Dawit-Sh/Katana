@@ -36,5 +36,6 @@
     <ID>TooManyFunctions:ServerListDao.kt$ServerListDao</ID>
     <ID>TooManyFunctions:UnifiedReaderDatabase.kt$UnifiedReaderDatabase : RoomDatabase</ID>
     <ID>TooManyFunctions:UserListDao.kt$UserListDao</ID>
+    <ID>TooManyFunctions:ReaderAnnotationDao.kt$ReaderAnnotationDao</ID>
   </CurrentIssues>
 </SmellBaseline>

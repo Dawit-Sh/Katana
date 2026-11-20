@@ -458,6 +458,15 @@ fun EpubReaderScreen(
                     },
                 )
             }
+            // Old marks in a book whose chapters share one file were named after the last chapter: name them
+            // again once the contents are known (an empty list would wipe good names, so it waits for them).
+            LaunchedEffect(annotationStore, item.id, bookProgress.tocEntries) {
+                val toc = bookProgress.tocEntries
+                if (annotationStore == null || toc.isEmpty()) return@LaunchedEffect
+                annotationStore.correctChapterNames(item.id) { href, progression ->
+                    toc.currentEpubChapterTitle(currentProgress = progression ?: 0.0, currentHref = href)
+                }
+            }
             EpubHighlightPlacementEffect(
                 publication = state.publication,
                 itemId = item.id,

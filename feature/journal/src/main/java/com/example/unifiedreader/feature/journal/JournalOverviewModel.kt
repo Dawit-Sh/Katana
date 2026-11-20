@@ -1,5 +1,6 @@
 package com.example.unifiedreader.feature.journal
 
+import com.example.unifiedreader.core.model.DeviceClock
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.util.Calendar
@@ -136,7 +137,7 @@ internal fun JournalDayEntry.line(): String = listOfNotNull(
 ).joinToString(" · ")
 
 internal fun formatJournalTime(epochMillis: Long): String =
-    SimpleDateFormat("HH:mm", Locale.US).format(Date(epochMillis))
+    DeviceClock.format(epochMillis)
 
 /** "4 min", "1 h 12 min". */
 internal fun formatJournalMinutes(millis: Long): String {

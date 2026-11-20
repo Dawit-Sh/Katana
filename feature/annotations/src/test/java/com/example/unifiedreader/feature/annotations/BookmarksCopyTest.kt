@@ -1,12 +1,26 @@
 package com.example.unifiedreader.feature.annotations
 
+import com.example.unifiedreader.core.model.DeviceClock
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneOffset
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Test
 
 class BookmarksCopyTest {
+    // These read times the 24-hour way; DeviceClockTest covers the 12-hour default.
+    @Before
+    fun useTwentyFourHourClock() {
+        DeviceClock.uses24Hour = true
+    }
+
+    @After
+    fun restoreClock() {
+        DeviceClock.uses24Hour = false
+    }
+
     private val zone = ZoneOffset.ofHours(3)
     private val today = LocalDate.of(2026, 11, 18)
 
