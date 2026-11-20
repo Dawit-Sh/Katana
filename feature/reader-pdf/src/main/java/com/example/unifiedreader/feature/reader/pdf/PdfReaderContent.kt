@@ -17,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.primaryAuthor
+import com.example.unifiedreader.feature.annotations.HighlightCardOverlay
+import com.example.unifiedreader.feature.annotations.HighlightNoteDialog
 import com.example.unifiedreader.feature.annotations.PageBookmarkJumpEffect
 import com.example.unifiedreader.feature.annotations.PageBookmarkRibbon
 import com.example.unifiedreader.feature.annotations.PageBookmarks
@@ -120,6 +122,8 @@ internal class PdfReaderBook(
     val documentState: ReaderDocumentState,
     val pageCount: Int,
     val pageRenderer: PageImageRenderer,
+    /** The book's highlights and selectable text; null for a book that can't keep highlights. */
+    val marks: PdfTextMarks? = null,
 )
 
 /** Everything the reader's page area and chrome need, gathered by [PdfReaderScreen]. */
@@ -132,6 +136,9 @@ internal class PdfReaderParts(
     /** The book's page bookmarks; null when the reader has none. */
     val bookmarks: PageBookmarks? = null,
 ) {
+    val marks: PdfTextMarks?
+        get() = book.marks
+
     val item: ReadableItem
         get() = book.item
 
@@ -210,6 +217,7 @@ internal fun PdfReaderContent(
             },
         )
         PdfPageBookmarkLayer(parts = parts, navigation = navigation)
+        parts.marks?.let { marks -> PdfHighlightCards(marks) }
     }
 }
 
@@ -247,7 +255,27 @@ private fun PdfReaderBars(
                 onClick = { bookmarks.toggle(pageIndex, pageCount) },
             )
         },
+        search = parts.marks?.let { marks -> PdfSearchControls(marks.search, onJump) },
+        marksPanel = parts.bookmarks?.let { bookmarks ->
+            bookmarks.export?.let { export ->
+                PdfMarksPanel(
+                    bookmarks = bookmarks,
+                    export = export,
+                    highlights = parts.marks?.highlights.orEmpty(),
+                    onJumpToPage = onJump,
+                    hasText = parts.marks != null,
+                )
+            }
+        },
+        markStrip = parts.bookmarks?.pageMarkDockStrip { page -> if (pageCount > 0) onJump(page.coerceIn(0, pageCount - 1)) },
     )
+}
+
+/** The card on a highlight and its note, over the pages and the bars. */
+@Composable
+private fun PdfHighlightCards(marks: PdfTextMarks) {
+    HighlightCardOverlay(editor = marks.editor, highlights = marks.highlights)
+    HighlightNoteDialog(editor = marks.editor, highlights = marks.highlights)
 }
 
 /** The ribbon on a bookmarked page, and a bookmark opened from the Bookmarks page or the book's page. */
@@ -289,6 +317,7 @@ private fun PdfScrollPages(
             )
         },
         modifier = Modifier.fillMaxSize(),
+        marks = parts.marks,
     )
 }
 

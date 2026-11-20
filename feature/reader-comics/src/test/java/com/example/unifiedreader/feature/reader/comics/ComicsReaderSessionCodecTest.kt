@@ -75,6 +75,15 @@ class ComicsReaderSessionCodecTest {
     }
 
     @Test
+    fun `page turn none is saved and restored`() {
+        val patch = buildComicReaderPreferencesPatch(pageTurnStyle = PageTurnStyle.None)
+        val restored = restoreComicReaderPreferences(ReaderSessionSnapshot(itemId = "comic-1", preferences = patch))
+
+        assertEquals(PageTurnStyle.None.name, patch[ComicsPageTurnStyleKey])
+        assertEquals(PageTurnStyle.None, requireNotNull(restored).pageTurnStyle)
+    }
+
+    @Test
     fun `build comic reader preferences patch includes page turn style`() {
         val patch = buildComicReaderPreferencesPatch(
             pageTurnStyle = PageTurnStyle.Curl,

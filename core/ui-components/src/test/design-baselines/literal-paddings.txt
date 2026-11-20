@@ -42,7 +42,6 @@
 10 feature/reader-epub/src/main/java/com/example/unifiedreader/feature/reader/epub/EpubReaderPreferencesPane.kt
 10 feature/reader-epub/src/main/java/com/example/unifiedreader/feature/reader/epub/EpubTableOfContentsSheet.kt
 3 feature/reader-pdf/src/main/java/com/example/unifiedreader/feature/reader/pdf/PdfReaderChrome.kt
-1 feature/reader-pdf/src/main/java/com/example/unifiedreader/feature/reader/pdf/PdfReaderEntry.kt
 1 feature/settings/src/main/java/com/example/unifiedreader/feature/settings/FilterChipsSettingsPage.kt
 2 feature/settings/src/main/java/com/example/unifiedreader/feature/settings/LicensesSettingsPage.kt
 2 feature/settings/src/main/java/com/example/unifiedreader/feature/settings/ReadingDefaultsGroup.kt

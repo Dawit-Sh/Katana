@@ -1,4 +1,4 @@
-package com.example.unifiedreader.feature.reader.epub
+package com.example.unifiedreader.feature.annotations
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -36,10 +37,6 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.unifiedreader.feature.annotations.HighlightColor
-import com.example.unifiedreader.feature.annotations.HighlightStyle
-import com.example.unifiedreader.feature.annotations.QuoteShareDialog
-import com.example.unifiedreader.feature.annotations.ReaderHighlight
 import com.example.unifiedreader.ui.components.AppAnchoredCard
 import com.example.unifiedreader.ui.components.AppChip
 import com.example.unifiedreader.ui.components.AppDialog
@@ -53,32 +50,43 @@ import com.example.unifiedreader.ui.components.AppTextField
 /**
  * The card on a highlight, at the highlight: its style and colour (a tap changes it at once), its
  * note, Copy, Share as an image and Delete. Placed in a full-size slot over the page; the anchor
- * comes in window pixels. The share card opens from it, in a dialog of its own.
+ * comes in window pixels. The share card opens from it, in a dialog of its own. The same in every
+ * reader that keeps highlights (EPUB, PDF).
  */
 @Composable
-internal fun EpubHighlightCardOverlay(
-    controller: EpubAnnotationController,
+fun HighlightCardOverlay(
+    editor: HighlightEditor,
     highlights: List<ReaderHighlight>,
+    modifier: Modifier = Modifier,
 ) {
-    controller.sharing.highlightId?.let { sharingId ->
-        highlights.firstOrNull { it.id == sharingId }?.let { highlight ->
-            QuoteShareDialog(highlight = highlight, onDismiss = controller.sharing::close)
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    Box(modifier = modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInWindow() }) {
+        editor.sharing.highlightId?.let { sharingId ->
+            highlights.firstOrNull { it.id == sharingId }?.let { highlight ->
+                QuoteShareDialog(highlight = highlight, onDismiss = editor.sharing::close)
+            }
+        }
+        val state = editor.card
+        val highlight = state?.let { card -> highlights.firstOrNull { it.id == card.highlightId } }
+        if (state != null && highlight != null) {
+            HighlightCard(editor = editor, highlight = highlight, anchor = state.anchor?.translate(-origin.x, -origin.y))
         }
     }
-    var origin by remember { mutableStateOf(Offset.Zero) }
-    Box(modifier = Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInWindow() })
-    val state = controller.card ?: return
-    val highlight = highlights.firstOrNull { it.id == state.highlightId } ?: return
+}
+
+/** The card itself, at [anchor] (the slot's pixels). */
+@Composable
+private fun HighlightCard(editor: HighlightEditor, highlight: ReaderHighlight, anchor: Rect?) {
     AppAnchoredCard(
-        anchor = state.anchor?.translate(-origin.x, -origin.y),
-        onDismissRequest = controller::closeCard,
+        anchor = anchor,
+        onDismissRequest = editor::closeCard,
     ) {
         Column(
             modifier = Modifier.padding(AppLayout.menuInset),
             verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
         ) {
-            HighlightStyleChips(highlight = highlight, onStyle = { style -> controller.restyle(highlight.id, style = style) })
-            HighlightColorRow(highlight = highlight, onColor = { color -> controller.restyle(highlight.id, color = color) })
+            HighlightStyleChips(highlight = highlight, onStyle = { style -> editor.restyle(highlight.id, style = style) })
+            HighlightColorRow(highlight = highlight, onColor = { color -> editor.restyle(highlight.id, color = color) })
             highlight.note?.let { note ->
                 Text(
                     text = note,
@@ -87,7 +95,7 @@ internal fun EpubHighlightCardOverlay(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            HighlightCardActions(highlight = highlight, controller = controller)
+            HighlightCardActions(highlight = highlight, editor = editor)
         }
     }
 }
@@ -104,7 +112,7 @@ private fun HighlightStyleChips(highlight: ReaderHighlight, onStyle: (HighlightS
             AppChip(
                 selected = highlight.style == style,
                 onClick = { onStyle(style) },
-                label = { Text(EpubAnnotationCopy.style(style)) },
+                label = { Text(HighlightCopy.style(style)) },
             )
         }
     }
@@ -124,49 +132,51 @@ private fun HighlightColorRow(highlight: ReaderHighlight, onColor: (HighlightCol
 
 /** Note, Copy, Share as an image and Delete, at the card's end. */
 @Composable
-private fun HighlightCardActions(highlight: ReaderHighlight, controller: EpubAnnotationController) {
+private fun HighlightCardActions(highlight: ReaderHighlight, editor: HighlightEditor) {
     val context = LocalContext.current
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-        AppIconButton(onClick = { controller.editNote(highlight.id) }) {
+        AppIconButton(onClick = { editor.editNote(highlight.id) }) {
             Icon(
                 imageVector = AppIcons.Edit,
-                contentDescription = if (highlight.note == null) EpubAnnotationCopy.AddNote else EpubAnnotationCopy.EditNote,
+                contentDescription = if (highlight.note == null) HighlightCopy.AddNote else HighlightCopy.EditNote,
             )
         }
         AppIconButton(
             onClick = {
                 context.copyToClipboard(highlight.text)
-                controller.closeCard()
+                editor.closeCard()
             },
         ) {
-            Icon(imageVector = AppIcons.ContentCopy, contentDescription = EpubAnnotationCopy.Copy)
+            Icon(imageVector = AppIcons.ContentCopy, contentDescription = HighlightCopy.Copy)
         }
         AppIconButton(
             onClick = {
-                controller.closeCard()
-                controller.sharing.open(highlight.id)
+                editor.closeCard()
+                editor.sharing.open(highlight.id)
             },
         ) {
-            Icon(imageVector = AppIcons.Share, contentDescription = EpubAnnotationCopy.ShareImage)
+            Icon(imageVector = AppIcons.Share, contentDescription = HighlightCopy.ShareImage)
         }
-        AppIconButton(onClick = { controller.delete(highlight) }) {
-            Icon(imageVector = AppIcons.Delete, contentDescription = EpubAnnotationCopy.Delete)
+        AppIconButton(onClick = { editor.delete(highlight) }) {
+            Icon(imageVector = AppIcons.Delete, contentDescription = HighlightCopy.Delete)
         }
     }
 }
 
 /** The note editor for a highlight, as a dialog over the book. */
 @Composable
-internal fun EpubHighlightNoteDialog(
-    controller: EpubAnnotationController,
+fun HighlightNoteDialog(
+    editor: HighlightEditor,
     highlights: List<ReaderHighlight>,
+    modifier: Modifier = Modifier,
 ) {
-    val highlightId = controller.editingNoteOf ?: return
+    val highlightId = editor.editingNoteOf ?: return
     val highlight = highlights.firstOrNull { it.id == highlightId } ?: return
     var text by rememberSaveable(highlightId) { mutableStateOf(highlight.note.orEmpty()) }
     AppDialog(
-        onDismissRequest = controller::cancelNote,
-        title = { Text(EpubAnnotationCopy.NoteTitle) },
+        onDismissRequest = editor::cancelNote,
+        modifier = modifier,
+        title = { Text(HighlightCopy.NoteTitle) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap)) {
                 Text(
@@ -178,19 +188,19 @@ internal fun EpubHighlightNoteDialog(
                 AppTextField(
                     value = text,
                     onValueChange = { text = it },
-                    placeholder = { Text(EpubAnnotationCopy.NotePlaceholder) },
+                    placeholder = { Text(HighlightCopy.NotePlaceholder) },
                     minLines = NoteFieldLines,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
         },
-        dismissButton = { AppDialogDismissButton(text = EpubAnnotationCopy.Cancel, onClick = controller::cancelNote) },
-        confirmButton = { AppDialogConfirmButton(text = EpubAnnotationCopy.Save, onClick = { controller.saveNote(highlightId, text) }) },
+        dismissButton = { AppDialogDismissButton(text = HighlightCopy.Cancel, onClick = editor::cancelNote) },
+        confirmButton = { AppDialogConfirmButton(text = HighlightCopy.Save, onClick = { editor.saveNote(highlightId, text) }) },
     )
 }
 
 @Composable
-internal fun HighlightColorSwatch(
+private fun HighlightColorSwatch(
     color: HighlightColor,
     selected: Boolean,
     onClick: () -> Unit,
@@ -204,7 +214,7 @@ internal fun HighlightColorSwatch(
             .then(if (selected) Modifier.border(SwatchRing, ring, CircleShape) else Modifier)
             .clickable(onClick = onClick)
             .semantics {
-                contentDescription = EpubAnnotationCopy.color(color)
+                contentDescription = HighlightCopy.color(color)
                 this.selected = selected
             },
     )

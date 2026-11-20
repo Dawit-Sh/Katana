@@ -281,6 +281,7 @@ fun UnifiedReaderAppContent(
                         onAnswer = viewModel::answerProgressOffer,
                         onDismiss = viewModel::dismissProgressOffer,
                     )
+                    MarkRemovalHoldHost()
                     KeepReaderListContext(uiState = uiState, viewModel = viewModel)
                     val isLibraryVisible = !isReaderMode &&
                         uiState.topLevel == TopLevelDestination.Library &&

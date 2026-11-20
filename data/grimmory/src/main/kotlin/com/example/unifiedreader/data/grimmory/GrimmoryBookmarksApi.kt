@@ -18,10 +18,10 @@ import java.time.ZoneId
 import kotlinx.serialization.Serializable
 
 /**
- * A bookmark as Grimmory keeps it (`/api/v1/bookmarks`, the web reader's): an EPUB's place is an EPUB
- * CFI ([cfi]); a PDF's is [pageNumber]. [title] and [notes] are the reader's own. [cfi] and
- * [pageNumber] are null when it came from the notebook list, which leaves places out. Times are the
- * server's.
+ * A bookmark as Grimmory keeps it (`/api/v1/bookmarks`, the web readers'): an EPUB's place is an EPUB
+ * CFI ([cfi]); a PDF's is [pageNumber] (from 1); a comic's is its page from 1 written in [cfi] ("12"), as
+ * Grimmory's comic reader keeps it. [title] and [notes] are the reader's own. [cfi] and [pageNumber] are
+ * null when it came from the notebook list, which leaves places out. Times are the server's.
  */
 data class GrimmoryBookmark(
     val id: String,
@@ -33,6 +33,14 @@ data class GrimmoryBookmark(
     val createdAtEpochMillis: Long?,
     val updatedAtEpochMillis: Long?,
 )
+
+/** Where a new bookmark goes: an EPUB CFI (or a comic's page, which Grimmory keeps there too), or a PDF's page. */
+sealed interface GrimmoryBookmarkPlace {
+    data class Cfi(val cfi: String) : GrimmoryBookmarkPlace
+
+    /** A PDF page, from 1. */
+    data class PdfPage(val pageNumber: Int) : GrimmoryBookmarkPlace
+}
 
 /** What Grimmory said to a new or changed bookmark. */
 sealed interface GrimmoryBookmarkWrite {
@@ -55,8 +63,8 @@ interface GrimmoryBookmarksApi {
     /** Every bookmark of every book in one request, without places (Grimmory's notebook). */
     suspend fun allBookmarks(accessToken: String): List<GrimmoryBookmark>
 
-    /** A new bookmark at [cfi]; Grimmory takes no notes here (they go in an [update] after). */
-    suspend fun create(accessToken: String, bookId: String, cfi: String, title: String?): GrimmoryBookmarkWrite
+    /** A new bookmark at [place]; Grimmory takes no notes here (they go in an [update] after). */
+    suspend fun create(accessToken: String, bookId: String, place: GrimmoryBookmarkPlace, title: String?): GrimmoryBookmarkWrite
 
     /** A bookmark's name and note; an empty one clears it (Grimmory keeps a missing one as it is). */
     suspend fun update(accessToken: String, bookmarkId: String, title: String, notes: String): GrimmoryBookmarkWrite
@@ -106,20 +114,26 @@ class KtorGrimmoryBookmarksApi(
             }
     }
 
-    override suspend fun create(accessToken: String, bookId: String, cfi: String, title: String?): GrimmoryBookmarkWrite =
-        writeRequest {
-            httpClient.post("$baseUrl/api/v1/bookmarks") {
-                bearerAuth(accessToken)
-                contentType(ContentType.Application.Json)
-                setBody(
-                    GrimmoryCreateBookmarkRequestDto(
-                        bookId = bookId.toLongOrNull() ?: error("Grimmory bookId must be numeric: $bookId"),
-                        cfi = cfi,
-                        title = title?.takeIf(String::isNotBlank)?.take(TITLE_LIMIT),
-                    ),
-                )
-            }
+    override suspend fun create(
+        accessToken: String,
+        bookId: String,
+        place: GrimmoryBookmarkPlace,
+        title: String?,
+    ): GrimmoryBookmarkWrite = writeRequest {
+        httpClient.post("$baseUrl/api/v1/bookmarks") {
+            bearerAuth(accessToken)
+            contentType(ContentType.Application.Json)
+            setBody(
+                GrimmoryCreateBookmarkRequestDto(
+                    bookId = bookId.toLongOrNull() ?: error("Grimmory bookId must be numeric: $bookId"),
+                    // A PDF bookmark is one with a page and no CFI (Grimmory's isPdfBookmark).
+                    cfi = (place as? GrimmoryBookmarkPlace.Cfi)?.cfi,
+                    pageNumber = (place as? GrimmoryBookmarkPlace.PdfPage)?.pageNumber,
+                    title = title?.takeIf(String::isNotBlank)?.take(TITLE_LIMIT),
+                ),
+            )
         }
+    }
 
     override suspend fun update(accessToken: String, bookmarkId: String, title: String, notes: String): GrimmoryBookmarkWrite =
         writeRequest {
@@ -186,7 +200,8 @@ internal data class GrimmoryBookmarkDto(
 @Serializable
 internal data class GrimmoryCreateBookmarkRequestDto(
     val bookId: Long,
-    val cfi: String,
+    val cfi: String? = null,
+    val pageNumber: Int? = null,
     val title: String? = null,
 )
 

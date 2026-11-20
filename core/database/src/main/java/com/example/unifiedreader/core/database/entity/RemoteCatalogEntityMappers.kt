@@ -91,6 +91,7 @@ fun ReadableItem.toEntity(
     comicLanguagesJson = encodeMetadataValues(comicMetadata?.languages),
     comicLocationsJson = encodeMetadataValues(comicMetadata?.locations),
     updatedAtEpochMillis = updatedAtEpochMillis,
+    remoteFileSizeKb = remoteFileSizeKb,
 )
 
 fun ReadableItemEntity.toDomain(): ReadableItem = ReadableItem(
@@ -101,6 +102,7 @@ fun ReadableItemEntity.toDomain(): ReadableItem = ReadableItem(
     isLocalImport = isLocalImport,
     remoteFileId = remoteFileId,
     remoteFileType = remoteFileType,
+    remoteFileSizeKb = remoteFileSizeKb,
     title = title,
     format = format.toFormatType(),
     kind = kind.toReadableItemKind(),

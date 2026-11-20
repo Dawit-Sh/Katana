@@ -556,6 +556,10 @@ fun ComicsReaderScreen(
                             onClick = { bookmarks.toggle(pageIndex, pages.size) },
                         )
                     },
+                    marks = pageBookmarks,
+                    markStrip = pageBookmarks?.pageMarkDockStrip { page ->
+                        if (pages.isNotEmpty()) jumpTo(page.coerceIn(0, pages.lastIndex))
+                    },
                 )
             },
         )

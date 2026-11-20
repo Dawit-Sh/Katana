@@ -62,34 +62,44 @@ class GrimmoryHighlightSync @Inject constructor(
 
     /** [books]' highlights from the server, and their changes waiting here up to it. False when it failed. */
     suspend fun syncBooks(books: List<ReadableItem>): Boolean =
-        run(books.filter(ReadableItem::syncsHighlightsWithGrimmory)) { annotations, token, synced ->
-            synced.eachBook { item -> syncBook(annotations, token, item, remote = null) }
+        syncMarksBooks(books.filter(ReadableItem::syncsHighlightsWithGrimmory).mapNotNull(ReadableItem::asGrimmoryMarksBook))
+
+    /** The same for books and copies here of Grimmory's books (EPUBs only: other formats' highlights stay here). */
+    suspend fun syncMarksBooks(books: List<GrimmoryMarksBook>): Boolean =
+        run(books.filter { it.item.format == FormatType.EPUB }) { annotations, token, synced ->
+            synced.eachBook { book -> syncBook(annotations, token, book, remote = null) }
         }
 
     /**
      * Every book's highlights from the server in one request, then what waits here: [catalog] is the
-     * library, [booksOnDevice] the books with highlights here that the server has or waits for.
+     * library, [copies] the files here that are copies of its books, [booksOnDevice] the books with
+     * highlights here that the server has or waits for.
      */
-    suspend fun syncLibrary(catalog: List<ReadableItem>, booksOnDevice: Set<String>): Boolean {
-        val books = catalog.filter(ReadableItem::syncsHighlightsWithGrimmory)
+    suspend fun syncLibrary(
+        catalog: List<ReadableItem>,
+        booksOnDevice: Set<String>,
+        copies: List<GrimmoryMarksBook> = emptyList(),
+    ): Boolean {
+        val books = catalog.filter(ReadableItem::syncsHighlightsWithGrimmory).mapNotNull(ReadableItem::asGrimmoryMarksBook) +
+            copies.filter { it.item.format == FormatType.EPUB }
         return run(books) { annotations, token, synced ->
-            val byRemoteId = synced.associateBy { item -> item.remoteId.orEmpty() }
+            val byBookId = synced.groupBy(GrimmoryMarksBook::bookId)
             val serverLists = annotations.allHighlights(token).groupBy { highlight -> highlight.bookId.orEmpty() }
-            val toSync = serverLists.keys.mapNotNull(byRemoteId::get) + synced.filter { it.id in booksOnDevice }
-            toSync.distinctBy(ReadableItem::id).eachBook { item ->
-                syncBook(annotations, token, item, remote = serverLists[item.remoteId].orEmpty())
+            val toSync = serverLists.keys.flatMap { bookId -> byBookId[bookId].orEmpty() } + synced.filter { it.item.id in booksOnDevice }
+            toSync.distinctBy { it.item.id }.eachBook { book ->
+                syncBook(annotations, token, book, remote = serverLists[book.bookId].orEmpty())
             }
         }
     }
 
     private suspend fun run(
-        books: List<ReadableItem>,
-        block: suspend (annotations: GrimmoryAnnotationsApi, token: String, books: List<ReadableItem>) -> Unit,
+        books: List<GrimmoryMarksBook>,
+        block: suspend (annotations: GrimmoryAnnotationsApi, token: String, books: List<GrimmoryMarksBook>) -> Unit,
     ): Boolean {
         if (books.isEmpty()) return true
         return mutex.withLock {
             val session = credentialStore.sessionFlow.value ?: return@withLock false
-            val synced = books.forActiveGrimmoryServer(session)
+            val synced = books.onActiveGrimmoryServer(session)
             if (synced.isEmpty()) return@withLock true
             runSuspendCatching {
                 runWithStoredSessionAddressFailover(
@@ -118,13 +128,13 @@ class GrimmoryHighlightSync @Inject constructor(
 
     // One book failing (a server error) doesn't stop the others; the server going away or the sign-in
     // running out does, so the address failover and the renewal can act.
-    private suspend fun List<ReadableItem>.eachBook(sync: suspend (ReadableItem) -> Unit) {
+    private suspend fun List<GrimmoryMarksBook>.eachBook(sync: suspend (GrimmoryMarksBook) -> Unit) {
         var firstFailure: Throwable? = null
-        forEach { item ->
-            runSuspendCatching { sync(item) }.onFailure { failure ->
+        forEach { book ->
+            runSuspendCatching { sync(book) }.onFailure { failure ->
                 failure.rethrowIfServerAddressUnreachable()
                 if (failure is GrimmoryUnauthorizedException || failure is GrimmorySignedOutException) throw failure
-                Log.w(LOG_TAG, "Highlight sync of ${item.id} failed.", failure)
+                Log.w(LOG_TAG, "Highlight sync of ${book.item.id} failed.", failure)
                 if (firstFailure == null) firstFailure = failure
             }
         }
@@ -135,10 +145,11 @@ class GrimmoryHighlightSync @Inject constructor(
     private suspend fun syncBook(
         annotations: GrimmoryAnnotationsApi,
         token: String,
-        item: ReadableItem,
+        marksBook: GrimmoryMarksBook,
         remote: List<GrimmoryAnnotation>?,
     ) {
-        val bookId = item.remoteId ?: return
+        val item = marksBook.item
+        val bookId = marksBook.bookId
         val book = AnnotatedBook(itemId = item.id, title = item.title, author = item.bookMetadata?.primaryAuthor())
         val server = GrimmoryHighlightServer(annotations, token, bookId)
         var list = remote ?: annotations.bookHighlights(token, bookId)

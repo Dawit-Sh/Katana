@@ -41,16 +41,30 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.unifiedreader.feature.annotations.BookMarksExport
+import com.example.unifiedreader.feature.annotations.BookMarksPanelCopy
 import com.example.unifiedreader.feature.annotations.PageBookmarkCopy
+import com.example.unifiedreader.feature.annotations.PageBookmarks
+import com.example.unifiedreader.feature.annotations.PageMarksPanelBody
+import com.example.unifiedreader.feature.annotations.ReaderHighlight
+import com.example.unifiedreader.feature.annotations.pageIndexTitle
 import com.example.unifiedreader.feature.reader.core.ReaderBarButton
 import com.example.unifiedreader.feature.reader.core.ReaderChromeDefaults
 import com.example.unifiedreader.feature.reader.core.ReaderChromeFrame
 import com.example.unifiedreader.feature.reader.core.ReaderDock
 import com.example.unifiedreader.feature.reader.core.ReaderDockProgress
+import com.example.unifiedreader.feature.reader.core.ReaderPanel
+import com.example.unifiedreader.feature.reader.core.ReaderPanelSlot
+import com.example.unifiedreader.feature.reader.core.ReaderSearchDockStrip
+import com.example.unifiedreader.feature.reader.core.ReaderSearchPanel
+import com.example.unifiedreader.feature.reader.core.ReaderSearchParts
+import com.example.unifiedreader.feature.reader.core.readerSearchGroups
 import com.example.unifiedreader.feature.reader.core.ReaderDocumentState
 import com.example.unifiedreader.feature.reader.core.ReaderTopBar
 import com.example.unifiedreader.feature.reader.core.readerOverlayTokens
+import com.example.unifiedreader.feature.reader.core.stackedDockStrips
 import com.example.unifiedreader.ui.components.AppCircularProgress
+import com.example.unifiedreader.ui.components.AppFloatingPanelPlacement
 import com.example.unifiedreader.ui.components.AppIcons
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
@@ -80,41 +94,35 @@ internal fun PdfReaderChrome(
     onPageSelected: (Int) -> Unit,
     // Bookmarks the page on screen, or takes its bookmark off; null when the book can't keep them.
     bookmark: PdfBookmarkButton? = null,
+    // The book's marks panel (bookmarks, highlights, export); null when the book can't keep marks.
+    marksPanel: PdfMarksPanel? = null,
+    // Search in the book; null for a book without text (DjVu).
+    search: PdfSearchControls? = null,
+    // Previous and Next through the marks, over the page strip, after one was opened from a list.
+    markStrip: (@Composable () -> Unit)? = null,
 ) {
-    var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    var openPanel by rememberSaveable { mutableStateOf<PdfChromePanel?>(null) }
     LaunchedEffect(overlayVisible) {
-        if (!overlayVisible) settingsOpen = false
+        if (!overlayVisible) openPanel = null
+    }
+    fun toggle(panel: PdfChromePanel) {
+        openPanel = if (openPanel == panel) null else panel
     }
     ReaderChromeFrame(
-        panelOpen = settingsOpen,
-        onDismissPanel = { settingsOpen = false },
+        panelOpen = openPanel != null,
+        onDismissPanel = { openPanel = null },
         topBar = {
             ReaderTopBar(title = title, subtitle = author, onBack = onBack) {
-                ReaderBarButton(
-                    icon = AppIcons.NavigateBefore,
-                    contentDescription = "Previous page",
-                    onClick = onPrevious,
-                    enabled = canNavigatePrevious,
-                )
-                ReaderBarButton(
-                    icon = AppIcons.NavigateNext,
-                    contentDescription = "Next page",
-                    onClick = onNext,
-                    enabled = canNavigateNext,
-                )
-                bookmark?.let { button ->
-                    ReaderBarButton(
-                        icon = if (button.isPageBookmarked) AppIcons.BookmarkFilled else AppIcons.Bookmark,
-                        contentDescription = if (button.isPageBookmarked) PageBookmarkCopy.RemoveBookmark else PageBookmarkCopy.Bookmark,
-                        active = button.isPageBookmarked,
-                        onClick = button.onClick,
-                    )
-                }
-                ReaderBarButton(
-                    icon = AppIcons.Tune,
-                    contentDescription = "Reading settings",
-                    active = settingsOpen,
-                    onClick = { settingsOpen = !settingsOpen },
+                PdfTopBarButtons(
+                    canNavigatePrevious = canNavigatePrevious,
+                    canNavigateNext = canNavigateNext,
+                    onPrevious = onPrevious,
+                    onNext = onNext,
+                    openPanel = openPanel,
+                    onToggle = ::toggle,
+                    bookmark = bookmark,
+                    hasMarks = marksPanel != null,
+                    hasSearch = search != null,
                 )
             }
         },
@@ -126,15 +134,24 @@ internal fun PdfReaderChrome(
                 currentPageIndex = currentPageIndex,
                 progress = progress,
                 onPageSelected = onPageSelected,
+                markStrip = markStrip,
+                search = search?.takeIf { openPanel != PdfChromePanel.Search },
+                onOpenSearch = { openPanel = PdfChromePanel.Search },
             )
         },
     ) { slot ->
         PdfReaderSettingsPanel(
-            isOpen = settingsOpen,
+            isOpen = openPanel == PdfChromePanel.Settings,
             slot = slot,
             settings = settings,
-            onDismissRequest = { settingsOpen = false },
+            onDismissRequest = { openPanel = null },
         )
+        marksPanel?.let { panel ->
+            PdfMarksPanelSheet(panel, openPanel == PdfChromePanel.Marks, slot, currentPageIndex, pageCount) { openPanel = null }
+        }
+        search?.let { controls ->
+            PdfSearchPanel(controls, openPanel == PdfChromePanel.Search, slot, currentPageIndex) { openPanel = null }
+        }
     }
 }
 
@@ -147,7 +164,11 @@ private fun PdfReaderDock(
     currentPageIndex: Int,
     progress: Float,
     onPageSelected: (Int) -> Unit,
+    markStrip: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
+    // A search: while it has matches, they sit over the dock instead of the page strip.
+    search: PdfSearchControls? = null,
+    onOpenSearch: () -> Unit = {},
 ) {
     val configuration = LocalConfiguration.current
     val thumbnailHeight = ReaderChromeDefaults.stripThumbnailHeight(
@@ -156,19 +177,33 @@ private fun PdfReaderDock(
     )
     ReaderDock(
         modifier = modifier,
-        strip = if (pageCount > 0) {
+        strip = if (search != null && search.search.isActive) {
             {
-                PdfPagePreviewStrip(
-                    pageRenderer = pageRenderer,
-                    documentState = documentState,
-                    pageCount = pageCount,
-                    currentPageIndex = currentPageIndex,
-                    thumbnailHeight = thumbnailHeight,
-                    onPageSelected = onPageSelected,
+                ReaderSearchDockStrip(
+                    search = search.search,
+                    onOpenResults = onOpenSearch,
+                    onStep = { forward -> search.step(forward, currentPageIndex) },
+                    onEnd = search.search::clear,
                 )
             }
         } else {
-            null
+            stackedDockStrips(
+                markStrip,
+                if (pageCount > 0) {
+                    {
+                        PdfPagePreviewStrip(
+                            pageRenderer = pageRenderer,
+                            documentState = documentState,
+                            pageCount = pageCount,
+                            currentPageIndex = currentPageIndex,
+                            thumbnailHeight = thumbnailHeight,
+                            onPageSelected = onPageSelected,
+                        )
+                    }
+                } else {
+                    null
+                },
+            )
         },
     ) {
         ReaderDockProgress(
@@ -326,6 +361,160 @@ private const val PdfPreviewWidthRatio = 0.73f
 private const val PdfPagePreviewStripTag = "pdf-page-preview-strip"
 private const val PDF_PREVIEW_CACHE_MAX_ENTRIES = 64
 private const val PDF_PREVIEW_RENDER_LONG_EDGE_PX = 420
+
+/** The top bar's buttons: previous and next, search, the bookmark and the marks (each when the book has them), settings. */
+@Composable
+private fun PdfTopBarButtons(
+    canNavigatePrevious: Boolean,
+    canNavigateNext: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    openPanel: PdfChromePanel?,
+    onToggle: (PdfChromePanel) -> Unit,
+    bookmark: PdfBookmarkButton?,
+    hasMarks: Boolean,
+    hasSearch: Boolean,
+) {
+    ReaderBarButton(
+        icon = AppIcons.NavigateBefore,
+        contentDescription = "Previous page",
+        onClick = onPrevious,
+        enabled = canNavigatePrevious,
+    )
+    ReaderBarButton(icon = AppIcons.NavigateNext, contentDescription = "Next page", onClick = onNext, enabled = canNavigateNext)
+    if (hasSearch) {
+        ReaderBarButton(
+            icon = AppIcons.Search,
+            contentDescription = PdfSearchCopy.Button,
+            active = openPanel == PdfChromePanel.Search,
+            onClick = { onToggle(PdfChromePanel.Search) },
+        )
+    }
+    PdfMarkButtons(
+        bookmark = bookmark,
+        marksOpen = openPanel == PdfChromePanel.Marks,
+        onMarksClick = if (hasMarks) ({ onToggle(PdfChromePanel.Marks) }) else null,
+    )
+    ReaderBarButton(
+        icon = AppIcons.Tune,
+        contentDescription = "Reading settings",
+        active = openPanel == PdfChromePanel.Settings,
+        onClick = { onToggle(PdfChromePanel.Settings) },
+    )
+}
+
+/** The bookmark button and the marks panel's, each when the book can keep marks. */
+@Composable
+private fun PdfMarkButtons(
+    bookmark: PdfBookmarkButton?,
+    marksOpen: Boolean,
+    onMarksClick: (() -> Unit)?,
+) {
+    bookmark?.let { button ->
+        ReaderBarButton(
+            icon = if (button.isPageBookmarked) AppIcons.BookmarkFilled else AppIcons.Bookmark,
+            contentDescription = if (button.isPageBookmarked) PageBookmarkCopy.RemoveBookmark else PageBookmarkCopy.Bookmark,
+            active = button.isPageBookmarked,
+            onClick = button.onClick,
+        )
+    }
+    onMarksClick?.let { onClick ->
+        ReaderBarButton(
+            icon = AppIcons.CollectionsBookmark,
+            contentDescription = BookMarksPanelCopy.PanelButton,
+            active = marksOpen,
+            onClick = onClick,
+        )
+    }
+}
+
+/** The reader's panels; one is open at a time. */
+internal enum class PdfChromePanel { Settings, Marks, Search }
+
+/** Search in the book, and going to a match's page. */
+internal class PdfSearchControls(
+    val search: PdfBookSearch,
+    val onJumpToPage: (Int) -> Unit,
+) {
+    fun select(index: Int) {
+        search.select(index)?.let(onJumpToPage)
+    }
+
+    fun step(forward: Boolean, fromPage: Int) {
+        search.step(forward, fromPage)?.let(onJumpToPage)
+    }
+}
+
+internal object PdfSearchCopy {
+    const val Button = "Search in the book"
+}
+
+/** The search panel at the end edge, as the EPUB reader's: matches under their pages. */
+@Composable
+private fun PdfSearchPanel(
+    controls: PdfSearchControls,
+    isOpen: Boolean,
+    slot: ReaderPanelSlot,
+    pageIndex: Int,
+    onDismissRequest: () -> Unit,
+) {
+    val results = controls.search.results
+    val groups = remember(results) { readerSearchGroups(results) { result -> pageIndexTitle(result.pageIndex) } }
+    ReaderSearchPanel(
+        isOpen = isOpen,
+        slot = slot,
+        search = controls.search,
+        groups = groups,
+        onDismissRequest = onDismissRequest,
+        onResultSelected = { index ->
+            controls.select(index)
+            onDismissRequest()
+        },
+        onStep = { forward -> controls.step(forward, pageIndex) },
+        parts = ReaderSearchParts.Pages,
+    )
+}
+
+/** The marks panel's contents: the page bookmarks, the highlights (none in a DjVu book), the export, and going to a page. */
+internal class PdfMarksPanel(
+    val bookmarks: PageBookmarks,
+    val export: BookMarksExport,
+    val highlights: List<ReaderHighlight>,
+    val onJumpToPage: (Int) -> Unit,
+    /** The pages have text to highlight (a PDF, not a DjVu book). */
+    val hasText: Boolean,
+)
+
+/** The marks panel at the end edge, as the EPUB reader's: open at the marks around page [pageIndex]. */
+@Composable
+private fun PdfMarksPanelSheet(
+    panel: PdfMarksPanel,
+    isOpen: Boolean,
+    slot: ReaderPanelSlot,
+    pageIndex: Int,
+    pageCount: Int,
+    onDismissRequest: () -> Unit,
+) {
+    ReaderPanel(
+        visible = isOpen,
+        placement = AppFloatingPanelPlacement.End,
+        width = ReaderChromeDefaults.contentsWidth,
+        slot = slot,
+        onDismissRequest = onDismissRequest,
+    ) {
+        PageMarksPanelBody(
+            bookmarks = panel.bookmarks,
+            export = panel.export,
+            highlights = panel.highlights,
+            emptyText = if (panel.hasText) BookMarksPanelCopy.EmptyPages else BookMarksPanelCopy.EmptyPictures,
+            hasText = panel.hasText,
+            pageIndex = pageIndex,
+            pageCount = pageCount,
+            onJumpToPage = panel.onJumpToPage,
+            onDismissRequest = onDismissRequest,
+        )
+    }
+}
 
 /** The top bar's bookmark button: filled while the page on screen is bookmarked. */
 internal class PdfBookmarkButton(

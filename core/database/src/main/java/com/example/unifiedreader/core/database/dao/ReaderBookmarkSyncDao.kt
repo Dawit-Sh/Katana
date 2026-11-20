@@ -22,17 +22,20 @@ interface ReaderBookmarkSyncDao {
     @Query("SELECT * FROM reader_bookmarks WHERE itemId = :itemId")
     fun getBookmarkRows(itemId: String): List<ReaderBookmarkEntity>
 
-    /** The changes a sync can send: removed, changed after reaching the server, or new with their server place worked out. */
+    /**
+     * The changes a sync can send: removed, changed after reaching the server, or new with their server place
+     * known (worked out in an EPUB; a page bookmark's page is its place from the start).
+     */
     @Query(
         "SELECT itemId, id, updatedAtEpochMillis FROM reader_bookmarks WHERE syncState = '$HIGHLIGHT_WAITING' " +
-            "AND (deleted = 1 OR remoteId IS NOT NULL OR remoteCfi IS NOT NULL) ORDER BY itemId, id",
+            "AND (deleted = 1 OR remoteId IS NOT NULL OR remoteCfi IS NOT NULL OR href LIKE 'page:%') ORDER BY itemId, id",
     )
     fun observeWaitingBookmarks(): Flow<List<WaitingBookmarkKey>>
 
     /** The books with bookmarks on a server, or waiting to go to one. */
     @Query(
         "SELECT DISTINCT itemId FROM reader_bookmarks WHERE remoteId IS NOT NULL OR " +
-            "(syncState = '$HIGHLIGHT_WAITING' AND (deleted = 1 OR remoteCfi IS NOT NULL))",
+            "(syncState = '$HIGHLIGHT_WAITING' AND (deleted = 1 OR remoteCfi IS NOT NULL OR href LIKE 'page:%'))",
     )
     fun getItemIdsWithServerBookmarks(): List<String>
 

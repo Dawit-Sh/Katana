@@ -3,19 +3,16 @@ package com.example.unifiedreader.feature.reader.epub
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
 import com.example.unifiedreader.feature.annotations.AnnotatedBook
 import com.example.unifiedreader.feature.annotations.AnnotationExports
 import com.example.unifiedreader.feature.annotations.AnnotationPlace
-import com.example.unifiedreader.feature.annotations.HighlightColor
-import com.example.unifiedreader.feature.annotations.HighlightStyle
+import com.example.unifiedreader.feature.annotations.BookMarksExport
+import com.example.unifiedreader.feature.annotations.HighlightEditor
 import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
-import com.example.unifiedreader.feature.annotations.ReaderHighlight
 import com.example.unifiedreader.feature.translation.ReaderTextSelection
 import com.example.unifiedreader.ui.components.AppToastIcon
 import com.example.unifiedreader.ui.components.AppToastMessage
@@ -26,12 +23,9 @@ import kotlinx.coroutines.launch
 import org.readium.r2.navigator.Selection
 import org.readium.r2.shared.publication.Locator
 
-/** The highlight card open over the page: which highlight, and where it is on screen (window pixels). */
-internal data class EpubHighlightCardState(val highlightId: String, val anchor: Rect?)
-
 /**
  * The reader's side of highlights, bookmarks and saved words: makes them from a selection or the
- * page on screen, opens the card on a highlight (and its share card), and changes or removes them.
+ * page on screen; the card on a highlight (and its share card and note) is the shared [HighlightEditor].
  * Everything is saved at once; nothing waits for the book to close.
  */
 @Stable
@@ -42,34 +36,23 @@ internal class EpubAnnotationController(
     private val toasts: () -> AppToastState?,
     private val chapterTitleOf: (Locator) -> String?,
 ) {
-    var card by mutableStateOf<EpubHighlightCardState?>(null)
-        private set
-
-    /** The highlight whose note is being written, if any. */
-    var editingNoteOf by mutableStateOf<String?>(null)
-        private set
-
-    /** The highlight being shared as an image, if any. */
-    val sharing = EpubQuoteSharing()
+    /** The card on a highlight, its note and its share card, as every reader has them. */
+    val editor = HighlightEditor(store = store, scope = scope, toasts = toasts)
 
     /** The page bookmarks: the top bar's button and the panel's rows. */
     val bookmarks = EpubBookmarkActions(store = store, book = book, scope = scope, toasts = toasts, chapterTitleOf = chapterTitleOf)
 
     /** This book's marks as Markdown; every book's is on the Bookmarks page. */
-    val export = EpubMarkExport(exports = AnnotationExports(store), book = book, toasts = toasts)
+    val export = BookMarksExport(exports = AnnotationExports(store), book = book, toasts = toasts)
 
     fun highlight(selection: Selection, anchor: Rect?, withNote: Boolean) {
-        val text = selection.locator.text.highlight?.trim().orEmpty()
-        if (text.isEmpty()) return
-        scope.launch {
-            val made = store.addHighlight(
-                book = book,
-                place = selection.locator.toAnnotationPlace(chapterTitleOf),
-                text = text,
-                look = store.lastLook(),
-            )
-            if (withNote) editingNoteOf = made.id else card = EpubHighlightCardState(made.id, anchor)
-        }
+        editor.add(
+            book = book,
+            place = selection.locator.toAnnotationPlace(chapterTitleOf),
+            text = selection.locator.text.highlight.orEmpty(),
+            anchor = anchor,
+            withNote = withNote,
+        )
     }
 
     fun saveWord(selection: Selection) {
@@ -87,38 +70,7 @@ internal class EpubAnnotationController(
     }
 
     fun open(highlightId: String, anchor: Rect?) {
-        card = EpubHighlightCardState(highlightId, anchor)
-    }
-
-    fun closeCard() {
-        card = null
-    }
-
-    /** A new style or colour for a highlight; null keeps that part. */
-    fun restyle(highlightId: String, style: HighlightStyle? = null, color: HighlightColor? = null) {
-        scope.launch { store.updateHighlight(highlightId, style = style, color = color) }
-    }
-
-    fun editNote(highlightId: String) {
-        card = null
-        editingNoteOf = highlightId
-    }
-
-    fun saveNote(highlightId: String, note: String) {
-        editingNoteOf = null
-        scope.launch { store.updateHighlight(highlightId, note = note) }
-    }
-
-    fun cancelNote() {
-        editingNoteOf = null
-    }
-
-    fun delete(highlight: ReaderHighlight) {
-        card = null
-        scope.launch {
-            store.deleteHighlight(highlight.id)
-            toasts()?.show(AppToastMessage(text = EpubAnnotationCopy.Removed, icon = AppToastIcon.Removed))
-        }
+        editor.open(highlightId, anchor)
     }
 
     fun deleteWord(wordId: String) {

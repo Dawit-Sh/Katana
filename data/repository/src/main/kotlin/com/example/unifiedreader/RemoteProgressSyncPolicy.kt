@@ -3,6 +3,8 @@ package com.example.unifiedreader
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.ReadingProgress
 import com.example.unifiedreader.core.model.SyncState
+import com.example.unifiedreader.core.model.isBeyondFutureClockLimit
+import com.example.unifiedreader.core.model.trustedAt
 import com.example.unifiedreader.core.model.progress.ProgressSyncLocator
 import com.example.unifiedreader.core.model.progress.ProgressSyncSnapshot
 import com.example.unifiedreader.core.model.progress.ProgressSyncStore
@@ -29,6 +31,13 @@ sealed interface RemoteProgressSyncDecision {
     ) : RemoteProgressSyncDecision
 }
 
+/**
+ * What a pull does with the server's copy of a book's place: the most recent read wins, a save not yet
+ * pushed by a margin. A time more than a day ahead of this device's clock (a server or device whose clock
+ * is wrong) never wins by being "the most recent": a server's counts as no time (it can't beat a place
+ * here), and a save here stamped so is read as the oldest when it is in step (so the server's next read
+ * wins and a true time comes back) or as now when it waits to go up (so it still goes up).
+ */
 fun decideRemoteProgressSync(
     local: ProgressSyncSnapshot?,
     remote: ReadingProgress?,
@@ -53,13 +62,13 @@ fun decideRemoteProgressSync(
         }
     }
 
+    val remoteUpdatedAtEpochMillis = remote.updatedAtEpochMillis?.trustedAt(nowEpochMillis)
     if (local == null) {
         return remote.toApplyRemoteDecision(
-            updatedAtEpochMillis = remote.updatedAtEpochMillis ?: nowEpochMillis,
+            updatedAtEpochMillis = remoteUpdatedAtEpochMillis ?: nowEpochMillis,
         )
     }
 
-    val remoteUpdatedAtEpochMillis = remote.updatedAtEpochMillis
     if (remoteUpdatedAtEpochMillis == null) {
         return RemoteProgressSyncDecision.KeepLocal
     }
@@ -70,11 +79,18 @@ fun decideRemoteProgressSync(
     } else {
         PENDING_LOCAL_PROGRESS_CLOCK_TOLERANCE_MILLIS
     }
-    return if (remoteUpdatedAtEpochMillis > local.updatedAtEpochMillis + pendingLocalTolerance) {
+    return if (remoteUpdatedAtEpochMillis > local.comparableUpdatedAt(nowEpochMillis) + pendingLocalTolerance) {
         remote.toApplyRemoteDecision(updatedAtEpochMillis = remoteUpdatedAtEpochMillis)
     } else {
         RemoteProgressSyncDecision.KeepLocal
     }
+}
+
+// A save here stamped more than a day ahead of this device's clock, saved while the clock was wrong.
+private fun ProgressSyncSnapshot.comparableUpdatedAt(nowEpochMillis: Long): Long = when {
+    !updatedAtEpochMillis.isBeyondFutureClockLimit(nowEpochMillis) -> updatedAtEpochMillis
+    syncState == SyncState.CLEAN -> 0L
+    else -> nowEpochMillis
 }
 
 /**

@@ -53,23 +53,40 @@ val ReaderBookmark.pageIndex: Int?
         .takeIf { place.href.startsWith(PageHrefPrefix) }
         ?.toIntOrNull()
 
-/** What a page-image reader keeps bookmarks with: the store, and the places other pages ask it to open at. */
+/**
+ * What a page-image reader keeps marks with: the bookmark store, the places other pages ask it to open at, and the
+ * whole marks store ([annotations]: highlights on pages with text, and the marks panel's export; null keeps the
+ * reader without highlights or a marks panel).
+ */
 class PageBookmarkSources(
     val store: ReaderBookmarkStore,
     val jumps: AnnotationJumps?,
+    val annotations: ReaderAnnotationStore? = null,
 )
 
 /** The open page-image book's bookmarks: the top bar's button and the ribbon. Saved at once. */
 @Stable
 class PageBookmarks internal constructor(
-    private val store: ReaderBookmarkStore,
+    sources: PageBookmarkSources,
     private val book: AnnotatedBook,
     private val scope: CoroutineScope,
     private val toasts: () -> AppToastState?,
     val all: List<ReaderBookmark>,
-    internal val jumps: AnnotationJumps?,
+    /** Previous and Next through the book's marks (its bookmarks, and its highlights in a PDF), after one is opened from a list. */
+    val steps: MarkSteps = MarkSteps(),
 ) {
+    private val store: ReaderBookmarkStore = sources.store
+    internal val jumps: AnnotationJumps? = sources.jumps
+
+    /** This book's marks as Markdown, for its marks panel; null without the whole marks store. */
+    val export: BookMarksExport? = sources.annotations?.let { annotations ->
+        BookMarksExport(exports = AnnotationExports(annotations), book = book, toasts = toasts)
+    }
+
     private var busy = false
+
+    /** The page of the bookmark before ([forward] false) or after the one stepped from; null at either end. */
+    fun stepPage(forward: Boolean): Int? = steps.step(forward)?.let { stop -> pageIndexOfBookmarkLocator(stop.locatorJson) }
 
     /** The bookmarks on page [pageIndex]. */
     fun onPage(pageIndex: Int): List<ReaderBookmark> = all.filter { it.pageIndex == pageIndex }
@@ -82,8 +99,7 @@ class PageBookmarks internal constructor(
         scope.launch {
             try {
                 if (onPage.isNotEmpty()) {
-                    onPage.forEach { bookmark -> store.deleteBookmark(bookmark.id) }
-                    toasts()?.show(AppToastMessage(text = PageBookmarkCopy.Removed, icon = AppToastIcon.Removed))
+                    store.removeBookmarksWithUndo(onPage.map(ReaderBookmark::id), toasts(), scope, PageBookmarkCopy.Removed)
                 } else {
                     store.addBookmark(
                         book = book,
@@ -98,6 +114,16 @@ class PageBookmarks internal constructor(
                 busy = false
             }
         }
+    }
+
+    /** The marks panel's remove; the toast's Undo brings it back as it was. */
+    fun delete(bookmarkId: String) {
+        scope.launch { store.removeBookmarksWithUndo(listOf(bookmarkId), toasts(), scope, PageBookmarkCopy.Removed) }
+    }
+
+    /** The reader's name and note for a bookmark; blank removes it. */
+    fun name(bookmarkId: String, title: String, note: String) {
+        scope.launch { store.nameBookmark(bookmarkId, title, note) }
     }
 }
 
@@ -115,22 +141,28 @@ fun rememberPageBookmarks(
     val store = sources?.store
     val flow = remember(store, itemId) { store?.bookmarks(itemId) ?: flowOf(emptyList()) }
     val all by flow.collectAsStateWithLifecycle(initialValue = emptyList())
-    if (store == null) return null
+    // A PDF's highlights step with its bookmarks (a comic has none).
+    val highlightFlow = remember(sources?.annotations, itemId) { sources?.annotations?.highlights(itemId) ?: flowOf(emptyList()) }
+    val highlights by highlightFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+    val steps = remember(itemId) { MarkSteps() }
+    LaunchedEffect(steps, all, highlights) { steps.update(markStops(highlights = highlights, bookmarks = all)) }
+    if (sources == null) return null
     return remember(sources, itemId, title, author, all) {
         PageBookmarks(
-            store = store,
+            sources = sources,
             book = AnnotatedBook(itemId = itemId, title = title, author = author),
             scope = scope,
             toasts = { latestToasts },
             all = all,
-            jumps = sources.jumps,
+            steps = steps,
         )
     }
 }
 
 /**
  * Goes to a page the Bookmarks page or the book's page asked for ([AnnotationJumps]), once the book
- * shows ([ready]): the reader opens where it was left, then moves to the bookmark's page.
+ * shows ([ready]): the reader opens where it was left, then moves to the bookmark's page, and the
+ * bookmark there becomes the one [PageBookmarks.steps] go on from.
  */
 @Composable
 fun PageBookmarkJumpEffect(
@@ -143,7 +175,10 @@ fun PageBookmarkJumpEffect(
     val jumps = bookmarks?.jumps
     LaunchedEffect(jumps, itemId, ready) {
         if (!ready || jumps == null) return@LaunchedEffect
-        val pageIndex = jumps.take(itemId)?.let(::pageIndexOfBookmarkLocator) ?: return@LaunchedEffect
+        val locatorJson = jumps.take(itemId) ?: return@LaunchedEffect
+        val pageIndex = pageIndexOfBookmarkLocator(locatorJson) ?: return@LaunchedEffect
+        // The mark opened (a highlight or a bookmark) becomes the one the steps go on from.
+        bookmarks?.steps?.opened { stop -> stop.locatorJson == locatorJson }
         latestOnJump(pageIndex)
     }
 }

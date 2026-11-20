@@ -24,6 +24,17 @@ as a whole is released under the GNU General Public License, version 3 or (at yo
 version, with the agreement of yabai's author. The full text is `LICENSE` at the top of the repository, and
 the complete source is at https://github.com/Dawit-Sh/Katana.
 
+## PDFium and PdfiumAndroidKt (the text of PDF pages)
+
+`feature:reader-pdf` uses PdfiumAndroidKt 1.0.35 (`io.legere:pdfiumandroid`,
+https://github.com/johngray1965/PdfiumAndroidKt), Apache License 2.0, Copyright John Gray and contributors,
+to read the words on a PDF page and where they sit, for selecting text and placing highlights (Android's
+`PdfRenderer` still draws the pages). It bundles PDFium (https://pdfium.googlesource.com/pdfium/),
+BSD 3-Clause License, Copyright 2014 The PDFium Authors, with its third-party parts under their own
+permissive licences (FreeType under the FreeType License, libjpeg-turbo, OpenJPEG, libpng, Little CMS, zlib
+and AGG; see PDFium's `LICENSE` and `third_party/`). The library also brings Guava
+(https://github.com/google/guava), Apache License 2.0.
+
 ## jsoup (MOBI and AZW3 conversion)
 
 `core:ebook-convert` uses jsoup 1.18.1 (https://jsoup.org), the copy Readium already brings. MIT License,

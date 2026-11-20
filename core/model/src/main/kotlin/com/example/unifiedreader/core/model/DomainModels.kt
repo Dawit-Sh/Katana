@@ -75,6 +75,8 @@ data class ReadableItem(
     val isLocalImport: Boolean = false,
     val remoteFileId: String? = null,
     val remoteFileType: String? = null,
+    /** The server file's size in KB, rounded down (Grimmory's books): a local file that is the same file has it too. */
+    val remoteFileSizeKb: Long? = null,
     val title: String,
     val format: FormatType,
     val kind: ReadableItemKind = format.defaultReadableItemKind(),

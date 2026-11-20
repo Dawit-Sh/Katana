@@ -171,6 +171,25 @@ class AnnotationBackupStoreTest {
     )
 
     @Test
+    fun `a PDF's highlight comes back on its page, on its lines, with its look and note`() = runBlocking {
+        val pdf = AnnotatedBook("local:field-notes.pdf", "Field Notes", null)
+        val spot = PageTextSpot(4, 30, 52, listOf(PageTextRect(0.1f, 0.2f, 0.9f, 0.22f), PageTextRect(0.1f, 0.23f, 0.3f, 0.25f)))
+        val pagePlace = pageHighlightPlace(spot, pageCount = 40, pageCharCount = 900)
+        val look = HighlightLook(HighlightStyle.Underline, HighlightColor.Pink)
+        store(source, "a").addHighlight(pdf, pagePlace, "the words on two lines", look, note = "Mine")
+
+        val result = backups(target).restore(backups(source).backUp().text)
+
+        assertEquals(1, result.addedHighlights)
+        val highlight = store(target, "b").highlights(pdf.itemId).first().single()
+        assertEquals(pagePlace, highlight.place)
+        assertEquals(spot.rects, pageTextSpotOf(highlight.place.locatorJson)!!.rects)
+        assertEquals(HighlightStyle.Underline, highlight.style)
+        assertEquals(HighlightColor.Pink, highlight.color)
+        assertEquals("Mine", highlight.note)
+    }
+
+    @Test
     fun `the restore message counts what was added`() {
         assertEquals("Added 1 highlight, 2 words and 3 bookmarks", AnnotationRestoreResult(1, 2, 0, 3).message)
         assertEquals("Added 2 highlights and 1 word", AnnotationRestoreResult(2, 1, 0).message)
