@@ -25,6 +25,7 @@ import com.example.unifiedreader.feature.annotations.MarkedBookPlaceholderCover
 import com.example.unifiedreader.feature.annotations.MarkedLibrary
 import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
 import com.example.unifiedreader.feature.annotations.markedLibrary
+import com.example.unifiedreader.feature.annotations.removeBookmarksWithUndo
 import com.example.unifiedreader.feature.library.ItemProgressSummary
 import com.example.unifiedreader.feature.library.LibraryCoverAspectRatio
 import com.example.unifiedreader.feature.library.LibraryCoverImageVariant
@@ -71,11 +72,9 @@ class AppBookmarksScreen(
     /** The reader opens [itemId] at this place next, instead of where it was left. */
     fun openAt(itemId: String, locatorJson: String) = jumps.request(itemId, locatorJson)
 
+    /** Removes a bookmark; the toast's Undo brings it back as it was. */
     fun deleteBookmark(id: String, toasts: AppToastState?) {
-        scope.launch {
-            store.deleteBookmark(id)
-            toasts?.show(AppToastMessage(text = BookmarksCopy.BookmarkRemoved, icon = AppToastIcon.Removed))
-        }
+        scope.launch { store.removeBookmarksWithUndo(listOf(id), toasts, scope) }
     }
 
     fun nameBookmark(id: String, title: String, note: String) {

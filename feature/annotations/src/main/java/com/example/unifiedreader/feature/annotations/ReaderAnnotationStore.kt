@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 /** The reader's highlights, bookmarks and saved words on this device. */
-interface ReaderAnnotationStore : ReaderBookmarkStore, SavedWordStudyStore {
+interface ReaderAnnotationStore : ReaderBookmarkStore, SavedWordStudyStore, HighlightRemovalStore {
     /** One book's highlights in reading order. */
     fun highlights(itemId: String): Flow<List<ReaderHighlight>>
 
@@ -46,8 +46,6 @@ interface ReaderAnnotationStore : ReaderBookmarkStore, SavedWordStudyStore {
         color: HighlightColor? = null,
         note: String? = null,
     ): ReaderHighlight?
-
-    suspend fun deleteHighlight(id: String)
 
     suspend fun saveWord(
         book: AnnotatedBook,
@@ -83,7 +81,8 @@ class RoomReaderAnnotationStore(
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) : ReaderAnnotationStore,
     ReaderBookmarkStore by RoomReaderBookmarkStore(bookmarkDao, ioDispatcher, now, newId),
-    SavedWordStudyStore by RoomSavedWordStudyStore(studyDao, ioDispatcher, now) {
+    SavedWordStudyStore by RoomSavedWordStudyStore(studyDao, ioDispatcher, now),
+    HighlightRemovalStore by RoomHighlightRemovalStore(dao, ioDispatcher, now) {
 
     override suspend fun correctChapterNames(
         itemId: String,
@@ -166,10 +165,6 @@ class RoomReaderAnnotationStore(
         )
         dao.upsertHighlight(changed)
         changed.toModel()
-    }
-
-    override suspend fun deleteHighlight(id: String) = io {
-        dao.markHighlightDeleted(id, syncState = SYNC_DIRTY, atEpochMillis = now())
     }
 
     override suspend fun saveWord(

@@ -41,6 +41,8 @@ object BookmarksCopy {
     const val NothingFoundTitle = "Nothing found"
     const val NothingFoundBody = "No book has marks that match. Try other words or another filter."
     const val BookmarkRemoved = "Bookmark removed"
+    const val HighlightRemoved = "Highlight removed"
+    const val Undo = "Undo"
     const val WordRemoved = "Word removed"
 
     const val ReviewTitle = "Review saved words"

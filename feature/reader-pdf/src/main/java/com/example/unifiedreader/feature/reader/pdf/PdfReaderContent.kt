@@ -247,6 +247,7 @@ private fun PdfReaderBars(
                 onClick = { bookmarks.toggle(pageIndex, pageCount) },
             )
         },
+        markStrip = parts.bookmarks?.pageMarkDockStrip { page -> if (pageCount > 0) onJump(page.coerceIn(0, pageCount - 1)) },
     )
 }
 
