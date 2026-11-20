@@ -236,10 +236,12 @@ class AppSettingsToolsViewModel @Inject constructor(
         remoteDocumentReadCache.forgetKept(remoteDocumentReadCache.keptItemIds() - books.mapTo(mutableSetOf()) { it.item.id })
         keptState.value = KeptBooksSnapshot(books = books, freeBytes = free, isLoaded = true)
         if (measureCovers) coverBytes.value = withContext(Dispatchers.IO) { coverCacheBytes(context) }
+        val imported = withContext(Dispatchers.IO) { importedBookBytes(filesDir = context.filesDir, cacheDir = context.cacheDir) }
         storageState.value = StorageSettingsState(
             downloadedBookBytes = books.filter { it.isDownload }.sumOf { it.sizeBytes },
             keptBookBytes = books.filterNot { it.isDownload }.sumOf { it.sizeBytes },
             coverBytes = coverBytes.value ?: 0L,
+            importedBookBytes = imported,
             freeBytes = free,
             finishedBookCount = books.count { it.isFinished },
             isLoaded = true,
@@ -303,7 +305,24 @@ internal fun coverCacheBytes(context: Context): Long =
             .sumOf { folder -> folder.walkTopDown().filter(File::isFile).sumOf(File::length) }
     }
 
+/**
+ * What the books imported from this device keep in the app's own space: their covers, the EPUB a MOBI, AZW, AZW3
+ * or FB2 is read from, a DjVu's copy and a comic's copy. The picked files themselves stay where they are.
+ */
+internal fun importedBookBytes(filesDir: File, cacheDir: File): Long =
+    (ImportedBookFolders.map { name -> File(filesDir, name) } + ImportedBookCacheFolders.map { name -> File(cacheDir, name) })
+        .filter(File::isDirectory)
+        .sumOf { folder -> folder.walkTopDown().filter(File::isFile).sumOf(File::length) }
+
 private const val PERCENT = 100
+private val ImportedBookFolders = listOf("imported-cover-cache")
+private val ImportedBookCacheFolders = listOf(
+    "epub-imports",
+    "djvu-imports",
+    "comic-zip-archives",
+    "comic-archives",
+    "comic-archives-solid",
+)
 private val ServerCoverFolders = listOf(
     GRIMMORY_COVER_DIRECTORY_NAME,
     KAVITA_COVER_DIRECTORY_NAME,
