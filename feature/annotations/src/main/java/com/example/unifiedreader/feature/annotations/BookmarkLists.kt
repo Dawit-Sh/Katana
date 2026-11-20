@@ -54,9 +54,11 @@ fun MarkSearchField(
 /**
  * The book page's (the library's details sheet) bookmarks section: "Bookmarks · 3", then every
  * bookmark of the book in reading order, a tap opening the book there. With none, one quiet line.
+ * [marksHome], for a book that is a file here, is one more quiet line: where its marks live.
  */
 fun LazyListScope.bookPageBookmarks(
     bookmarks: List<ReaderBookmark>,
+    marksHome: String? = null,
     onOpen: (ReaderBookmark) -> Unit,
 ) {
     item(key = "bookmarks-label") {
@@ -97,6 +99,16 @@ fun LazyListScope.bookPageBookmarks(
                     }
                 }
             }
+        }
+    }
+    if (marksHome != null) {
+        item(key = "bookmarks-home") {
+            Text(
+                text = marksHome,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = AppLayout.inset).padding(top = AppLayout.gridGap),
+            )
         }
     }
     item(key = "bookmarks-end") { AppSheetSectionEnd() }

@@ -90,6 +90,8 @@ data class ReadableItemEntity(
     val comicLanguagesJson: String?,
     @ColumnInfo(defaultValue = "NULL") val comicLocationsJson: String? = null,
     val updatedAtEpochMillis: Long,
+    // The server file's size in KB (Grimmory's books), to find a local file that is the same file.
+    @ColumnInfo(defaultValue = "NULL") val remoteFileSizeKb: Long? = null,
 )
 
 data class ReadableItemLibraryEntity(

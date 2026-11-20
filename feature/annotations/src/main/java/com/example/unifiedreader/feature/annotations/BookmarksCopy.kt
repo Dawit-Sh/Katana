@@ -30,6 +30,12 @@ object BookmarksCopy {
     const val Delete = "Delete"
     const val EmptyTitle = "No bookmarks yet"
     const val BookPageEmpty = "No bookmarks yet. While reading, tap the bookmark at the top to keep a page."
+
+    // Where a local book's marks live, on its page.
+    const val MarksSyncWithGrimmory = "Highlights and bookmarks sync with Grimmory."
+    const val BookmarksSyncWithGrimmory = "Bookmarks sync with Grimmory."
+    const val MarksNotOnGrimmory = "Not on Grimmory: highlights and bookmarks stay on this device."
+    const val MarksOnThisDevice = "Highlights and bookmarks stay on this device."
     const val NothingInBook = "None of this book's marks match."
     const val EmptyBody = "Bookmark a page, highlight words or add a word to your dictionary while you read. They all gather here."
     const val NothingFoundTitle = "Nothing found"

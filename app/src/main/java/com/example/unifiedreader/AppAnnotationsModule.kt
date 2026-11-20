@@ -1,6 +1,7 @@
 package com.example.unifiedreader
 
 import com.example.unifiedreader.core.database.UnifiedReaderDatabase
+import com.example.unifiedreader.core.database.dao.LocalServerLinkDao
 import com.example.unifiedreader.feature.annotations.AnnotationJumps
 import com.example.unifiedreader.feature.annotations.BookmarkSyncStore
 import com.example.unifiedreader.feature.annotations.HighlightSyncStore
@@ -53,6 +54,10 @@ object AppAnnotationsModule {
         bookmarks = database.readerBookmarkDao(),
         runInTransaction = { block -> database.runInTransaction(Runnable(block)) },
     )
+
+    /** Which local books are copies of a server's books, for their marks' sync. */
+    @Provides
+    fun provideLocalServerLinkDao(database: UnifiedReaderDatabase): LocalServerLinkDao = database.localServerLinkDao()
 
     /** When highlights sync with Grimmory; the app shell starts it and asks it. */
     @Provides

@@ -89,7 +89,7 @@ export ANDROID_HOME=~/Library/Android/sdk_new
   that resumes on Main (anything behind a `Dispatchers.IO` hop): the looper can't run and the
   suite hangs with no timeout. Poll while idling the looper instead (`waitForUiState { ... }`).
   If `testDebugUnitTest` stops progressing, `jstack` the Gradle Test Executor JVM.
-- Room schema is v39 (`core/database/.../UnifiedReaderDatabase.kt`), no destructive fallback: every version bump
+- Room schema is v41 (`core/database/.../UnifiedReaderDatabase.kt`), no destructive fallback: every version bump
   needs a migration. `exportSchema = true` writes each version to `core/database/schemas/`: commit the new file
   with the bump (`UnifiedReaderDatabaseSchemaTest` checks every version from 36 has one) and add a
   `MigrationTestHelper` case for the new migration there. Run the tests twice after a bump: the first build

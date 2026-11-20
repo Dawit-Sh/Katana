@@ -12,6 +12,7 @@ import com.example.unifiedreader.core.database.dao.JournalDao
 import com.example.unifiedreader.core.database.dao.ReadingProgressDao
 import com.example.unifiedreader.core.database.dao.ReaderSessionStateDao
 import com.example.unifiedreader.core.model.ReadableItem
+import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.core.network.buildHttpClient
 import com.example.unifiedreader.data.grimmory.GrimmoryRemoteJournalPusher
@@ -829,6 +830,7 @@ object AppModule {
         translationService: TranslationService,
         annotationStore: ReaderAnnotationStore,
         annotationJumps: AnnotationJumps,
+        localCopies: GrimmoryLocalCopies,
         @ApplicationScope applicationScope: CoroutineScope,
         appDispatchers: AppDispatchers,
     ): List<@JvmSuppressWildcards ReaderScreenFactory> = listOf(
@@ -865,7 +867,9 @@ object AppModule {
                 translation = translationService,
                 annotations = annotationStore,
                 jumps = annotationJumps,
-                syncsHighlights = ReadableItem::syncsHighlightsWithGrimmory,
+                syncsHighlights = { item ->
+                    item.syncsHighlightsWithGrimmory() || item.format == FormatType.EPUB && localCopies.isLinked(item)
+                },
             ),
         ),
         pdfReaderFactory(

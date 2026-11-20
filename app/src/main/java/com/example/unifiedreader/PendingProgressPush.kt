@@ -28,6 +28,7 @@ internal sealed interface PendingProgressPush {
 internal fun ReaderProgressSnapshot.serverAnswer(
     remote: ReadingProgress?,
     localRefinesRemote: (ProgressSyncSnapshot, ReadingProgress?) -> Boolean = { _, _ -> false },
+    nowEpochMillis: Long = System.currentTimeMillis(),
 ): PendingProgressPush? {
     val local = ProgressSyncSnapshot(
         itemId = itemId,
@@ -43,7 +44,7 @@ internal fun ReaderProgressSnapshot.serverAnswer(
     val decision = decideRemoteProgressSync(
         local = local,
         remote = remote,
-        nowEpochMillis = updatedAtEpochMillis,
+        nowEpochMillis = nowEpochMillis,
         localRefinesRemote = localRefinesRemote,
     ).askingBeforeGoingBack(local)
     if (decision !is RemoteProgressSyncDecision.OfferRemote) BackwardProgressOffers.withdraw(itemId)

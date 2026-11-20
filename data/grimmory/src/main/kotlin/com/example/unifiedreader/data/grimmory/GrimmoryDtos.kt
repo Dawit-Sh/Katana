@@ -190,6 +190,7 @@ internal data class GrimmoryBookFileDto(
     val fileName: String? = null,
     val bookType: String? = null,
     val extension: String? = null,
+    val fileSizeKb: Long? = null,
 )
 
 @Serializable
@@ -331,6 +332,7 @@ internal fun GrimmoryBookDto.toCatalogEntry(
         remoteId = bookId,
         remoteFileId = primaryFile?.id?.toString(),
         remoteFileType = primaryFile?.bookType?.takeIf(String::isNotBlank) ?: format.name,
+        remoteFileSizeKb = primaryFile?.fileSizeKb?.takeIf { it > 0 },
         title = itemTitle,
         format = format,
         kind = format.defaultGrimmoryItemKind(),
