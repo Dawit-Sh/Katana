@@ -13,12 +13,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * A book file's size and KOReader-style partial MD5 ([PartialMd5]): the same file whichever folder or app it was
- * picked from, where the picker's address (and so the book's id) differs.
+ * The fingerprint ([LocalFileFingerprint], size and KOReader-style partial MD5) of the file behind a content address,
+ * or null when it can't be read: the same file whichever folder or app it was picked from.
  */
-data class LocalFileFingerprint(val size: Long, val partialMd5: String)
-
-/** The fingerprint of the file behind a content address, or null when it can't be read. */
 fun interface LocalFileFingerprinter {
     suspend fun of(uri: String): LocalFileFingerprint?
 }
@@ -53,5 +50,5 @@ internal fun fingerprintOf(channel: FileChannel): LocalFileFingerprint {
         }
         buffer.array()
     }
-    return LocalFileFingerprint(size = size, partialMd5 = md5)
+    return LocalFileFingerprint(sizeBytes = size, partialMd5 = md5)
 }

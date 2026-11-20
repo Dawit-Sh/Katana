@@ -95,7 +95,13 @@ object AppSettingsToolsModule {
         marksHoming = LocalMarksHoming(
             pending = PendingLocalMarksStore(context),
             mover = { fromItemId, toItemId ->
-                withContext(Dispatchers.IO) { database.readerAnnotationDao().moveMarks(fromItemId, toItemId) }
+                withContext(Dispatchers.IO) {
+                    database.runInTransaction<Int> {
+                        database.readerAnnotationDao().moveMarks(fromItemId, toItemId).also {
+                            database.localServerLinkDao().carryLink(fromItemId, toItemId, System.currentTimeMillis())
+                        }
+                    }
+                }
             },
         ),
         releaseRead = { uri ->

@@ -59,7 +59,7 @@ class LocalBookImports(
             title = item.title,
             author = item.bookMetadata?.author,
             format = item.format.name,
-            fileSize = fingerprint?.size,
+            fileSize = fingerprint?.sizeBytes,
             partialMd5 = fingerprint?.partialMd5,
         )
     }

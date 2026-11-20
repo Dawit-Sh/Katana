@@ -29,7 +29,7 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class LocalBookIdentityTest {
     private val context = ApplicationProvider.getApplicationContext<Application>()
-    private val calculus = LocalFileFingerprint(size = 3_800_000, partialMd5 = "c0ffee")
+    private val calculus = LocalFileFingerprint(sizeBytes = 3_800_000, partialMd5 = "c0ffee")
     private val documents = PickedFiles()
     private val released = mutableListOf<Uri>()
 
@@ -89,7 +89,7 @@ class LocalBookIdentityTest {
         val imported = requireNotNull(books.import(uri))
 
         assertEquals(
-            listOf(LocalBookIdentity(imported.id, "Calculus", "Strang", "PDF", calculus.size, calculus.partialMd5)),
+            listOf(LocalBookIdentity(imported.id, "Calculus", "Strang", "PDF", calculus.sizeBytes, calculus.partialMd5)),
             books.localBooks(),
         )
     }
@@ -98,7 +98,7 @@ class LocalBookIdentityTest {
     fun `importing a file a restore was waiting for gives it that book's marks, once`() = runBlocking {
         val moved = mutableListOf<Pair<String, String>>()
         val pending = InMemoryPendingMarks()
-        pending.remember(listOf(waiting("document-aa01", calculus), waiting("document-bb02", calculus.copy(size = 1))))
+        pending.remember(listOf(waiting("document-aa01", calculus), waiting("document-bb02", calculus.copy(sizeBytes = 1))))
         val uri = Uri.parse("content://storage/Calculus.pdf")
         val books = imports(
             mapOf(uri.toString() to calculus),
@@ -144,7 +144,7 @@ class LocalBookIdentityTest {
         title = "Calculus",
         author = "Strang",
         format = "PDF",
-        fileSize = fingerprint.size,
+        fileSize = fingerprint.sizeBytes,
         partialMd5 = fingerprint.partialMd5,
     )
 }
