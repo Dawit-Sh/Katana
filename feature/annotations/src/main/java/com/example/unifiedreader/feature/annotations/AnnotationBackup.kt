@@ -67,6 +67,10 @@ class AnnotationBackupStore(
             val here = if (names.keys.any(::isLocalBookId)) localBooks?.localBooks() else null
             val rehome = here?.let { books -> planLocalRehome(names, decoded.books.map(BackupBook::toIdentity), books) }
                 ?: LocalRehomePlan()
+            // Marks already here under an old id (a restore before this version, or a file picked again) go with them.
+            val movedHere = rehome.newIds.entries.sumOf { (from, to) ->
+                local?.marksMover?.moveMarks(from, to) ?: dao.moveMarks(from, to)
+            }
             val backup = decoded.rehomed(rehome)
             val restoredPlaces = restorePlaces(decoded.places, rehome, here.orEmpty())
             pendingLocalMarks?.remember(
@@ -95,6 +99,7 @@ class AnnotationBackupStore(
                 forBooksNotHere = addedIds.count { it in rehome.notHere },
                 forUnsureBooks = addedIds.count { it in rehome.unsure },
                 restoredPlaces = restoredPlaces,
+                movedToTheirBook = movedHere,
             )
         }
     }
@@ -143,6 +148,8 @@ data class AnnotationRestoreResult(
     val forUnsureBooks: Int = 0,
     /** Reading places of books from files put back (each only where it was newer than this device's). */
     val restoredPlaces: Int = 0,
+    /** Marks that were already here under a book's old id and now sit with the book again. */
+    val movedToTheirBook: Int = 0,
 ) {
     /**
      * What the toast says: "Added 12 highlights, 3 words and 2 bookmarks", and, when some are for books
@@ -156,12 +163,16 @@ data class AnnotationRestoreResult(
                 counted(addedBookmarks, "bookmark"),
                 counted(restoredPlaces, "reading place"),
             )
-            val summary = when (added.size) {
-                0 -> "Nothing new: this device has it all"
-                1 -> "Added ${added.single()}"
+            val summary = when {
+                added.isEmpty() && movedToTheirBook > 0 -> "Nothing new to add"
+                added.isEmpty() -> "Nothing new: this device has it all"
+                added.size == 1 -> "Added ${added.single()}"
                 else -> "Added ${added.dropLast(1).joinToString(", ")} and ${added.last()}"
             }
             val notes = listOfNotNull(
+                movedToTheirBook.takeIf { it > 0 }?.let { moved ->
+                    if (moved == 1) "1 mark here is back with its book" else "$moved marks here are back with their book"
+                },
                 forBooksNotHere.takeIf { it > 0 }?.let { "${it.areOrIs()} for books not on this device" },
                 forUnsureBooks.takeIf { it > 0 }?.let {
                     "${it.areOrIs()} for a book this device has more than one copy of, so they were left as they were"

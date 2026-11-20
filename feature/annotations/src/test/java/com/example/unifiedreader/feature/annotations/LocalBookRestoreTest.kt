@@ -132,6 +132,34 @@ class LocalBookRestoreTest {
     }
 
     @Test
+    fun `marks an earlier restore left under the old id go back to the book here`() = runBlocking {
+        markUp(epub)
+        val file = backups(source, here = listOf(epub)).backUp()
+        // 1.0.8 restored without knowing the books here: the marks kept the old id, and no book showed them.
+        backups(target, here = null).restore(file.text)
+        val again = epub.copy(itemId = "document-bbbb2222")
+
+        val result = backups(target, here = listOf(again)).restore(file.text)
+
+        assertEquals(setOf("document-bbbb2222"), targetItemIds())
+        assertEquals("Nothing new to add. 3 marks here are back with their book", result.message)
+    }
+
+    @Test
+    fun `marks under an old id stay where they are when the book here isn't certain`() = runBlocking {
+        markUp(epub)
+        val oldFile = backups(source, here = null).backUp()
+        backups(target, here = null).restore(oldFile.text)
+        val epubAgain = epub.copy(itemId = "document-bbbb2222", fileSize = null, partialMd5 = null)
+        val azw3 = epubAgain.copy(itemId = "document-cccc3333", format = "AZW3")
+
+        val result = backups(target, here = listOf(epubAgain, azw3)).restore(oldFile.text)
+
+        assertEquals(setOf("document-aaaa1111"), targetItemIds())
+        assertEquals(0, result.movedToTheirBook)
+    }
+
+    @Test
     fun `a book's reading place comes back under its new id, and only a newer one replaces this device's`() = runBlocking {
         markUp(epub)
         val server = LocalReadingPlace("grimmory:item:2694", "CFI", cfi = "server", updatedAtEpochMillis = 500)

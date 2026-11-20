@@ -37,6 +37,8 @@ class LocalBooksInBackup(
     val directory: LocalBookDirectory,
     val pendingMarks: PendingLocalMarks? = null,
     val readingPlaces: LocalReadingPlaces? = null,
+    /** Moves marks already on this device under a book's old id to the book here (an earlier restore's, say). */
+    val marksMover: LocalBookMarksMover? = null,
 )
 
 /**

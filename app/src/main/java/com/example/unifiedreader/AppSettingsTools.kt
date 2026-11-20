@@ -11,6 +11,7 @@ import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.core.model.runSuspendCatching
 import com.example.unifiedreader.feature.annotations.AnnotationBackupStore
 import com.example.unifiedreader.feature.annotations.AnnotationMarkdown
+import com.example.unifiedreader.feature.annotations.LocalBookMarksMover
 import com.example.unifiedreader.feature.annotations.LocalBooksInBackup
 import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
 import com.example.unifiedreader.feature.downloads.DownloadEntryStatus
@@ -78,6 +79,7 @@ object AppSettingsToolsModule {
                 hydrate = sessions::hydrate,
                 localItems = { localBooks.getImportedItems() },
             ),
+            marksMover = localMarksMover(database),
         ),
     )
 
@@ -94,20 +96,23 @@ object AppSettingsToolsModule {
         fingerprints = LocalFileFingerprints(context),
         marksHoming = LocalMarksHoming(
             pending = PendingLocalMarksStore(context),
-            mover = { fromItemId, toItemId ->
-                withContext(Dispatchers.IO) {
-                    database.runInTransaction<Int> {
-                        database.readerAnnotationDao().moveMarks(fromItemId, toItemId).also {
-                            database.localServerLinkDao().carryLink(fromItemId, toItemId, System.currentTimeMillis())
-                        }
-                    }
-                }
-            },
+            mover = localMarksMover(database),
         ),
         releaseRead = { uri ->
             runCatching { context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
         },
     )
+
+    /** Moves a book from a file's marks to its new id, its Grimmory link along with them, in one transaction. */
+    private fun localMarksMover(database: UnifiedReaderDatabase) = LocalBookMarksMover { fromItemId, toItemId ->
+        withContext(Dispatchers.IO) {
+            database.runInTransaction<Int> {
+                database.readerAnnotationDao().moveMarks(fromItemId, toItemId).also {
+                    database.localServerLinkDao().carryLink(fromItemId, toItemId, System.currentTimeMillis())
+                }
+            }
+        }
+    }
 }
 
 /** The Downloads sheet's "On this device": the books and what Remove does; no actions without the tools. */
