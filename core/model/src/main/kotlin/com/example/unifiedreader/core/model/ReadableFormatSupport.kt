@@ -72,3 +72,7 @@ fun String.readableFormatOfFileName(): FormatType? =
     } else {
         substringAfterLast('.', missingDelimiterValue = "").toReadableFormatTypeOrNull()
     }
+
+/** The format as a tile or a book page names it: "EPUB", "AZW3", "DjVu". */
+val FormatType.label: String
+    get() = if (this == FormatType.DJVU) "DjVu" else name

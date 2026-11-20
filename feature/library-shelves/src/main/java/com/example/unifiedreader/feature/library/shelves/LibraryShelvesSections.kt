@@ -185,7 +185,7 @@ internal fun LibraryShelfTabsBand(
 @Composable
 private fun ShelfStripCard(
     item: ReadableItem,
-    supportingText: String,
+    supportingText: String?,
     trailingText: String,
     accentColor: Color,
     progress: ItemProgressSummary?,

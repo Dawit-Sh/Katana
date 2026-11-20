@@ -42,6 +42,30 @@ class LibraryShelvesTextTest {
         assertEquals("30 Dec 2025", finished.tileMetaText(nowEpochMillis = now, zone = ZoneOffset.UTC))
     }
 
+    @Test
+    fun `a book without an author shows no author line, not its title again`() {
+        val book = reading(localBook(id = "local:alice", title = "Alice scan", format = FormatType.DJVU))
+
+        assertEquals(null, book.tileSupportingText())
+    }
+
+    @Test
+    fun `the same title in two formats tells apart by the format on the meta line`() {
+        val epub = reading(localBook(id = "local:a", title = "Pride and Prejudice", format = FormatType.EPUB))
+        val azw3 = reading(epub.item.copy(id = "local:b", format = FormatType.AZW3))
+
+        assertEquals("EPUB · 30%", epub.tileMetaText())
+        assertEquals("AZW3 · 30%", azw3.tileMetaText())
+    }
+
+    private fun localBook(id: String, title: String, format: FormatType) =
+        ReadableItem(id = id, sourceType = SourceType.LOCAL, libraryId = "local-imports", title = title, format = format)
+
+    private fun reading(item: ReadableItem) = ContinueReadingShelfItem(
+        item = item,
+        progress = ItemProgressSummary(label = "30%", fraction = 0.3f, lastReadAtEpochMillis = 0L),
+    )
+
     private fun finishedAt(time: LocalDateTime) = RecentlyFinishedShelfItem(
         item = ReadableItem(
             id = "kavita:finished",

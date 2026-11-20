@@ -20,6 +20,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.example.unifiedreader.core.model.ReadableItem
+import com.example.unifiedreader.core.model.label
 import com.example.unifiedreader.ui.components.AppCoverShape
 import com.example.unifiedreader.ui.components.AppRoundCheck
 import com.example.unifiedreader.ui.theme.AppMotion
@@ -48,10 +49,8 @@ internal fun GridCoverCard(
     menuContent: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    val progressLabel = progress?.tileLabel
     val progressBarFraction = progress?.tileBarFraction
-    val seriesLabel = seriesIssueCount?.let { count -> if (count == 1) "1 issue" else "$count issues" }
-    val metaLabel = lengthLabel ?: listOfNotNull(seriesLabel, progressLabel).joinToString(" · ").ifEmpty { null }
+    val metaLabel = gridTileMetaLabel(item, progress?.tileLabel, seriesIssueCount, lengthLabel)
     // A picked cover steps back a little inside an accent ring.
     val picked = isSelectionMode && isSelected
     val coverScale by animateFloatAsState(
@@ -154,3 +153,19 @@ internal fun GridCoverCard(
 
 private const val SelectedCoverScale = 0.94f
 private val SelectedCoverRingWidth = 3.dp
+
+/**
+ * A grid tile's meta line: the book's format first, so the same title in two formats (an EPUB and an AZW3) tells
+ * itself apart, then its length while sorted by pages, or a series' issues and the progress. A series has no format.
+ */
+internal fun gridTileMetaLabel(
+    item: ReadableItem,
+    progressLabel: String?,
+    seriesIssueCount: Int? = null,
+    lengthLabel: String? = null,
+): String? {
+    val formatLabel = item.format.label.takeIf { seriesIssueCount == null }
+    val seriesLabel = seriesIssueCount?.let { count -> if (count == 1) "1 issue" else "$count issues" }
+    val rest = lengthLabel ?: listOfNotNull(seriesLabel, progressLabel).joinToString(" · ").ifEmpty { null }
+    return listOfNotNull(formatLabel, rest).joinToString(" · ").ifEmpty { null }
+}

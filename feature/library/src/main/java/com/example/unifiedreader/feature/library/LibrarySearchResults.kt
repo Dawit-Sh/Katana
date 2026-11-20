@@ -36,6 +36,7 @@ import com.example.unifiedreader.core.model.LibrarySearchSnippet
 import com.example.unifiedreader.core.model.LibrarySearchTagSuggestion
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.librarySearchSnippet
+import com.example.unifiedreader.core.model.label
 import com.example.unifiedreader.core.model.librarySecondaryText
 import com.example.unifiedreader.ui.components.AppBookRow
 import com.example.unifiedreader.ui.components.AppBookRowDefaults
@@ -148,7 +149,8 @@ internal fun LibrarySearchResultRow(
                 )
             },
             supporting = {
-                item.librarySecondaryText()?.let { line -> AppBookRowLine(text = line, color = quietColor) }
+                // Who wrote it and its format, so an EPUB and an AZW3 of one title tell apart.
+                AppBookRowLine(text = librarySearchResultLine(item), color = quietColor)
                 if (snippet != null && snippetText != null) {
                     if (snippet.source == LibrarySearchMatchSource.DESCRIPTION) {
                         Column(verticalArrangement = Arrangement.spacedBy(SnippetGap)) {
@@ -217,3 +219,7 @@ private fun LibrarySearchSnippet.marked(style: SpanStyle): AnnotatedString = bui
 
 private val SearchChipGap = 8.dp
 private val SnippetGap = 2.dp
+
+/** A search result's line under its title: "Jane Austen · EPUB", or the format alone without an author. */
+internal fun librarySearchResultLine(item: ReadableItem): String =
+    listOfNotNull(item.librarySecondaryText(), item.format.label).joinToString(" · ")
