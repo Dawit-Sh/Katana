@@ -36,6 +36,13 @@ internal object DjvuNative {
     @JvmStatic
     external fun nativeRenderPage(handle: Long, pageIndex: Int, bitmap: Bitmap)
 
+    /**
+     * A page's hidden text as {UTF-8 bytes of its words, numbers}, or null when the page has none (see
+     * [djvuPageTextOf]). Throws [DjvuException] only when DjVuLibre runs out of memory or fails badly.
+     */
+    @JvmStatic
+    external fun nativePageText(handle: Long, pageIndex: Int): Array<Any?>?
+
     @JvmStatic
     external fun nativeClose(handle: Long)
 }

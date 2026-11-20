@@ -66,6 +66,8 @@ import com.example.unifiedreader.feature.reader.core.stackedDockStrips
 import com.example.unifiedreader.ui.components.AppCircularProgress
 import com.example.unifiedreader.ui.components.AppFloatingPanelPlacement
 import com.example.unifiedreader.ui.components.AppIcons
+import com.example.unifiedreader.ui.components.AppWindowWidth
+import com.example.unifiedreader.ui.components.currentAppWindowWidth
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -96,7 +98,7 @@ internal fun PdfReaderChrome(
     bookmark: PdfBookmarkButton? = null,
     // The book's marks panel (bookmarks, highlights, export); null when the book can't keep marks.
     marksPanel: PdfMarksPanel? = null,
-    // Search in the book; null for a book without text (DjVu).
+    // Search in the book; null for a book that can't keep highlights (no marks store).
     search: PdfSearchControls? = null,
     // Previous and Next through the marks, over the page strip, after one was opened from a list.
     markStrip: (@Composable () -> Unit)? = null,
@@ -362,7 +364,11 @@ private const val PdfPagePreviewStripTag = "pdf-page-preview-strip"
 private const val PDF_PREVIEW_CACHE_MAX_ENTRIES = 64
 private const val PDF_PREVIEW_RENDER_LONG_EDGE_PX = 420
 
-/** The top bar's buttons: previous and next, search, the bookmark and the marks (each when the book has them), settings. */
+/**
+ * The top bar's buttons: previous and next, search, the bookmark and the marks (each when the book has them), settings.
+ * On a narrow screen previous and next stay out, so the title keeps its room: taps, swipes, the volume keys and the
+ * slider turn pages there, and the bar has what an EPUB's has (search, bookmark, marks, settings).
+ */
 @Composable
 private fun PdfTopBarButtons(
     canNavigatePrevious: Boolean,
@@ -375,13 +381,15 @@ private fun PdfTopBarButtons(
     hasMarks: Boolean,
     hasSearch: Boolean,
 ) {
-    ReaderBarButton(
-        icon = AppIcons.NavigateBefore,
-        contentDescription = "Previous page",
-        onClick = onPrevious,
-        enabled = canNavigatePrevious,
-    )
-    ReaderBarButton(icon = AppIcons.NavigateNext, contentDescription = "Next page", onClick = onNext, enabled = canNavigateNext)
+    if (currentAppWindowWidth() != AppWindowWidth.Compact) {
+        ReaderBarButton(
+            icon = AppIcons.NavigateBefore,
+            contentDescription = "Previous page",
+            onClick = onPrevious,
+            enabled = canNavigatePrevious,
+        )
+        ReaderBarButton(icon = AppIcons.NavigateNext, contentDescription = "Next page", onClick = onNext, enabled = canNavigateNext)
+    }
     if (hasSearch) {
         ReaderBarButton(
             icon = AppIcons.Search,
@@ -475,13 +483,13 @@ private fun PdfSearchPanel(
     )
 }
 
-/** The marks panel's contents: the page bookmarks, the highlights (none in a DjVu book), the export, and going to a page. */
+/** The marks panel's contents: the page bookmarks, the highlights, the export, and going to a page. */
 internal class PdfMarksPanel(
     val bookmarks: PageBookmarks,
     val export: BookMarksExport,
     val highlights: List<ReaderHighlight>,
     val onJumpToPage: (Int) -> Unit,
-    /** The pages have text to highlight (a PDF, not a DjVu book). */
+    /** The pages may have text to highlight (a PDF or a DjVu book, not a comic). */
     val hasText: Boolean,
 )
 

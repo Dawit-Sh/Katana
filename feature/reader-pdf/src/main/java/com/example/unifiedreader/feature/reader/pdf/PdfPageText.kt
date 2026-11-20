@@ -1,5 +1,6 @@
 package com.example.unifiedreader.feature.reader.pdf
 
+import androidx.compose.ui.geometry.Offset
 import com.example.unifiedreader.feature.annotations.PageTextRect
 import kotlin.math.hypot
 import kotlin.math.max
@@ -12,22 +13,36 @@ import kotlin.math.min
  * belongs to a line, whose height every selection and highlight on it takes, so a short word gets a box
  * as tall as its line's.
  *
- * [aspect] is the page's height over its width: distances on the page are measured in page widths.
+ * Words may run any of four ways on the drawn page ([turn]: a page turned by its /Rotate, or a table printed
+ * sideways). Lines, the nearest word and a selection's ends are worked out as the words read, then turned back.
+ *
+ * [aspect] is the page's height over its width: distances on the page are measured in page widths. [pageTurn] is
+ * how the page itself is turned (its /Rotate, in quarter turns clockwise), which tells words running right to left
+ * on an upright page (Hebrew, Arabic) from words upside down.
  */
 internal class PdfPageText(
     val pageIndex: Int,
     val text: String,
-    private val boxes: FloatArray,
+    boxes: FloatArray,
     val aspect: Float,
+    pageTurn: Int = 0,
 ) {
     val length: Int get() = text.length
 
+    /** How the words run on the drawn page, in quarter turns clockwise: 0 left to right, 1 down, 2 upside down, 3 up. */
+    val turn: Int
+
+    // The boxes as the words read: left to right along a line ("left", "right"), lines going down ("top", "bottom").
+    private val boxes: FloatArray
     private val lineOf = IntArray(text.length) { NoLine }
     private val lineTops = ArrayList<Float>()
     private val lineBottoms = ArrayList<Float>()
 
     init {
         require(boxes.size == text.length * BoxSize) { "One box per character" }
+        turn = readingTurn(text, boxes, aspect, pageTurn)
+        this.boxes = boxes.copyOf()
+        if (turn != 0) for (index in text.indices) turnBoxToReading(this.boxes, index * BoxSize, turn)
         groupLines()
     }
 
@@ -38,14 +53,18 @@ internal class PdfPageText(
      * (in page widths); spaces and the characters PDFium made up never count. Null when none is that close.
      */
     fun charNear(x: Float, y: Float, maxDistance: Float = Float.MAX_VALUE): Int? {
+        val point = toReading(x, y, turn)
+        // Along a line and across lines, in page widths.
+        val alongScale = if (turn % 2 == 0) 1f else aspect
+        val acrossScale = if (turn % 2 == 0) aspect else 1f
         var best: Int? = null
         var bestDistance = maxDistance
         for (index in text.indices) {
             if (!hasBox(index) || text[index].isWhitespace()) continue
             val line = lineOf[index]
             val at = index * BoxSize
-            val dx = max(max(boxes[at + Left] - x, x - boxes[at + Right]), 0f)
-            val dy = max(max(lineTops[line] - y, y - lineBottoms[line]), 0f) * aspect
+            val dx = max(max(boxes[at + Left] - point.x, point.x - boxes[at + Right]), 0f) * alongScale
+            val dy = max(max(lineTops[line] - point.y, point.y - lineBottoms[line]), 0f) * acrossScale
             val distance = hypot(dx, dy)
             if (distance == 0f) return index
             if (distance < bestDistance) {
@@ -69,7 +88,27 @@ internal class PdfPageText(
     }
 
     /** One box per line for the characters [start] up to [end] (not included), each as tall as its line. */
-    fun rects(start: Int, end: Int): List<PageTextRect> {
+    fun rects(start: Int, end: Int): List<PageTextRect> = readingRects(start, end).map { rect -> drawn(rect, turn) }
+
+    /**
+     * Where the selection of [start] up to [end] (not included) begins and ends on the drawn page: the corners its
+     * handles hang from (its first line's start and its last line's end, at the lines' foot) and the points half way
+     * across those lines. Null when none of the characters has a box.
+     */
+    fun ends(start: Int, end: Int): PdfTextEnds? {
+        val lines = readingRects(start, end)
+        val first = lines.firstOrNull() ?: return null
+        val last = lines.last()
+        return PdfTextEnds(
+            startCorner = fromReading(first.left, first.bottom, turn),
+            endCorner = fromReading(last.right, last.bottom, turn),
+            startPoint = fromReading(first.left, (first.top + first.bottom) / 2f, turn),
+            endPoint = fromReading(last.right, (last.top + last.bottom) / 2f, turn),
+        )
+    }
+
+    /** [rects], as the words read (not yet turned back onto the drawn page). */
+    private fun readingRects(start: Int, end: Int): List<PageTextRect> {
         val rects = ArrayList<PageTextRect>()
         var line = NoLine
         var left = 0f
@@ -144,6 +183,14 @@ internal class PdfPageText(
         private val WordJoiners = charArrayOf('\'', '’', '-', '‐', '_')
     }
 }
+
+/** Where a selection begins and ends on the drawn page, as fractions of it (see [PdfPageText.ends]). */
+internal class PdfTextEnds(
+    val startCorner: Offset,
+    val endCorner: Offset,
+    val startPoint: Offset,
+    val endPoint: Offset,
+)
 
 /**
  * Text as PDFium gives it, made readable: a word broken over two lines with a hyphen is joined again, other

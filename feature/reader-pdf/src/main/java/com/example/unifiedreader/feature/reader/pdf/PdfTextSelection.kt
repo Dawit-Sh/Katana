@@ -31,11 +31,19 @@ internal class PdfTextSelection private constructor(
     /** The words as they read, lines joined. */
     val text: String get() = page.textOf(start, end)
 
-    /** Where the start handle points: the selection's first line, at its left edge, half way down. */
-    val startPoint: Offset? get() = rects.firstOrNull()?.let { Offset(it.left, (it.top + it.bottom) / 2f) }
+    private val ends: PdfTextEnds? = page.ends(start, end)
 
-    /** Where the end handle points: the selection's last line, at its right edge, half way down. */
-    val endPoint: Offset? get() = rects.lastOrNull()?.let { Offset(it.right, (it.top + it.bottom) / 2f) }
+    /** Where the start handle points: the selection's first line, at its start, half way across. */
+    val startPoint: Offset? get() = ends?.startPoint
+
+    /** Where the end handle points: the selection's last line, at its end, half way across. */
+    val endPoint: Offset? get() = ends?.endPoint
+
+    /** The corner the start handle hangs from: the first line's start, at its foot (its left, below it, upright). */
+    val startCorner: Offset? get() = ends?.startCorner
+
+    /** The corner the end handle hangs from: the last line's end, at its foot. */
+    val endCorner: Offset? get() = ends?.endCorner
 
     /** The selection with a finger now at character [index], moving what [dragging] says. */
     fun dragTo(index: Int): PdfTextSelection {

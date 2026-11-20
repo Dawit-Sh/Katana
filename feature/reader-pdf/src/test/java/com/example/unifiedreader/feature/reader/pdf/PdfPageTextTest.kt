@@ -117,6 +117,12 @@ internal fun lineBand(line: Int): Pair<Float, Float> = (LineTop + line * LineSte
  * sit half a line up, like a footnote number.
  */
 internal fun testPage(vararg lines: String, raised: Set<Int> = emptySet()): PdfPageText {
+    val (text, boxes) = testText(*lines, raised = raised)
+    return PdfPageText(pageIndex = 0, text = text, boxes = boxes, aspect = 1.4f)
+}
+
+/** A [testPage]'s text and its boxes, upright. */
+internal fun testText(vararg lines: String, raised: Set<Int> = emptySet()): Pair<String, FloatArray> {
     val text = StringBuilder()
     val boxes = ArrayList<Float>()
     lines.forEachIndexed { lineIndex, line ->
@@ -133,5 +139,5 @@ internal fun testPage(vararg lines: String, raised: Set<Int> = emptySet()): PdfP
             text.append(char)
         }
     }
-    return PdfPageText(pageIndex = 0, text = text.toString(), boxes = boxes.toFloatArray(), aspect = 1.4f)
+    return text.toString() to boxes.toFloatArray()
 }

@@ -134,8 +134,9 @@ fun resolveAppFloatingPanelLayout(
  * from the system bars and from any bar the panel must not cover ([contentPadding] adds the
  * panel's own margin inside that slot; the bottom sheet ignores the bottom and side margins).
  * While visible, a scrim covers the slot, tapping it or pressing back calls
- * [onDismissRequest], and the panel slides in from its edge. A predictive back gesture moves
- * and shrinks the panel toward its edge as it goes; letting go closes it from there.
+ * [onDismissRequest], the panel slides in from its edge, and the app's toasts show over it.
+ * A predictive back gesture moves and shrinks the panel toward its edge as it goes; letting go
+ * closes it from there.
  */
 @Composable
 fun AppFloatingPanel(
@@ -230,6 +231,8 @@ fun AppFloatingPanel(
                 }
             }
         }
+        // While it is open, toasts show over the panel, not hidden under it: the Undo after removing something in it.
+        if (visible) AppToastHost()
     }
 }
 

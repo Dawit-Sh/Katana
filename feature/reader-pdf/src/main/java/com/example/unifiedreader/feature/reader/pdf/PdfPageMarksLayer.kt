@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.PointerInputScope
@@ -23,6 +24,7 @@ import com.example.unifiedreader.feature.annotations.PageTextRect
 import com.example.unifiedreader.feature.reader.core.ReaderSearchTint
 import com.example.unifiedreader.feature.reader.core.ReaderSelectionHighlight
 import kotlin.math.max
+import kotlin.math.min
 
 /**
  * Page [pageIndex]'s highlights in their style and colour, and its selected words with their two handles, drawn
@@ -41,13 +43,7 @@ internal fun PdfPageMarksLayer(
         if (page.isEmpty) return@Canvas
         marks.search.hitsOn(pageIndex).forEach { (hit, current) -> drawSearchHit(hit.rects, page, current) }
         marks.highlightsOn(pageIndex).forEach { mark ->
-            drawHighlight(
-                rects = mark.spot.rects,
-                page = page,
-                style = mark.highlight.style,
-                color = Color(mark.highlight.color.argb),
-                fillAlpha = mark.highlight.color.fillAlpha,
-            )
+            drawHighlight(mark, page)
         }
         marks.selection?.takeIf { it.pageIndex == pageIndex }?.let { selection ->
             selection.rects.forEach { rect ->
@@ -55,50 +51,60 @@ internal fun PdfPageMarksLayer(
                 drawRect(ReaderSelectionHighlight.color, onScreen.topLeft, onScreen.size)
             }
             pdfSelectionHandles(selection, page)?.let { handles ->
-                drawHandle(handles.start, PdfSelectionDrag.Start, HandleRadius.toPx())
-                drawHandle(handles.end, PdfSelectionDrag.End, HandleRadius.toPx())
+                drawHandle(handles, PdfSelectionDrag.Start, HandleRadius.toPx())
+                drawHandle(handles, PdfSelectionDrag.End, HandleRadius.toPx())
             }
         }
     }
 }
 
-/** Where a selection's handles hang on screen: under its first line's start and its last line's end. */
-internal class PdfSelectionHandles(val start: Offset, val end: Offset) {
+/**
+ * Where a selection's handles hang on screen: from its first line's start and its last line's end, on the side
+ * of the next line, turned with the words ([turn], see [PdfPageText.turn]) so they keep to the lines' ends.
+ */
+internal class PdfSelectionHandles(val start: Offset, val end: Offset, val turn: Int = 0) {
     /** The handle a finger down at [position] takes, within [reach] pixels of its round part; null for neither. */
     fun at(position: Offset, radius: Float, reach: Float): PdfSelectionDrag? {
-        val startCentre = handleCentre(start, PdfSelectionDrag.Start, radius)
-        val endCentre = handleCentre(end, PdfSelectionDrag.End, radius)
-        val toStart = (position - startCentre).getDistance()
-        val toEnd = (position - endCentre).getDistance()
+        val toStart = (position - centre(PdfSelectionDrag.Start, radius)).getDistance()
+        val toEnd = (position - centre(PdfSelectionDrag.End, radius)).getDistance()
         return when {
             toStart > reach && toEnd > reach -> null
             toStart <= toEnd -> PdfSelectionDrag.Start
             else -> PdfSelectionDrag.End
         }
     }
+
+    /** [handle]'s round part: past the line's foot, before the start's corner and after the end's. */
+    fun centre(handle: PdfSelectionDrag, radius: Float): Offset {
+        val corner = if (handle == PdfSelectionDrag.Start) start else end
+        val along = alongLine(turn) * if (handle == PdfSelectionDrag.Start) -radius else radius
+        return corner + along + acrossLines(turn) * radius
+    }
 }
 
 /** The handles of [selection] for a page drawn at [page], or null when it has no lines. */
 internal fun pdfSelectionHandles(selection: PdfTextSelection, page: Rect): PdfSelectionHandles? {
-    val first = selection.rects.firstOrNull() ?: return null
-    val last = selection.rects.last()
-    return PdfSelectionHandles(
-        start = pageToScreen(page, first.left, first.bottom),
-        end = pageToScreen(page, last.right, last.bottom),
-    )
+    val start = selection.startCorner
+    val end = selection.endCorner
+    return if (start == null || end == null) {
+        null
+    } else {
+        PdfSelectionHandles(
+            start = pageToScreen(page, start.x, start.y),
+            end = pageToScreen(page, end.x, end.y),
+            turn = selection.page.turn,
+        )
+    }
 }
 
-/** A handle's round part: below the line, to the left of the start's corner and to the right of the end's. */
-private fun handleCentre(corner: Offset, handle: PdfSelectionDrag, radius: Float): Offset =
-    Offset(if (handle == PdfSelectionDrag.Start) corner.x - radius else corner.x + radius, corner.y + radius)
-
 /** A teardrop whose sharp corner touches the selection's corner, as Android's own text handles. */
-private fun DrawScope.drawHandle(corner: Offset, handle: PdfSelectionDrag, radius: Float) {
+private fun DrawScope.drawHandle(handles: PdfSelectionHandles, handle: PdfSelectionDrag, radius: Float) {
     val colour = ReaderSelectionHighlight.color.copy(alpha = 1f)
-    val centre = handleCentre(corner, handle, radius)
+    val corner = if (handle == PdfSelectionDrag.Start) handles.start else handles.end
+    val centre = handles.centre(handle, radius)
     drawCircle(colour, radius, centre)
-    val squareLeft = if (handle == PdfSelectionDrag.Start) corner.x - radius else corner.x
-    drawRect(colour, Offset(squareLeft, corner.y), Size(radius, radius))
+    // The square between the corner and the round part's centre makes the point.
+    drawRect(colour, Offset(min(corner.x, centre.x), min(corner.y, centre.y)), Size(radius, radius))
 }
 
 /** A search match: the amber behind its words, stronger with a line under them when it is the [current] one. */
@@ -114,30 +120,38 @@ private fun DrawScope.drawSearchHit(rects: List<PageTextRect>, page: Rect, curre
 }
 
 /** One highlight's lines on a page drawn at [page]: filled, underlined, struck through or with a wavy line. */
-private fun DrawScope.drawHighlight(
-    rects: List<PageTextRect>,
-    page: Rect,
-    style: HighlightStyle,
-    color: Color,
-    fillAlpha: Float,
-) {
-    rects.forEach { rect ->
-        val line = pageRectToScreen(page, rect)
-        val stroke = max(MinLine.toPx(), line.height * LineShare)
-        when (style) {
-            HighlightStyle.Highlight -> drawRect(color.copy(alpha = fillAlpha), line.topLeft, line.size)
-            HighlightStyle.Underline -> {
-                val y = line.bottom - stroke / 2f
-                drawLine(color, Offset(line.left, y), Offset(line.right, y), stroke)
+private fun DrawScope.drawHighlight(mark: PdfHighlightMark, page: Rect) {
+    val style = mark.highlight.style
+    val color = Color(mark.highlight.color.argb)
+    val turn = mark.spot.turn
+    mark.spot.rects.forEach { rect ->
+        val shown = pageRectToScreen(page, rect)
+        if (style == HighlightStyle.Highlight) {
+            drawRect(color.copy(alpha = mark.highlight.color.fillAlpha), shown.topLeft, shown.size)
+        } else {
+            // Lines are drawn as for words running left to right, turned with the words about the line's centre.
+            val line = readingLine(shown, turn)
+            rotate(degrees = QuarterTurnDegrees * quarterTurn(turn), pivot = shown.center) {
+                drawLineStyle(line, style, color)
             }
-            HighlightStyle.Strikethrough -> {
-                val y = line.center.y
-                drawLine(color, Offset(line.left, y), Offset(line.right, y), stroke)
-            }
-            HighlightStyle.Squiggly -> drawPath(squiggle(line, stroke), color, style = Stroke(width = stroke))
         }
     }
 }
+
+/** A line under, through or waving under the words of [line], as they would be drawn running left to right. */
+private fun DrawScope.drawLineStyle(line: Rect, style: HighlightStyle, color: Color) {
+    val stroke = max(MinLine.toPx(), line.height * LineShare)
+    when (style) {
+        HighlightStyle.Underline -> {
+            val y = line.bottom - stroke / 2f
+            drawLine(color, Offset(line.left, y), Offset(line.right, y), stroke)
+        }
+        HighlightStyle.Strikethrough -> drawLine(color, Offset(line.left, line.center.y), Offset(line.right, line.center.y), stroke)
+        HighlightStyle.Squiggly -> drawPath(squiggle(line, stroke), color, style = Stroke(width = stroke))
+        HighlightStyle.Highlight -> Unit
+    }
+}
+
 
 /** A wave along the bottom of [line], as the EPUB reader's (a crest every six strokes, about a stroke high). */
 private fun squiggle(line: Rect, stroke: Float): Path {
@@ -220,6 +234,9 @@ private suspend fun AwaitPointerEventScope.followFinger(id: PointerId, onDrag: (
 }
 
 /** A handle's round part. */
+/** A quarter turn, in the degrees DrawScope.rotate takes (clockwise on screen). */
+private const val QuarterTurnDegrees = 90f
+
 internal val HandleRadius: Dp = 10.dp
 
 /** How far from a handle's round part a finger still takes it. */

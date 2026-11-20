@@ -46,6 +46,19 @@ class DjvuDocument private constructor(
         }
     }
 
+    /**
+     * The words of page [pageIndex] (from 0) in the book's hidden text layer (the OCR text of most scanned
+     * books), or null when the page has none or it can't be read.
+     */
+    fun pageText(pageIndex: Int): DjvuPageText? {
+        val raw = synchronized(lock) {
+            val live = liveHandle()
+            checkPageIndex(pageIndex)
+            DjvuNative.nativePageText(live, pageIndex)
+        }
+        return raw?.let(::djvuPageTextOf)
+    }
+
     /** Frees the document. Calling it again does nothing. */
     override fun close() {
         synchronized(lock) {

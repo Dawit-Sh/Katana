@@ -16,6 +16,18 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.withContext
 
+/** Where a page view gets a page's words: PDFium for a PDF, the hidden text layer for a DjVu book. */
+internal interface PageTextSource {
+    /** Page [pageIndex]'s text, read now if it isn't kept; null when the page or the file has none to give. */
+    suspend fun page(pageIndex: Int): PdfPageText?
+
+    /** Page [pageIndex]'s text if it was read already. */
+    fun cached(pageIndex: Int): PdfPageText?
+
+    /** Lets go of the book; nothing is read after it. Safe to call more than once. */
+    fun close()
+}
+
 /**
  * The words on a PDF's pages, read with PDFium (the book's own drawing stays with Android's PdfRenderer). Nothing
  * runs until a page's text is first asked for (a long press): then the file is opened once, and each page's text
@@ -28,7 +40,7 @@ import kotlinx.coroutines.withContext
 internal class PdfTextSource(
     context: Context,
     private val uri: Uri,
-) {
+) : PageTextSource {
     private val appContext = context.applicationContext
     private val lock = Any()
     private var executor: ExecutorService? = null
@@ -46,15 +58,13 @@ internal class PdfTextSource(
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, PdfPageText>): Boolean = size > CachedPages
     }
 
-    /** Page [pageIndex]'s text, read now if it isn't kept; null when the page or the file has none to give. */
-    suspend fun page(pageIndex: Int): PdfPageText? =
+    override suspend fun page(pageIndex: Int): PdfPageText? =
         cached(pageIndex) ?: thread()?.let { thread -> withContext(thread) { readKept(pageIndex) } }
 
-    /** Page [pageIndex]'s text if it was read already. */
-    fun cached(pageIndex: Int): PdfPageText? = synchronized(lock) { pages[pageIndex] }
+    override fun cached(pageIndex: Int): PdfPageText? = synchronized(lock) { pages[pageIndex] }
 
     /** Closes the file once whatever is reading has finished. Safe to call more than once. */
-    fun close() {
+    override fun close() {
         val running = synchronized(lock) {
             val wasOpen = !closed
             closed = true
@@ -164,7 +174,7 @@ private fun readText(page: PdfPage, textPage: PdfTextPage, pageIndex: Int): PdfP
         source[PdfPageText.Bottom] = box?.bottom ?: 0f
         mapping.writeBox(source, into = boxes, at = index * PdfPageText.BoxSize)
     }
-    return PdfPageText(pageIndex = pageIndex, text = text, boxes = boxes, aspect = height.toFloat() / width)
+    return PdfPageText(pageIndex = pageIndex, text = text, boxes = boxes, aspect = height.toFloat() / width, pageTurn = mapping.turn)
 }
 
 private fun ParcelFileDescriptor.closeQuietly() {
