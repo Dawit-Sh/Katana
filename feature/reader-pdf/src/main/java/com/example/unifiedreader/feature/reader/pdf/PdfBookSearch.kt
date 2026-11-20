@@ -50,7 +50,7 @@ internal class PdfBookSearch(
 
     override val resultCount: Int get() = results.size
 
-    override fun row(index: Int): ReaderSearchRow? = results.getOrNull(index)?.let { ReaderSearchRow(it.snippet, it.pageIndex + 1) }
+    override fun row(index: Int): ReaderSearchRow? = results.getOrNull(index)?.let { ReaderSearchRow(it.snippet, page = null) }
 
     /** A search found something: the pages show its matches and the dock its buttons. */
     val isActive: Boolean get() = results.isNotEmpty()
