@@ -35,6 +35,8 @@ fun SourceNavigationFrame(
     showAddSource: Boolean = false,
     /** The drawer's reading card (the rail has no room for one). */
     readingCard: (@Composable () -> Unit)? = null,
+    /** How many words are saved, for My words in the drawer; null leaves My words out. */
+    myWordsCount: Int? = null,
     content: @Composable () -> Unit,
 ) {
     val railShown = sourceNavigationUsesRail()
@@ -51,6 +53,7 @@ fun SourceNavigationFrame(
         showAddSource = showAddSource,
         gesturesEnabled = !railShown,
         readingCard = readingCard,
+        myWordsCount = myWordsCount,
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
             if (railShown) {
@@ -60,6 +63,7 @@ fun SourceNavigationFrame(
                     onDestinationSelected = onDestinationSelected,
                     settingsBadge = settingsBadge,
                     showAddSource = showAddSource,
+                    showMyWords = myWordsCount != null,
                 )
             }
             Box(

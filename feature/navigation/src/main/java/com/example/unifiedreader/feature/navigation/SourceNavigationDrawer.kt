@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Text
@@ -53,6 +54,9 @@ sealed interface SourceNavigationDestination {
     /** Every book's highlights, bookmarks and saved words. */
     data object Bookmarks : SourceNavigationDestination
 
+    /** Every saved word, with the sentence it was met in. */
+    data object MyWords : SourceNavigationDestination
+
     /** "Add a server": the choices the first launch offers. */
     data object AddSource : SourceNavigationDestination
 }
@@ -71,6 +75,8 @@ fun SourceNavigationDrawer(
     gesturesEnabled: Boolean = true,
     /** The reading card, in the room between the sources and the destinations below. */
     readingCard: (@Composable () -> Unit)? = null,
+    /** How many words are saved, at the end of the My words row; null leaves the row out. */
+    myWordsCount: Int? = null,
     content: @Composable () -> Unit,
 ) {
     val presentation = UnifiedReaderThemeTokens.presentation
@@ -159,6 +165,26 @@ fun SourceNavigationDrawer(
                         },
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    if (myWordsCount != null) {
+                        AppDrawerItem(
+                            label = { Text(text = MyWordsLabel) },
+                            selected = selectedDestination == SourceNavigationDestination.MyWords,
+                            onClick = { onDestinationSelected(SourceNavigationDestination.MyWords) },
+                            icon = {
+                                Icon(
+                                    imageVector = AppIcons.Style,
+                                    contentDescription = null,
+                                )
+                            },
+                            badge = {
+                                Text(
+                                    text = myWordsCount.toString(),
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                     AppDrawerItem(
                         label = { Text(text = "Journal") },
                         selected = selectedDestination == SourceNavigationDestination.Journal,
@@ -225,6 +251,9 @@ private fun DrawerTopSection(
         }
     }
 }
+
+/** The My words row's name, in the drawer and on the rail. */
+internal const val MyWordsLabel = "My words"
 
 private val DrawerMaxWidth = 320.dp
 private val DrawerWithCardMaxWidth = 360.dp

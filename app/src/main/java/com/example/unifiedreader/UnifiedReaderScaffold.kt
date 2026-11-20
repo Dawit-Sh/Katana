@@ -118,6 +118,8 @@ fun UnifiedReaderScaffold(
     tagsViewModel: AppLibraryTagsViewModel? = null,
     // Every book's highlights, bookmarks and saved words; without it the Bookmarks screen is empty.
     bookmarks: AppBookmarksScreen? = null,
+    // The saved words; without it the menu has no My words.
+    myWords: AppMyWordsScreen? = null,
 ) {
     val themeColors = UnifiedReaderThemeTokens.colors
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -421,6 +423,7 @@ fun UnifiedReaderScaffold(
         sourceOrder = navigationSources(uiState.sourceOrder, connectedServers),
         showAddSource = canAddNavigationSource(connectedServers),
         settingsBadge = waitingUpdateVersion,
+        myWordsCount = myWords?.let { it.count.collectAsStateWithLifecycle().value },
         readingCard = {
             JournalReadingCard(snapshot = uiState.journalSnapshot, onClick = {
                 drawerScope.launch { drawerState.close() }
@@ -431,6 +434,7 @@ fun UnifiedReaderScaffold(
             TopLevelDestination.Library -> SourceNavigationDestination.Source(uiState.selectedSource)
             TopLevelDestination.Lists -> SourceNavigationDestination.Lists
             TopLevelDestination.Bookmarks -> SourceNavigationDestination.Bookmarks
+            TopLevelDestination.MyWords -> SourceNavigationDestination.MyWords
             TopLevelDestination.Journal -> SourceNavigationDestination.Journal
             TopLevelDestination.Settings -> SourceNavigationDestination.Settings
         },
@@ -446,6 +450,11 @@ fun UnifiedReaderScaffold(
                     // Like Settings: picking it in the menu always lands on the books.
                     bookmarks?.state?.home()
                     viewModel.onTopLevelSelected(TopLevelDestination.Bookmarks)
+                }
+                SourceNavigationDestination.MyWords -> {
+                    // Like Bookmarks: picking it in the menu lands on the list, not a review left open.
+                    myWords?.state?.home()
+                    viewModel.onTopLevelSelected(TopLevelDestination.MyWords)
                 }
                 SourceNavigationDestination.Journal -> viewModel.onTopLevelSelected(TopLevelDestination.Journal)
                 SourceNavigationDestination.Settings -> {
@@ -623,6 +632,16 @@ fun UnifiedReaderScaffold(
                                 )
                             }
 
+                            TopLevelDestination.MyWords -> if (myWords != null) AppBackground(modifier = Modifier.fillMaxSize()) {
+                                MyWordsRoute(
+                                    myWords = myWords,
+                                    uiState = uiState,
+                                    onOpenBook = viewModel::onItemSelected,
+                                    contentTopInset = AppTopBarDefaults.contentInset,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
+
                             TopLevelDestination.Journal -> AppBackground(modifier = Modifier.fillMaxSize()) {
                                 // The heavy full journal snapshot (stats/timelines/catalog join) is
                                 // built in the background once the library has loaded (see
@@ -781,6 +800,10 @@ fun UnifiedReaderScaffold(
 
                                 TopLevelDestination.Bookmarks -> if (bookmarks != null) {
                                     BookmarksTopBar(bookmarks, uiState, onOpenBook = viewModel::onItemSelected, onDrawerClick = openDrawer)
+                                }
+
+                                TopLevelDestination.MyWords -> if (myWords != null) {
+                                    MyWordsTopBar(myWords, uiState, onOpenBook = viewModel::onItemSelected, onDrawerClick = openDrawer)
                                 }
 
                                 TopLevelDestination.Journal -> JournalTopBar(

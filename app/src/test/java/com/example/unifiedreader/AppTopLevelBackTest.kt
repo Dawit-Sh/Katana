@@ -19,6 +19,7 @@ class AppTopLevelBackTest {
         listOf(
             TopLevelDestination.Lists,
             TopLevelDestination.Bookmarks,
+            TopLevelDestination.MyWords,
             TopLevelDestination.Journal,
             TopLevelDestination.Settings,
         ).forEach { screen ->

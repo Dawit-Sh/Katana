@@ -49,6 +49,9 @@ enum class TopLevelDestination {
 
     /** Every book's highlights, bookmarks and saved words (feature:annotations). */
     Bookmarks,
+
+    /** Every saved word, with the sentence it was met in (feature:annotations). */
+    MyWords,
     Journal,
     Settings,
 }

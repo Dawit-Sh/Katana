@@ -22,7 +22,7 @@ fun sourceNavigationUsesRail(): Boolean =
 
 /**
  * The drawer's destinations as a rail: the sources in the drawer order (the connected servers
- * and Local), "Add" while a server is not connected, then Lists, Bookmarks, Journal and Settings
+ * and Local), "Add" while a server is not connected, then Lists, Bookmarks, My words, Journal and Settings
  * at the bottom.
  */
 @Composable
@@ -35,6 +35,8 @@ fun SourceNavigationRail(
     settingsBadge: String? = null,
     /** "Add" after the sources, while a server is not connected. */
     showAddSource: Boolean = false,
+    /** Whether My words is offered (after Bookmarks). */
+    showMyWords: Boolean = false,
 ) {
     AppNavigationRail(
         modifier = modifier,
@@ -51,6 +53,14 @@ fun SourceNavigationRail(
                 selected = selectedDestination == SourceNavigationDestination.Bookmarks,
                 onClick = { onDestinationSelected(SourceNavigationDestination.Bookmarks) },
             )
+            if (showMyWords) {
+                AppNavigationRailItem(
+                    label = MyWordsLabel,
+                    icon = AppIcons.Style,
+                    selected = selectedDestination == SourceNavigationDestination.MyWords,
+                    onClick = { onDestinationSelected(SourceNavigationDestination.MyWords) },
+                )
+            }
             AppNavigationRailItem(
                 label = "Journal",
                 icon = AppIcons.History,

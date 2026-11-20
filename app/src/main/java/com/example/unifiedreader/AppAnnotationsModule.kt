@@ -3,6 +3,7 @@ package com.example.unifiedreader
 import com.example.unifiedreader.core.database.UnifiedReaderDatabase
 import com.example.unifiedreader.core.database.dao.LocalServerLinkDao
 import com.example.unifiedreader.feature.annotations.AnnotationJumps
+import com.example.unifiedreader.feature.annotations.WordMeanings
 import com.example.unifiedreader.feature.annotations.BookmarkSyncStore
 import com.example.unifiedreader.feature.annotations.HighlightSyncStore
 import com.example.unifiedreader.feature.annotations.RoomBookmarkPlacementStore
@@ -69,4 +70,8 @@ object AppAnnotationsModule {
     @Provides
     @Singleton
     fun provideAnnotationJumps(): AnnotationJumps = AnnotationJumps()
+
+    /** Where My words gets a word's one-line meaning: no source yet, so no meaning lines. */
+    @Provides
+    fun provideWordMeanings(): WordMeanings = WordMeanings.None
 }

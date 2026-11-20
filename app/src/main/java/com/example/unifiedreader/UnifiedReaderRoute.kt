@@ -66,6 +66,8 @@ fun UnifiedReaderRoute(
     settingsTools: AppSettingsToolsViewModel = hiltViewModel(),
     // Every book's marks, for the Bookmarks screen.
     bookmarks: AppBookmarksViewModel = hiltViewModel(),
+    // The saved words, for My words.
+    myWords: AppMyWordsViewModel = hiltViewModel(),
     // The readers' shared settings, for Settings › Reading.
     readerDisplay: AppReaderDisplayViewModel = hiltViewModel(),
 ) {
@@ -103,6 +105,7 @@ fun UnifiedReaderRoute(
             listsViewModel = lists,
             tagsViewModel = tags,
             bookmarks = bookmarks.screen,
+            myWords = myWords.screen,
         )
     }
 }
@@ -115,6 +118,7 @@ fun UnifiedReaderAppContent(
     listsViewModel: AppListsViewModel? = null,
     tagsViewModel: AppLibraryTagsViewModel? = null,
     bookmarks: AppBookmarksScreen? = null,
+    myWords: AppMyWordsScreen? = null,
 ) {
     val uiState = viewModel.uiState
     val updateStateFlow = remember(updateController) {
@@ -239,6 +243,7 @@ fun UnifiedReaderAppContent(
                                     listsViewModel = listsViewModel,
                                     tagsViewModel = tagsViewModel,
                                     bookmarks = bookmarks,
+                                    myWords = myWords,
                                 )
                             }
                         }
