@@ -56,13 +56,15 @@ object DictionaryCopy {
  * The Dictionary card over a book: a sheet on phones, the kit's floating panel at the end edge
  * on tablets. Shows [request]'s word, its part of speech and first senses, and Add to My words;
  * without a dictionary on this device it points to Settings. Place it in the reader's full-size
- * overlay slot.
+ * overlay slot. [glass] false paints it solid, for a screen that is itself what the glass shows
+ * (My words, under the app's bar).
  */
 @Composable
 fun ReaderDictionaryOverlay(
     request: DictionaryRequest?,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    glass: Boolean = true,
 ) {
     val dictionary = LocalDictionary.current
     val openSettings = LocalOpenDictionarySettings.current
@@ -71,6 +73,7 @@ fun ReaderDictionaryOverlay(
         placement = AppFloatingPanelPlacement.End,
         onDismissRequest = onDismiss,
         modifier = modifier,
+        glass = glass,
         testTag = "dictionary-card",
     ) {
         val shown = request ?: return@AppFloatingPanel

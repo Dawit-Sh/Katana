@@ -2,6 +2,7 @@ package com.example.unifiedreader
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -144,7 +145,13 @@ internal fun MyWordsRoute(
             contentTopInset = contentTopInset,
             modifier = Modifier.fillMaxSize(),
         )
-        ReaderDictionaryOverlay(request = myWords.lookingUp, onDismiss = { myWords.lookingUp = null })
+        // Under the app's bar, painted solid: the page itself is what the bar's glass shows.
+        ReaderDictionaryOverlay(
+            request = myWords.lookingUp,
+            onDismiss = { myWords.lookingUp = null },
+            modifier = Modifier.padding(top = contentTopInset),
+            glass = false,
+        )
     }
 }
 
