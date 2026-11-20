@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.PointerInputScope
@@ -42,13 +43,7 @@ internal fun PdfPageMarksLayer(
         if (page.isEmpty) return@Canvas
         marks.search.hitsOn(pageIndex).forEach { (hit, current) -> drawSearchHit(hit.rects, page, current) }
         marks.highlightsOn(pageIndex).forEach { mark ->
-            drawHighlight(
-                rects = mark.spot.rects,
-                page = page,
-                style = mark.highlight.style,
-                color = Color(mark.highlight.color.argb),
-                fillAlpha = mark.highlight.color.fillAlpha,
-            )
+            drawHighlight(mark, page)
         }
         marks.selection?.takeIf { it.pageIndex == pageIndex }?.let { selection ->
             selection.rects.forEach { rect ->
@@ -125,30 +120,38 @@ private fun DrawScope.drawSearchHit(rects: List<PageTextRect>, page: Rect, curre
 }
 
 /** One highlight's lines on a page drawn at [page]: filled, underlined, struck through or with a wavy line. */
-private fun DrawScope.drawHighlight(
-    rects: List<PageTextRect>,
-    page: Rect,
-    style: HighlightStyle,
-    color: Color,
-    fillAlpha: Float,
-) {
-    rects.forEach { rect ->
-        val line = pageRectToScreen(page, rect)
-        val stroke = max(MinLine.toPx(), line.height * LineShare)
-        when (style) {
-            HighlightStyle.Highlight -> drawRect(color.copy(alpha = fillAlpha), line.topLeft, line.size)
-            HighlightStyle.Underline -> {
-                val y = line.bottom - stroke / 2f
-                drawLine(color, Offset(line.left, y), Offset(line.right, y), stroke)
+private fun DrawScope.drawHighlight(mark: PdfHighlightMark, page: Rect) {
+    val style = mark.highlight.style
+    val color = Color(mark.highlight.color.argb)
+    val turn = mark.spot.turn
+    mark.spot.rects.forEach { rect ->
+        val shown = pageRectToScreen(page, rect)
+        if (style == HighlightStyle.Highlight) {
+            drawRect(color.copy(alpha = mark.highlight.color.fillAlpha), shown.topLeft, shown.size)
+        } else {
+            // Lines are drawn as for words running left to right, turned with the words about the line's centre.
+            val line = readingLine(shown, turn)
+            rotate(degrees = QuarterTurnDegrees * quarterTurn(turn), pivot = shown.center) {
+                drawLineStyle(line, style, color)
             }
-            HighlightStyle.Strikethrough -> {
-                val y = line.center.y
-                drawLine(color, Offset(line.left, y), Offset(line.right, y), stroke)
-            }
-            HighlightStyle.Squiggly -> drawPath(squiggle(line, stroke), color, style = Stroke(width = stroke))
         }
     }
 }
+
+/** A line under, through or waving under the words of [line], as they would be drawn running left to right. */
+private fun DrawScope.drawLineStyle(line: Rect, style: HighlightStyle, color: Color) {
+    val stroke = max(MinLine.toPx(), line.height * LineShare)
+    when (style) {
+        HighlightStyle.Underline -> {
+            val y = line.bottom - stroke / 2f
+            drawLine(color, Offset(line.left, y), Offset(line.right, y), stroke)
+        }
+        HighlightStyle.Strikethrough -> drawLine(color, Offset(line.left, line.center.y), Offset(line.right, line.center.y), stroke)
+        HighlightStyle.Squiggly -> drawPath(squiggle(line, stroke), color, style = Stroke(width = stroke))
+        HighlightStyle.Highlight -> Unit
+    }
+}
+
 
 /** A wave along the bottom of [line], as the EPUB reader's (a crest every six strokes, about a stroke high). */
 private fun squiggle(line: Rect, stroke: Float): Path {
@@ -231,6 +234,9 @@ private suspend fun AwaitPointerEventScope.followFinger(id: PointerId, onDrag: (
 }
 
 /** A handle's round part. */
+/** A quarter turn, in the degrees DrawScope.rotate takes (clockwise on screen). */
+private const val QuarterTurnDegrees = 90f
+
 internal val HandleRadius: Dp = 10.dp
 
 /** How far from a handle's round part a finger still takes it. */

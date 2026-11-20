@@ -22,12 +22,17 @@ data class PageTextRect(val left: Float, val top: Float, val right: Float, val b
         x >= left - slop && x <= right + slop && y >= top - slop && y <= bottom + slop
 }
 
-/** Where a highlight sits: page [pageIndex] (0-based), its characters [start] up to [end] (not included), and its lines. */
+/**
+ * Where a highlight sits: page [pageIndex] (0-based), its characters [start] up to [end] (not included), and its
+ * lines. [turn] is which way its words run on the page as shown, in quarter turns clockwise (0 left to right, 1 down,
+ * 2 upside down, 3 up), so a line under or through them follows them on a turned page.
+ */
 data class PageTextSpot(
     val pageIndex: Int,
     val start: Int,
     val end: Int,
     val rects: List<PageTextRect>,
+    val turn: Int = 0,
 )
 
 /**
@@ -43,6 +48,7 @@ fun pageHighlightPlace(spot: PageTextSpot, pageCount: Int, pageCharCount: Int): 
             .put(StartKey, spot.start)
             .put(EndKey, spot.end)
             .put(RectsKey, JSONArray().apply { spot.rects.forEach { rect -> put(rect.toJson()) } })
+            .apply { if (spot.turn != 0) put(TurnKey, spot.turn) }
             .toString(),
         chapterTitle = pageIndexTitle(spot.pageIndex),
         progression = if (pageCount > 0) ((spot.pageIndex + withinPage.coerceIn(0.0, 1.0)) / pageCount).coerceIn(0.0, 1.0) else 0.0,
@@ -61,6 +67,7 @@ fun pageTextSpotOf(locatorJson: String): PageTextSpot? = try {
             start = json.optInt(StartKey, 0),
             end = json.optInt(EndKey, 0),
             rects = List(rects.length()) { index -> rects.getJSONArray(index).toRect() },
+            turn = json.optInt(TurnKey, 0).mod(QuarterTurns),
         ).takeIf { it.pageIndex >= 0 && it.rects.isNotEmpty() }
     }
 } catch (_: JSONException) {
@@ -94,3 +101,5 @@ private const val PageKey = "page"
 private const val StartKey = "start"
 private const val EndKey = "end"
 private const val RectsKey = "rects"
+private const val TurnKey = "turn"
+private const val QuarterTurns = 4

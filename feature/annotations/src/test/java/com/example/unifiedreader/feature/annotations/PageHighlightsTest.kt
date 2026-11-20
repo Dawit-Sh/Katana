@@ -22,6 +22,16 @@ class PageHighlightsTest {
     )
 
     @Test
+    fun `a highlight on turned words keeps which way they run, and an upright one stays as it was`() {
+        val turned = pageTextSpotOf(pageHighlightPlace(spot.copy(turn = 1), pageCount = 300, pageCharCount = 2400).locatorJson)!!
+        val upright = pageHighlightPlace(spot, pageCount = 300, pageCharCount = 2400).locatorJson
+
+        assertEquals(1, turned.turn)
+        assertEquals(0, pageTextSpotOf(upright)!!.turn)
+        assertTrue("an upright highlight's place has no turn", !upright.contains("turn"))
+    }
+
+    @Test
     fun `a page highlight's place keeps its page, characters and lines`() {
         val place = pageHighlightPlace(spot, pageCount = 300, pageCharCount = 2400)
 

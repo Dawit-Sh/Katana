@@ -94,6 +94,18 @@ class PdfTextTurnTest {
         assertPoint(Offset(0.115f, 1f - 0.189f), selection.endPoint!!)
     }
 
+    @Test
+    fun `a line under turned words is drawn as for upright words, then turned about the line's centre`() {
+        val shown = Rect(left = 860f, top = 140f, right = 900f, bottom = 330f)
+
+        assertEquals(shown, readingLine(shown, 0))
+        assertEquals(shown, readingLine(shown, 2))
+        val reading = readingLine(shown, 1)
+        assertEquals(shown.center, reading.center)
+        assertEquals(shown.height, reading.width, ScreenTolerance)
+        assertEquals(shown.width, reading.height, ScreenTolerance)
+    }
+
     /** The test page drawn turned [turn] quarter turns clockwise, with the page's own turn [pageTurn]. */
     private fun turnedPage(turn: Int, pageTurn: Int = turn): PdfPageText {
         val (text, boxes) = testText(*lines)

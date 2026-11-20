@@ -163,7 +163,13 @@ internal class PdfTextMarks(
         val current = selection ?: return
         val rects = current.rects
         if (rects.isEmpty()) return
-        val spot = PageTextSpot(pageIndex = current.pageIndex, start = current.start, end = current.end, rects = rects)
+        val spot = PageTextSpot(
+            pageIndex = current.pageIndex,
+            start = current.start,
+            end = current.end,
+            rects = rects,
+            turn = current.page.turn,
+        )
         editor.add(
             book = book,
             place = pageHighlightPlace(spot, pageCount = pageCount(), pageCharCount = current.page.length),

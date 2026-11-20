@@ -1,6 +1,7 @@
 package com.example.unifiedreader.feature.reader.pdf
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import com.example.unifiedreader.feature.annotations.PageTextRect
 import kotlin.math.abs
 import kotlin.math.hypot
@@ -98,6 +99,18 @@ internal fun alongLine(turn: Int): Offset = fromReading(1f, 0f, turn) - fromRead
 
 /** Which way, on screen, the next line of words running [turn] is (a unit step). */
 internal fun acrossLines(turn: Int): Offset = fromReading(0f, 1f, turn) - fromReading(0f, 0f, turn)
+
+/** [shown], a line of words running [turn], as its box would be with the words running left to right. */
+internal fun readingLine(shown: Rect, turn: Int): Rect = if (quarterTurn(turn) % 2 == 0) {
+    shown
+} else {
+    Rect(
+        left = shown.center.x - shown.height / 2f,
+        top = shown.center.y - shown.width / 2f,
+        right = shown.center.x + shown.height / 2f,
+        bottom = shown.center.y + shown.width / 2f,
+    )
+}
 
 private const val UpsideDown = 2
 private const val Up = 3
