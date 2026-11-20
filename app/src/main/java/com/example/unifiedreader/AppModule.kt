@@ -664,8 +664,8 @@ object AppModule {
 
     @Provides
     fun provideLocalDocumentDataSource(
-        repository: LocalDocumentRepository,
-    ): LocalDocumentDataSource = repository
+        imports: LocalBookImports,
+    ): LocalDocumentDataSource = imports
 
     @Provides
     fun provideLocalDocumentHydrator(

@@ -37,6 +37,10 @@ internal data class AnnotationBackup(
     val highlights: List<BackupHighlight> = emptyList(),
     val words: List<BackupWord> = emptyList(),
     val bookmarks: List<BackupBookmark> = emptyList(),
+    /** The books from files the marks belong to, with their files' fingerprints; older backups have none. */
+    val books: List<BackupBook> = emptyList(),
+    /** Where each book from a file was being read; older backups have none. */
+    val places: List<BackupPlace> = emptyList(),
 )
 
 @Serializable
