@@ -14,6 +14,9 @@ interface MyWordsActions : WordStudyActions {
     /** Removes the word; the toast's Undo brings it back as it was. */
     fun remove(word: SavedWord)
 
+    /** Shows the word on the Dictionary card. */
+    fun lookUp(word: SavedWord)
+
     suspend fun export(words: List<SavedWord>): MarkdownExport
 }
 

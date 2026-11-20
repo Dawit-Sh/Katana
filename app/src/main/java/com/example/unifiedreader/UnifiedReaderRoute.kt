@@ -57,6 +57,8 @@ import com.example.unifiedreader.ui.theme.ApplyLaunchSplashTheme
 import com.example.unifiedreader.ui.theme.UnifiedReaderTheme
 import com.example.unifiedreader.ui.theme.applyAndroidThemeMode
 import com.example.unifiedreader.feature.translation.LocalTranslationService
+import com.example.unifiedreader.feature.dictionary.LocalDictionary
+import com.example.unifiedreader.feature.dictionary.LocalOpenDictionarySettings
 import com.example.unifiedreader.feature.settings.LocalReaderComfortPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -70,6 +72,8 @@ fun UnifiedReaderRoute(
     myWords: AppMyWordsViewModel = hiltViewModel(),
     // The readers' shared settings, for Settings › Reading.
     readerDisplay: AppReaderDisplayViewModel = hiltViewModel(),
+    // The offline dictionary, for the readers' Dictionary card and Settings › Reading.
+    dictionary: AppDictionaryViewModel = hiltViewModel(),
 ) {
     val viewModel: AppViewModel = hiltViewModel()
     val updates: AppUpdatesViewModel = hiltViewModel()
@@ -91,6 +95,12 @@ fun UnifiedReaderRoute(
 
     CompositionLocalProvider(
         LocalTranslationService provides translation.service,
+        LocalDictionary provides dictionary.dictionary,
+        // The Dictionary card's Open Settings: leaves the book for Settings, where Reading has the download.
+        LocalOpenDictionarySettings provides {
+            if (viewModel.uiState.activeReader != null) viewModel.onBackPressed()
+            viewModel.onTopLevelSelected(TopLevelDestination.Settings)
+        },
         LocalAppSettingsTools provides settingsTools,
         LocalReaderComfortPreferences provides readerDisplay.preferences.comfort,
     ) {
@@ -171,7 +181,7 @@ fun UnifiedReaderAppContent(
         }
         ApplyLaunchSplashTheme(uiState.themeMode)
         // The start flow: the first launch, "Add a server", Connect on an empty library.
-        var sourceStartRequest by rememberSourceStartRequest()
+        var sourceStartRequest by rememberSourceStartRequest(uiState)
         val isReaderMode = uiState.activeReader != null && uiState.selectedItem != null
         // Leaving the reader is handled by the screen host below, with the predictive gesture.
         BackHandler(

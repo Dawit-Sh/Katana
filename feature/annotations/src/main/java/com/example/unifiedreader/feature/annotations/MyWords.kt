@@ -96,10 +96,25 @@ fun sentenceAround(sentence: String, word: String, before: Int = SNIPPET_BEFORE,
 }
 
 /**
- * The meaning line under [word] on My words: what [WordMeanings] gave for it. A meaning stored with
- * the word itself (a dictionary's Add to My words) goes first here once saved words keep one.
+ * The meaning line under [word] on My words: the meaning kept with the word (its note, where the
+ * dictionary's Add to My words puts the first definition, or what the reader wrote there), else
+ * what [WordMeanings] found for it ([meanings], by word id).
  */
-fun meaningLine(word: SavedWord, meanings: Map<String, String>): String? = meanings[word.id]
+fun meaningLine(word: SavedWord, meanings: Map<String, String>): String? =
+    word.note?.oneLine()?.takeIf(String::isNotBlank) ?: meanings[word.id]
+
+/**
+ * What [WordMeanings] finds for the words that keep no meaning of their own (no note), by word id,
+ * each on one line; words without one are left out.
+ */
+suspend fun WordMeanings.meaningsOf(words: List<SavedWord>, language: String): Map<String, String> =
+    if (this === WordMeanings.None) {
+        emptyMap()
+    } else {
+        words.filter { it.note.isNullOrBlank() }.mapNotNull { word ->
+            meaning(word.word, language)?.oneLine()?.takeIf(String::isNotBlank)?.let { meaning -> word.id to meaning }
+        }.toMap()
+    }
 
 /** The page a Readium locator names (`locations.position`, which the EPUB reader shows as its page). */
 internal fun locatorPosition(locatorJson: String): Int? = try {

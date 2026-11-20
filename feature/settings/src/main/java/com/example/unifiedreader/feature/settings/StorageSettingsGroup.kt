@@ -129,7 +129,7 @@ private fun StoragePanel(
 @Composable
 private fun storagePartColors(): List<Color> {
     val scheme = MaterialTheme.colorScheme
-    return listOf(scheme.primary, scheme.tertiary, scheme.secondary)
+    return listOf(scheme.primary, scheme.tertiary, scheme.secondary, scheme.outline)
 }
 
 /** One bar split by [parts], each as wide as its share of [totalBytes]; empty, it is all track. */

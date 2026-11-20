@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -21,6 +22,8 @@ import com.example.unifiedreader.core.model.LibraryFilterPanel
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.core.model.resolveLibraryFilterPanels
 import com.example.unifiedreader.core.model.displayName
+import com.example.unifiedreader.feature.dictionary.DictionarySettingsRow
+import com.example.unifiedreader.feature.dictionary.LocalDictionary
 import com.example.unifiedreader.feature.navigation.navigationIcon
 import com.example.unifiedreader.feature.translation.LocalTranslationService
 import com.example.unifiedreader.feature.translation.translationHubSummary
@@ -65,7 +68,12 @@ internal fun SettingsHub(
                 supporting = themeMode.label,
                 selected = selectedPage == SettingsPage.Theme,
                 onClick = { onOpenPage(SettingsPage.Theme) },
-                trailing = { ThemeCoverPreview() },
+                // With very large text the little preview would squeeze "Theme" until it breaks mid-word; it goes.
+                trailing = if (showsThemePreview(LocalDensity.current.fontScale)) {
+                    { ThemeCoverPreview() }
+                } else {
+                    null
+                },
             )
         }
         ReadingSettingsGroup(
@@ -136,8 +144,9 @@ internal fun SettingsHub(
 }
 
 /**
- * Settings › Reading: the look new books open with, Translation when the app has it, then the
- * readers' Keep the screen on and Volume keys switches. Left out when it has none of them.
+ * Settings › Reading: the look new books open with, Translation when the app has it, the English
+ * dictionary (download, remove), then the readers' Keep the screen on and Volume keys switches. Left
+ * out when it has none of them.
  */
 @Composable
 private fun ReadingSettingsGroup(
@@ -147,7 +156,8 @@ private fun ReadingSettingsGroup(
 ) {
     val translation = LocalTranslationService.current
     val comfort = LocalReaderComfortPreferences.current
-    if (newBookLook == null && translation == null && comfort == null) return
+    val dictionary = LocalDictionary.current
+    if (listOf(newBookLook, translation, dictionary, comfort).all { it == null }) return
     AppSettingsGroup(label = "Reading") {
         if (newBookLook != null) {
             AppSettingsRow(
@@ -170,7 +180,11 @@ private fun ReadingSettingsGroup(
                 onClick = { onOpenPage(SettingsPage.Translation) },
             )
         }
-        ReaderComfortSettingsRows(leadingDivider = newBookLook != null || translation != null)
+        if (dictionary != null) {
+            if (newBookLook != null || translation != null) AppSettingsRowDivider()
+            DictionarySettingsRow(dictionary = dictionary)
+        }
+        ReaderComfortSettingsRows(leadingDivider = newBookLook != null || translation != null || dictionary != null)
     }
 }
 
@@ -201,6 +215,11 @@ private fun ThemeCoverPreview() {
         )
     }
 }
+
+/** The Theme row's preview fits beside its words up to 150% text; past that the words need the room. */
+internal fun showsThemePreview(fontScale: Float): Boolean = fontScale < LargeTextScale
+
+private const val LargeTextScale = 1.5f
 
 /** The order itself: "Kavita, Grimmory, Local". Launch restores where you were, so no source is "first to open". */
 internal fun drawerOrderSummary(sourceOrder: List<SourceType>): String =

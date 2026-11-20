@@ -17,4 +17,11 @@ class DrawerPanelWidthTest {
         assertEquals(324.dp, drawerPanelMaxWidth(hasReadingCard = true, windowWidth = 360.dp))
         assertEquals(348.dp, drawerPanelMaxWidth(hasReadingCard = true, windowWidth = 384.dp))
     }
+
+    @Test
+    fun `the reading card leaves the side menu only at very large text, where it would be cut off`() {
+        assertEquals(true, drawerShowsReadingCard(fontScale = 1f))
+        assertEquals(true, drawerShowsReadingCard(fontScale = 1.3f))
+        assertEquals(false, drawerShowsReadingCard(fontScale = 2f))
+    }
 }

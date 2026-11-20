@@ -63,7 +63,7 @@ class LibraryShelfBrowserTabsTest {
 
         assertEquals("Star Courier", entry.title)
         assertEquals(continueReadingSupportingText(issue), entry.supportingText)
-        assertEquals("38%", entry.trailingText)
+        assertEquals("CBZ · 38%", entry.trailingText)
         assertEquals(0.375f, entry.progressFraction)
     }
 

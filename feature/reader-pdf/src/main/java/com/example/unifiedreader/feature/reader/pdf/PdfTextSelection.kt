@@ -5,7 +5,7 @@ import androidx.compose.ui.geometry.Offset
 import com.example.unifiedreader.feature.annotations.PageTextRect
 
 /** What the selection's menu asks for. */
-internal enum class PdfSelectionAction { Highlight, Note, Copy }
+internal enum class PdfSelectionAction { Highlight, Note, Dictionary, Copy }
 
 /** What a finger on a selection is moving: the words it grew from (after the long press), or one of its ends. */
 internal enum class PdfSelectionDrag { Words, Start, End }

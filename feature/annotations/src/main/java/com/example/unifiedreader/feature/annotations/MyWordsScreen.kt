@@ -32,7 +32,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -153,6 +152,7 @@ private fun MyWordsListPage(
                 onOpen = { actions.open(word) },
                 onEdit = { state.editing = word },
                 onRemove = { actions.remove(word) },
+                onLookUp = { actions.lookUp(word) },
             )
         }
     }
@@ -248,8 +248,8 @@ private fun checkMark(): @Composable () -> Unit = {
 }
 
 /**
- * One saved word: the word in the book's face and its meaning, the sentence it was met in, its note,
- * then its book, page and when it was saved. On a phone these stack; from 600 dp (at the usual text
+ * One saved word: the word in the book's face and its meaning (its note, else the dictionary's), the
+ * sentence it was met in, then its book, page and when it was saved. On a phone these stack; from 600 dp (at the usual text
  * size) the word and its meaning sit beside the rest. A tap opens the book there; a long press opens its menu.
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -261,9 +261,9 @@ private fun MyWordRow(
     onOpen: () -> Unit,
     onEdit: () -> Unit,
     onRemove: () -> Unit,
+    onLookUp: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
-    val context = LocalContext.current
     AppPanel(modifier = Modifier.fillMaxWidth()) {
         Box {
             val rowModifier = Modifier
@@ -288,7 +288,7 @@ private fun MyWordRow(
             AppMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 WordMenuItem(MyWordsCopy.LookUp, AppIcons.Search) {
                     menuOpen = false
-                    context.lookUpWord(word.word)
+                    onLookUp()
                 }
                 WordMenuItem(MyWordsCopy.EditNote, AppIcons.Edit) {
                     menuOpen = false
@@ -334,7 +334,7 @@ private fun WordHeading(word: SavedWord, meaning: String?, modifier: Modifier = 
     }
 }
 
-/** Where the word was met: the sentence with the word in bold, the word's note, then "book · page · saved". */
+/** Where the word was met: the sentence with the word in bold, then "book · page · saved". */
 @Composable
 private fun WordContext(word: SavedWord, modifier: Modifier = Modifier) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(RowLineGap)) {
@@ -348,7 +348,6 @@ private fun WordContext(word: SavedWord, modifier: Modifier = Modifier) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        word.note?.let { note -> NoteBox(note) }
         Text(
             text = listOfNotNull(word.book.title, wordPlace(word), BookmarksCopy.moment(word.createdAtEpochMillis))
                 .joinToString(" · "),

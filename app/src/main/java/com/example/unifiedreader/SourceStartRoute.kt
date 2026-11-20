@@ -1,15 +1,14 @@
 package com.example.unifiedreader
 
-import android.content.Context
-import android.content.SharedPreferences
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.edit
+import androidx.compose.runtime.setValue
 import com.example.unifiedreader.core.model.SourceConnectivityState
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.feature.settings.RemoteSourceSettingsActions
@@ -29,15 +28,39 @@ data class SourceStartRequest(
 )
 
 /**
- * The start flow's request, kept across configuration changes. A fresh install that has not yet
- * answered "Where are your books?" starts with it open.
+ * The start flow's request, kept across configuration changes. A launch with no source set up (no server signed in
+ * and no book from this device: a fresh install, or one whose data was cleared) opens on "Where are your books?",
+ * once per launch, as soon as the sources are known; how or when the app was installed doesn't matter.
  */
 @Composable
-internal fun rememberSourceStartRequest(): MutableState<SourceStartRequest?> {
-    val context = LocalContext.current.applicationContext
-    return rememberSaveable(stateSaver = SourceStartRequestSaver) {
-        mutableStateOf(SourceStartRequest(SourceStartMode.FirstLaunch).takeIf { firstLaunchPending(context) })
+internal fun rememberSourceStartRequest(uiState: AppUiState): MutableState<SourceStartRequest?> {
+    val request = rememberSaveable(stateSaver = SourceStartRequestSaver) { mutableStateOf<SourceStartRequest?>(null) }
+    var decided by rememberSaveable { mutableStateOf(false) }
+    val noSources = noSourcesSetUp(
+        serverSessions = uiState.serverSessions,
+        localBooksKnown = SourceType.LOCAL in uiState.hydratedSources,
+        hasLocalBooks = uiState.items.any { item -> item.sourceType == SourceType.LOCAL },
+    )
+    LaunchedEffect(noSources) {
+        if (decided || noSources == null) return@LaunchedEffect
+        decided = true
+        if (noSources && request.value == null) request.value = SourceStartRequest(SourceStartMode.FirstLaunch)
     }
+    return request
+}
+
+/**
+ * Whether no source is set up: true with no server signed in and no book from this device, false as soon as one is,
+ * null while that isn't known yet (a server's saved sign-in or the books from this device still loading).
+ */
+internal fun noSourcesSetUp(
+    serverSessions: Map<SourceType, Boolean?>,
+    localBooksKnown: Boolean,
+    hasLocalBooks: Boolean,
+): Boolean? = when {
+    hasLocalBooks || serverSessions.values.any { signedIn -> signedIn == true } -> false
+    !localBooksKnown || serverSessions.values.any { signedIn -> signedIn == null } -> null
+    else -> true
 }
 
 /** The start flow over the whole app, while [request] is set. */
@@ -49,11 +72,7 @@ internal fun SourceStartHost(
     onImportLocalFileClick: () -> Unit,
     onFinished: () -> Unit,
 ) {
-    val context = LocalContext.current.applicationContext
-    val finish = {
-        markFirstLaunchDone(context)
-        onFinished()
-    }
+    val finish = onFinished
     SourceStartFlow(
         mode = request.mode,
         initialServer = request.server,
@@ -66,7 +85,6 @@ internal fun SourceStartHost(
             onImportLocalFileClick()
         },
         onServerConnected = { server ->
-            markFirstLaunchDone(context)
             // The first server connected opens when the app starts.
             if (uiState.navigationConnectedServers.none { it != server }) {
                 viewModel.reorderSources(listOf(server) + uiState.sourceOrder.filter { it != server })
@@ -189,23 +207,3 @@ private val SourceStartRequestSaver: Saver<SourceStartRequest?, String> = Saver(
         }
     },
 )
-
-/**
- * The first launch is owed by a fresh install (installed, never updated) that has not answered it;
- * an update over an older version never shows it.
- */
-private fun firstLaunchPending(context: Context): Boolean {
-    if (firstLaunchPreferences(context).getBoolean(KeyFirstLaunchDone, false)) return false
-    val info = runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull() ?: return false
-    return info.firstInstallTime == info.lastUpdateTime
-}
-
-private fun markFirstLaunchDone(context: Context) {
-    firstLaunchPreferences(context).edit { putBoolean(KeyFirstLaunchDone, true) }
-}
-
-private fun firstLaunchPreferences(context: Context): SharedPreferences =
-    context.getSharedPreferences(FirstLaunchPreferences, Context.MODE_PRIVATE)
-
-private const val FirstLaunchPreferences = "first_launch"
-private const val KeyFirstLaunchDone = "done"

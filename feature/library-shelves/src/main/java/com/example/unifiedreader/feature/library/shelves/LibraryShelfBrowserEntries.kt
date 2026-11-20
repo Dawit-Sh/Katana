@@ -9,7 +9,7 @@ import com.example.unifiedreader.core.model.libraryPrimaryText
 internal data class LibraryShelfBrowserEntry(
     val item: ReadableItem,
     val title: String,
-    val supportingText: String,
+    val supportingText: String?,
     val trailingText: String,
     val progressFraction: Float?,
     val isRead: Boolean,

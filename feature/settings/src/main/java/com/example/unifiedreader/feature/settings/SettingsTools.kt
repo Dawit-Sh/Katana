@@ -24,13 +24,15 @@ data class StorageSettingsState(
     val downloadedBookBytes: Long = 0L,
     val keptBookBytes: Long = 0L,
     val coverBytes: Long = 0L,
+    /** What books imported from this device keep here: their covers and the copies they are read from. */
+    val importedBookBytes: Long = 0L,
     val freeBytes: Long = 0L,
     /** Books on the tablet you have finished, which Remove finished books takes away. */
     val finishedBookCount: Int = 0,
     val isLoaded: Boolean = false,
 ) {
     val totalBytes: Long
-        get() = downloadedBookBytes + keptBookBytes + coverBytes
+        get() = downloadedBookBytes + keptBookBytes + coverBytes + importedBookBytes
 }
 
 data class StorageSettings(
@@ -70,10 +72,12 @@ internal data class StoragePart(
     val bytes: Long,
 )
 
-internal fun storageParts(state: StorageSettingsState): List<StoragePart> = listOf(
+internal fun storageParts(state: StorageSettingsState): List<StoragePart> = listOfNotNull(
     StoragePart("Downloads", state.downloadedBookBytes),
     StoragePart("Kept from opening", state.keptBookBytes),
     StoragePart("Covers", state.coverBytes),
+    // Only once there is something imported: a server-only library keeps its three parts.
+    StoragePart("Imported books", state.importedBookBytes).takeIf { it.bytes > 0L },
 )
 
 /** The look row's line on the hub: the look, or what happens without one. */

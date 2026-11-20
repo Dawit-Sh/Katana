@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.unifiedreader.core.model.SourceType
@@ -81,6 +82,8 @@ fun SourceNavigationDrawer(
 ) {
     val presentation = UnifiedReaderThemeTokens.presentation
     val drawerShape = RoundedCornerShape(presentation.cardCornerRadius)
+    // With very large text the card can't fit the side menu whole; the Journal row below opens it instead.
+    val shownReadingCard = readingCard.takeIf { drawerShowsReadingCard(LocalDensity.current.fontScale) }
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = gesturesEnabled,
@@ -98,7 +101,7 @@ fun SourceNavigationDrawer(
                     // phone it leaves 24 dp of the page showing, where a tap closes it.
                     .widthIn(
                         max = drawerPanelMaxWidth(
-                            hasReadingCard = readingCard != null,
+                            hasReadingCard = shownReadingCard != null,
                             windowWidth = LocalConfiguration.current.screenWidthDp.dp,
                         ),
                     )
@@ -112,7 +115,7 @@ fun SourceNavigationDrawer(
                         .fillMaxHeight()
                         .padding(horizontal = 12.dp, vertical = 16.dp),
                 ) {
-                    DrawerTopSection(readingCard = readingCard, modifier = Modifier.weight(1f)) {
+                    DrawerTopSection(readingCard = shownReadingCard, modifier = Modifier.weight(1f)) {
                         KatanaDrawerHeader()
                         AppGroupLabel(
                             text = "Sources",
@@ -254,6 +257,11 @@ private fun DrawerTopSection(
 
 /** The My words row's name, in the drawer and on the rail. */
 internal const val MyWordsLabel = "My words"
+
+/** The reading card sits in the side menu up to 150% text; past that it would be cut off. */
+internal fun drawerShowsReadingCard(fontScale: Float): Boolean = fontScale < DrawerLargeTextScale
+
+private const val DrawerLargeTextScale = 1.5f
 
 private val DrawerMaxWidth = 320.dp
 private val DrawerWithCardMaxWidth = 360.dp

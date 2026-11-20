@@ -1,8 +1,12 @@
 package com.example.unifiedreader
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.lifecycle.ViewModel
@@ -22,6 +26,8 @@ import com.example.unifiedreader.feature.annotations.SavedWord
 import com.example.unifiedreader.feature.annotations.WordMeanings
 import com.example.unifiedreader.feature.annotations.meaningsOf
 import com.example.unifiedreader.feature.annotations.removeWordWithUndo
+import com.example.unifiedreader.feature.dictionary.DictionaryRequest
+import com.example.unifiedreader.feature.dictionary.ReaderDictionaryOverlay
 import com.example.unifiedreader.ui.components.AppToastIcon
 import com.example.unifiedreader.ui.components.AppToastMessage
 import com.example.unifiedreader.ui.components.AppToastState
@@ -71,12 +77,13 @@ class AppMyWordsScreen(
         store.allWords.map { it.size }.distinctUntilChanged().stateIn(scope, SharingStarted.WhileSubscribed(KEEP_MILLIS), 0)
 
     /**
-     * A one-line meaning by word id, from [WordMeanings] (none until a source is plugged in). A saved
-     * word doesn't keep its book's language, so it asks with none.
+     * A one-line meaning by word id from [WordMeanings] (the dictionary on this device), for the words
+     * that keep none of their own. A saved word doesn't keep its book's language; the dictionary is
+     * English, so it asks in English.
      */
     val meanings: StateFlow<Map<String, String>> =
         words.filterNotNull()
-            .mapLatest { list -> meanings.meaningsOf(list, language = null) }
+            .mapLatest { list -> meanings.meaningsOf(list, language = MEANING_LANGUAGE) }
             .stateIn(scope, SharingStarted.WhileSubscribed(KEEP_MILLIS), emptyMap())
 
     private val exports = AnnotationExports(store)
@@ -99,8 +106,21 @@ class AppMyWordsScreen(
 
     fun export(words: List<SavedWord>): MarkdownExport = exports.words(words)
 
+    /** The word on the Dictionary card, if any. */
+    var lookingUp: DictionaryRequest? by mutableStateOf(null)
+
+    /** Shows [word] on the Dictionary card; its Add to My words keeps the definition as the word's meaning. */
+    fun lookUp(word: SavedWord) {
+        lookingUp = DictionaryRequest(word = word.word) { meaning ->
+            val kept = meaning?.trim()?.takeIf(String::isNotEmpty)
+            // Already saved: the definition becomes its meaning, unless it keeps one of its own.
+            if (kept != null && word.note.isNullOrBlank()) setWordNote(word.id, kept)
+        }
+    }
+
     private companion object {
         const val KEEP_MILLIS = 5_000L
+        const val MEANING_LANGUAGE = "en"
     }
 }
 
@@ -115,14 +135,17 @@ internal fun MyWordsRoute(
 ) {
     val words by myWords.words.collectAsStateWithLifecycle()
     val meanings by myWords.meanings.collectAsStateWithLifecycle()
-    MyWordsScreen(
-        state = myWords.state,
-        words = words,
-        meanings = meanings,
-        actions = rememberMyWordsActions(myWords, words, uiState.items, onOpenBook),
-        contentTopInset = contentTopInset,
-        modifier = modifier,
-    )
+    Box(modifier = modifier) {
+        MyWordsScreen(
+            state = myWords.state,
+            words = words,
+            meanings = meanings,
+            actions = rememberMyWordsActions(myWords, words, uiState.items, onOpenBook),
+            contentTopInset = contentTopInset,
+            modifier = Modifier.fillMaxSize(),
+        )
+        ReaderDictionaryOverlay(request = myWords.lookingUp, onDismiss = { myWords.lookingUp = null })
+    }
 }
 
 /** The My words page's bar: the menu button and Export, or Back in the review. */
@@ -178,6 +201,8 @@ private class AppMyWordsActions(
     }
 
     override fun remove(word: SavedWord) = myWords.remove(word, toasts)
+
+    override fun lookUp(word: SavedWord) = myWords.lookUp(word)
 
     override fun setWordNote(id: String, note: String) = myWords.setWordNote(id, note)
 

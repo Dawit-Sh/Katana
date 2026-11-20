@@ -61,14 +61,28 @@ internal fun LibrarySettingsPage(
 
 /**
  * The library row's line on the hub, for the first source in the order: "14 filters in Grimmory ·
- * Grimmory first".
+ * Grimmory first", or "4 filters in Local" when it is the only one.
  */
 internal fun librarySettingsSummary(
     sourceOrder: List<SourceType>,
     filterPanelsBySource: Map<SourceType, List<LibraryFilterPanel>>,
 ): String {
-    val first = sourceOrder.firstOrNull() ?: SourceType.entries.first()
+    val first = sourceOrder.firstOrNull() ?: SourceType.LOCAL
     val count = resolveLibraryFilterPanels(sourceType = first, preferredPanels = filterPanelsBySource[first]).size
     val filters = if (count == 1) "1 filter" else "$count filters"
-    return "$filters in ${first.displayName()} · ${first.displayName()} first"
+    val name = first.displayName()
+    return if (sourceOrder.size > 1) "$filters in $name · $name first" else "$filters in $name"
+}
+
+/**
+ * The sources set up on this device, in [sourceOrder]: the files on this device, and each server with a saved
+ * sign-in in [sources]. The Library rows name only these, never a server that was never added.
+ */
+internal fun setUpSourceOrder(
+    sourceOrder: List<SourceType>,
+    sources: List<SourceSettingsEntry>,
+): List<SourceType> {
+    val signedIn = sources.filter { entry -> entry.connection.hasStoredSession }.mapTo(mutableSetOf()) { it.sourceType }
+    val order = sourceOrder.ifEmpty { SourceType.entries }
+    return order.filter { source -> source == SourceType.LOCAL || source in signedIn }
 }

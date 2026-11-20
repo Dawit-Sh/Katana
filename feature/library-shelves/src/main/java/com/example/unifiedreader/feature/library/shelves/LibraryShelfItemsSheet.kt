@@ -336,7 +336,7 @@ private fun ShelfBrowserList(
                 ShelfListRow(
                     item = entry.item,
                     title = entry.title,
-                    supportingText = entry.supportingText,
+                    supportingText = entry.supportingText.orEmpty(),
                     trailingText = entry.trailingText,
                     coverImageUrlProvider = coverImageUrlProvider,
                     onCoverVisible = onCoverVisible,

@@ -100,7 +100,7 @@ internal class PdfPageWords(
         PdfPageMarksLayer(marks = marks, pageIndex = pageIndex, pageBounds = pageBounds, modifier = modifier)
     }
 
-    /** The selection's Highlight / Note / Copy toolbar, while this page has the selection. */
+    /** The selection's Highlight / Note / Dictionary / Copy toolbar, while this page has the selection. */
     @Composable
     fun Menu() {
         val context = LocalContext.current
@@ -108,10 +108,15 @@ internal class PdfPageWords(
         PdfSelectionMenu(
             marks = marks,
             bounds = { selectionOnScreen()?.placed(toRoot = true) },
+            hasDictionary = marks.dictionary != null,
             onAction = { action ->
                 when (action) {
                     PdfSelectionAction.Highlight -> marks.highlightSelection(selectionOnScreen()?.placed(), withNote = false)
                     PdfSelectionAction.Note -> marks.highlightSelection(selectionOnScreen()?.placed(), withNote = true)
+                    PdfSelectionAction.Dictionary -> {
+                        marks.selection?.let { selection -> marks.dictionary?.lookUp(selection) }
+                        marks.clear()
+                    }
                     PdfSelectionAction.Copy -> marks.copySelection(context)
                 }
             },

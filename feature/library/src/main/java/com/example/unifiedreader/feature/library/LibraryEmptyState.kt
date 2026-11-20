@@ -89,7 +89,8 @@ internal fun LibraryEmptyState(
         LibraryEmptyReason.Empty -> AppEmptyState(
             title = "Nothing here yet",
             body = if (isLocal) {
-                "Import an EPUB, PDF or comic from this device, or connect a Kavita, Stump or Grimmory server."
+                "Import a book (EPUB, PDF, DjVu, MOBI, AZW, AZW3, FB2) or a comic (CBZ, CBR) from this device, " +
+                    "or connect a Kavita, Stump or Grimmory server."
             } else {
                 "Books added to $sourceName show up here after the next sync."
             },

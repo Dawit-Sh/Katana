@@ -2,22 +2,26 @@ package com.example.unifiedreader.feature.library.shelves
 
 import android.text.format.DateUtils
 import com.example.unifiedreader.core.model.ReadableItem
+import com.example.unifiedreader.core.model.label
 import com.example.unifiedreader.core.model.librarySecondaryText
 import com.example.unifiedreader.core.model.shortDayLabel
 import java.time.Instant
 import java.time.ZoneId
 
+/** A tile's author line; a book without an author has none (its title is already above it). */
 internal fun continueReadingSupportingText(
     item: ReadableItem,
-): String = item.librarySecondaryText() ?: item.title
+): String? = item.librarySecondaryText()
 
 // A shelf tile's second line and meta line, the same on the home strip and in See all.
 
-internal fun ContinueReadingShelfItem.tileSupportingText(): String = continueReadingSupportingText(item)
+internal fun ContinueReadingShelfItem.tileSupportingText(): String? = continueReadingSupportingText(item)
 
-internal fun ContinueReadingShelfItem.tileMetaText(): String = progress.tileLabel.orEmpty()
+/** The format, then the progress: "AZW3 · 12%", so two formats of one title tell apart. */
+internal fun ContinueReadingShelfItem.tileMetaText(): String =
+    listOfNotNull(item.format.label, progress.tileLabel).joinToString(" · ")
 
-internal fun NextInSeriesShelfItem.tileSupportingText(): String = item.librarySecondaryText() ?: item.title
+internal fun NextInSeriesShelfItem.tileSupportingText(): String? = item.librarySecondaryText()
 
 internal fun NextInSeriesShelfItem.tileMetaText(): String =
     "After ${currentItem.librarySecondaryText() ?: currentItem.title}"

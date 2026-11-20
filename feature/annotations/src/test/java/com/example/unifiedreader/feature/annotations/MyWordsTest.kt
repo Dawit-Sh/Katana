@@ -127,13 +127,21 @@ class MyWordsTest {
     }
 
     @Test
-    fun `meanings come from the source, one line each, and none from the no-op source`() = runBlocking {
+    fun `a word's own meaning comes first, the source fills in the others, none from the no-op source`() = runBlocking {
         val source = object : WordMeanings {
-            override suspend fun meaning(word: String, language: String?): String? =
-                if (word == "rime") "Frost formed from\n freezing fog." else null
+            override suspend fun meaning(word: String, language: String): String? =
+                "Frost formed from\n freezing fog.".takeIf { word == "rime" || word == "ironmongery" }
         }
-        assertEquals(mapOf("w2" to "Frost formed from freezing fog."), source.meaningsOf(list.words, language = null))
+        val asked = MyWordsList(listOf(ironmongery, rime.copy(note = null))).words
+        assertEquals(
+            mapOf("w2" to "Frost formed from freezing fog.", "w1" to "Frost formed from freezing fog."),
+            source.meaningsOf(asked, language = "en"),
+        )
+        // rime keeps its own meaning (its note), so the source isn't asked for it.
+        assertEquals(mapOf("w1" to "Frost formed from freezing fog."), source.meaningsOf(list.words, language = "en"))
         assertTrue(WordMeanings.None.meaningsOf(list.words, language = "en").isEmpty())
+        assertEquals("frost", meaningLine(rime, mapOf("w2" to "from the source")))
+        assertEquals("from the source", meaningLine(ironmongery, mapOf("w1" to "from the source")))
         assertNull(meaningLine(ironmongery, emptyMap()))
     }
 

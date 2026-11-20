@@ -11,6 +11,7 @@ internal object EpubAnnotationCopy {
     const val Highlight = HighlightCopy.Highlight
     const val Note = HighlightCopy.Note
     const val AddToDictionary = "Add to dictionary"
+    const val Dictionary = "Dictionary"
     const val Copy = HighlightCopy.Copy
     const val Delete = HighlightCopy.Delete
     const val EditNote = HighlightCopy.EditNote

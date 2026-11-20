@@ -338,7 +338,8 @@ internal sealed interface PdfPageRenderState {
         val pageIndex: Int,
     ) : PdfPageRenderState {
         override val cacheKey: String = "page:$pageIndex"
-        val contentDescription: String = "PDF page ${pageIndex + 1}"
+        /** "Page 5" for screen readers, as in scroll mode; the same for PDF and DjVu books. */
+        val contentDescription: String = "Page ${pageIndex + 1}"
     }
 
     data class Error(val message: String) : PdfPageRenderState {

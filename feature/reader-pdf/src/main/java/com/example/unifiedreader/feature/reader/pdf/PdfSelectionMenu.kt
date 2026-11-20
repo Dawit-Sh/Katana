@@ -18,7 +18,7 @@ import com.example.unifiedreader.feature.annotations.HighlightCopy
 import kotlin.math.roundToInt
 
 /**
- * The menu over selected words on a PDF page, once the finger lifts: Highlight, Note and Copy, in Android's own
+ * The menu over selected words on a PDF page, once the finger lifts: Highlight, Dictionary, Note and Copy, in Android's own
  * floating text toolbar, as the EPUB reader's (the same labels, in the same order). It stays over the words while
  * the page zooms or moves ([bounds], in this view's pixels), closes when the selection goes, and Back clears the
  * selection before it would leave the book.
@@ -28,6 +28,7 @@ internal fun PdfSelectionMenu(
     marks: PdfTextMarks,
     bounds: () -> Rect?,
     onAction: (PdfSelectionAction) -> Unit,
+    hasDictionary: Boolean = false,
 ) {
     val view = LocalView.current
     val selection = marks.selection
@@ -40,6 +41,7 @@ internal fun PdfSelectionMenu(
         if (!resting) return@DisposableEffect onDispose { }
         val callback = PdfSelectionActionModeCallback(
             bounds = { latestBounds() },
+            hasDictionary = hasDictionary,
             onAction = { action -> latestAction(action) },
             onClosedBySystem = marks::clear,
         )
@@ -60,6 +62,7 @@ private class PdfMenuHolder {
 
 private class PdfSelectionActionModeCallback(
     private val bounds: () -> Rect?,
+    private val hasDictionary: Boolean,
     private val onAction: (PdfSelectionAction) -> Unit,
     private val onClosedBySystem: () -> Unit,
 ) : ActionMode.Callback2() {
@@ -70,6 +73,7 @@ private class PdfSelectionActionModeCallback(
         this.mode = mode
         menu.add(Menu.NONE, HighlightItemId, HighlightOrder, HighlightCopy.Highlight)
         menu.add(Menu.NONE, NoteItemId, NoteOrder, HighlightCopy.Note)
+        if (hasDictionary) menu.add(Menu.NONE, DictionaryItemId, DictionaryOrder, DictionaryLabel)
         menu.add(Menu.NONE, CopyItemId, CopyOrder, android.R.string.copy)
         return true
     }
@@ -80,6 +84,7 @@ private class PdfSelectionActionModeCallback(
         val action = when (item.itemId) {
             HighlightItemId -> PdfSelectionAction.Highlight
             NoteItemId -> PdfSelectionAction.Note
+            DictionaryItemId -> PdfSelectionAction.Dictionary
             CopyItemId -> PdfSelectionAction.Copy
             else -> return false
         }
@@ -112,8 +117,11 @@ private class PdfSelectionActionModeCallback(
         const val HighlightItemId = 0x7EAD11
         const val NoteItemId = 0x7EAD12
         const val CopyItemId = 0x7EAD13
+        const val DictionaryItemId = 0x7EAD14
+        const val DictionaryLabel = "Dictionary"
         const val HighlightOrder = 0
-        const val NoteOrder = 1
-        const val CopyOrder = 2
+        const val DictionaryOrder = 1
+        const val NoteOrder = 2
+        const val CopyOrder = 3
     }
 }

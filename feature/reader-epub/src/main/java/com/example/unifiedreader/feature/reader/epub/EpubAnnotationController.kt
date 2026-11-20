@@ -3,6 +3,8 @@ package com.example.unifiedreader.feature.reader.epub
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -13,6 +15,8 @@ import com.example.unifiedreader.feature.annotations.AnnotationPlace
 import com.example.unifiedreader.feature.annotations.BookMarksExport
 import com.example.unifiedreader.feature.annotations.HighlightEditor
 import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
+import com.example.unifiedreader.feature.annotations.addToMyWords
+import com.example.unifiedreader.feature.dictionary.DictionaryRequest
 import com.example.unifiedreader.feature.translation.ReaderTextSelection
 import com.example.unifiedreader.ui.components.AppToastIcon
 import com.example.unifiedreader.ui.components.AppToastMessage
@@ -55,19 +59,37 @@ internal class EpubAnnotationController(
         )
     }
 
+    /** The word the Dictionary card shows, null while it is closed. */
+    var dictionaryRequest by mutableStateOf<DictionaryRequest?>(null)
+
     fun saveWord(selection: Selection) {
-        val read = ReaderTextSelection(
-            text = selection.locator.text.highlight.orEmpty(),
-            before = selection.locator.text.before.orEmpty(),
-            after = selection.locator.text.after.orEmpty(),
-        )
-        val word = read.text.trim().trim { it in WordEdgePunctuation }
-        if (word.isEmpty()) return
+        val word = selection.selectedWord() ?: return
+        save(word, selection, meaning = null)
+    }
+
+    /** The toolbar's Dictionary: opens the card on the selected word; its Add to My words saves it here. */
+    fun lookUp(selection: Selection) {
+        val word = selection.selectedWord() ?: return
+        dictionaryRequest = DictionaryRequest(word = word, onAddToMyWords = { meaning -> save(word, selection, meaning) })
+    }
+
+    private fun save(word: String, selection: Selection, meaning: String?) {
+        val read = selection.textSelection()
         scope.launch {
-            store.saveWord(book = book, word = word, sentence = read.sentence, place = selection.locator.toAnnotationPlace(chapterTitleOf))
+            val place = selection.locator.toAnnotationPlace(chapterTitleOf)
+            store.addToMyWords(book = book, word = word, sentence = read.sentence, place = place, meaning = meaning)
             toasts()?.show(AppToastMessage(text = EpubAnnotationCopy.wordSaved(word), icon = AppToastIcon.Added))
         }
     }
+
+    private fun Selection.textSelection() = ReaderTextSelection(
+        text = locator.text.highlight.orEmpty(),
+        before = locator.text.before.orEmpty(),
+        after = locator.text.after.orEmpty(),
+    )
+
+    private fun Selection.selectedWord(): String? =
+        textSelection().text.trim().trim { it in WordEdgePunctuation }.takeIf(String::isNotEmpty)
 
     fun open(highlightId: String, anchor: Rect?) {
         editor.open(highlightId, anchor)

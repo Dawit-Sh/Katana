@@ -140,7 +140,10 @@ private fun SourceStartChoices(
             modifier = Modifier.padding(start = 4.dp, bottom = 30.dp),
         )
         AppScreenTitle(text = "Where are your books?")
-        SourceStartLead(text = "Katana reads EPUB, PDF and comics (CBZ and CBR) from your own server or from this device.")
+        SourceStartLead(
+            text = "Katana reads EPUB, PDF, DjVu, comics (CBZ, CBR), MOBI, AZW, AZW3 and FB2 " +
+                "from your own server or from this device.",
+        )
         Spacer(modifier = Modifier.height(30.dp))
         AppPanel(modifier = Modifier.fillMaxWidth()) {
             servers.forEachIndexed { index, entry ->
@@ -156,7 +159,7 @@ private fun SourceStartChoices(
             SourceStartChoice(
                 icon = SourceType.LOCAL.navigationIcon(),
                 title = "Files on this device",
-                supporting = "Import EPUB, PDF, CBZ or CBR files",
+                supporting = "Import EPUB, PDF, DjVu, CBZ, CBR, MOBI, AZW, AZW3 or FB2 files",
                 onClick = onImportFile,
             )
         }
@@ -380,7 +383,7 @@ private fun SourceType.startChoiceLine(): String = when (this) {
     SourceType.KAVITA -> "Manga, comics and books from a Kavita server"
     SourceType.STUMP -> "Comics, manga and books from a Stump server"
     SourceType.GRIMMORY -> "Books from a Grimmory server"
-    SourceType.LOCAL -> "Import EPUB, PDF, CBZ or CBR files"
+    SourceType.LOCAL -> "Import EPUB, PDF, DjVu, CBZ, CBR, MOBI, AZW, AZW3 or FB2 files"
 }
 
 private val SourceStartColumnMaxWidth = 560.dp

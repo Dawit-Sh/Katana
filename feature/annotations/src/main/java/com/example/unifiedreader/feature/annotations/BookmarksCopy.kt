@@ -19,6 +19,8 @@ object BookmarksCopy {
     const val Back = "Back to Bookmarks"
     const val BackToBook = "Back to the book"
     const val Continue = "Continue"
+    /** Continue, or a jump to a mark, on a book that isn't in the library here (its file was removed). */
+    const val BookNotHere = "This book isn't on this device any more"
     const val Bookmarks = "Bookmarks"
     const val Highlights = "Highlights"
     const val Words = "Words"
