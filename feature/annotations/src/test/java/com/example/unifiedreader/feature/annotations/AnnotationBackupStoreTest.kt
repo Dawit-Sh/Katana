@@ -4,6 +4,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.unifiedreader.core.database.UnifiedReaderDatabase
 import com.example.unifiedreader.core.database.entity.ReaderBookmarkEntity
+import com.example.unifiedreader.core.database.entity.ReaderHighlightEntity
 import java.time.ZoneOffset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -114,6 +115,79 @@ class AnnotationBackupStoreTest {
             assertEquals(listOf("sumo mandarins"), here.allHighlights.first().map(ReaderHighlight::text))
             assertEquals(1, here.allWords.first().size)
         }
+
+    @Test
+    fun `two highlights of the same words in one chapter both come back, once`() = runBlocking {
+        val early = AnnotationPlace("c1.xhtml", "{\"href\":\"c1.xhtml\",\"locations\":{\"progression\":0.1}}", "Chapter 1", 0.1)
+        val late = AnnotationPlace("c1.xhtml", "{\"href\":\"c1.xhtml\",\"locations\":{\"progression\":0.6}}", "Chapter 1", 0.6)
+        store(source, "a").apply {
+            addHighlight(hole, early, "the hole", HighlightLook())
+            addHighlight(hole, late, "the hole", HighlightLook(color = HighlightColor.Blue))
+        }
+        val text = backups(source).backUp().text
+
+        val result = backups(target).restore(text)
+        val again = backups(target).restore(text)
+
+        assertEquals(2, result.addedHighlights)
+        assertEquals(0, again.addedHighlights)
+        val restored = store(target, "b").allHighlights.first()
+        assertEquals(listOf(0.1, 0.6), restored.mapNotNull { it.place.progression }.sorted())
+    }
+
+    @Test
+    fun `a highlight is the same only by id or exact place, never by its words and chapter`() {
+        val early = "{\"href\":\"c1.xhtml\",\"locations\":{\"progression\":0.1}}"
+        val late = "{\"href\":\"c1.xhtml\",\"locations\":{\"progression\":0.6}}"
+        val here = highlightRow("here", early)
+        val backup = AnnotationBackup(
+            exportedAtEpochMillis = 1L,
+            highlights = listOf(
+                backupHighlight("here", early),
+                backupHighlight("same-place-other-device", early),
+                backupHighlight("same-words-later", late),
+            ),
+        )
+
+        val plan = planAnnotationRestore(backup, listOf(here), emptyList(), knownHighlightId = { false })
+
+        assertEquals(listOf("same-words-later"), plan.highlights.map(ReaderHighlightEntity::id))
+    }
+
+    private fun highlightRow(id: String, locator: String) = ReaderHighlightEntity(
+        id = id,
+        itemId = hole.itemId,
+        bookTitle = hole.title,
+        bookAuthor = hole.author,
+        href = "c1.xhtml",
+        locatorJson = locator,
+        text = "the hole",
+        chapterTitle = "Chapter 1",
+        progression = null,
+        style = HighlightStyle.Highlight.name,
+        color = HighlightColor.Yellow.name,
+        note = null,
+        createdAtEpochMillis = 1L,
+        updatedAtEpochMillis = 1L,
+        deleted = false,
+        syncState = "DIRTY",
+        remoteId = null,
+        remoteCfi = null,
+    )
+
+    private fun backupHighlight(id: String, locator: String) = BackupHighlight(
+        id = id,
+        itemId = hole.itemId,
+        bookTitle = hole.title,
+        href = "c1.xhtml",
+        locatorJson = locator,
+        text = "the hole",
+        chapterTitle = "Chapter 1",
+        style = HighlightStyle.Highlight.name,
+        color = HighlightColor.Yellow.name,
+        createdAt = 1L,
+        updatedAt = 1L,
+    )
 
     @Test
     fun `a file that isn't a Katana backup is refused`() = runBlocking {

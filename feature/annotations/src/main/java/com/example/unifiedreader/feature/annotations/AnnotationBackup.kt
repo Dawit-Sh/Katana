@@ -206,14 +206,15 @@ internal fun planAnnotationRestore(
     existingWords: List<SavedWordEntity>,
     knownHighlightId: (String) -> Boolean,
 ): AnnotationRestorePlan {
-    val highlightKeys = existingHighlights.mapTo(mutableSetOf(), ReaderHighlightEntity::sameWordsKey)
+    val highlightPlaces = existingHighlights.mapNotNullTo(mutableSetOf(), ReaderHighlightEntity::samePlaceKey)
     val highlightIds = existingHighlights.mapTo(mutableSetOf(), ReaderHighlightEntity::id)
     val highlights = backup.highlights
         .map(BackupHighlight::toEntity)
         .filter { row ->
+            val place = row.samePlaceKey()
             row.id !in highlightIds &&
                 !knownHighlightId(row.id) &&
-                highlightKeys.add(row.sameWordsKey()) &&
+                (place == null || highlightPlaces.add(place)) &&
                 highlightIds.add(row.id)
         }
     val wordKeys = existingWords.mapTo(mutableSetOf(), SavedWordEntity::sameWordKey)
@@ -237,7 +238,13 @@ internal fun planBookmarkRestore(
 private fun ReaderBookmarkEntity.samePageKey(): String =
     listOf(itemId, href, progression?.toString().orEmpty()).joinToString("\u0000")
 
-private fun ReaderHighlightEntity.sameWordsKey(): String = listOf(itemId, href, text.trim()).joinToString("\u0000")
+/**
+ * Where a highlight sits: its book, chapter and exact locator (the range of its words). Two highlights are the same
+ * only when they are the same row (id) or sit at this same place; the same words elsewhere in the chapter are
+ * another highlight. Null when the row has no locator, so only its id can match it.
+ */
+private fun ReaderHighlightEntity.samePlaceKey(): String? = locatorJson.trim().takeIf(String::isNotEmpty)
+    ?.let { locator -> listOf(itemId, href, locator).joinToString("\u0000") }
 
 private fun SavedWordEntity.sameWordKey(): String =
     listOf(itemId, word.trim().lowercase(Locale.ROOT), sentence?.trim().orEmpty()).joinToString("\u0000")
