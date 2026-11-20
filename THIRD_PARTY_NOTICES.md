@@ -35,6 +35,18 @@ permissive licences (FreeType under the FreeType License, libjpeg-turbo, OpenJPE
 and AGG; see PDFium's `LICENSE` and `third_party/`). The library also brings Guava
 (https://github.com/google/guava), Apache License 2.0.
 
+## Open English WordNet (the offline dictionary)
+
+The English dictionary that Settings › Reading downloads (`katana-dictionary-en-1.sqlite`, on the
+`dict-en-1` release; nothing of it is in the APK) is built by `tools/build-dictionary.py` from Open English
+WordNet 2025 (https://github.com/globalwordnet/english-wordnet), Copyright the Open English WordNet team,
+licensed under the Creative Commons Attribution 4.0 International License
+(https://creativecommons.org/licenses/by/4.0/). Katana keeps its definitions, examples and irregular word
+forms and drops the rest. It is based on WordNet 3.1, Copyright 2011 Princeton University; WordNet's licence
+lets it be used, copied, changed and shared with this notice kept: "WordNet 3.1 Copyright 2011 by Princeton
+University. All rights reserved. THIS SOFTWARE AND DATABASE IS PROVIDED "AS IS" AND PRINCETON UNIVERSITY
+MAKES NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR IMPLIED."
+
 ## jsoup (MOBI and AZW3 conversion)
 
 `core:ebook-convert` uses jsoup 1.18.1 (https://jsoup.org), the copy Readium already brings. MIT License,

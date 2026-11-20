@@ -19,6 +19,7 @@ import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.primaryAuthor
 import com.example.unifiedreader.feature.annotations.HighlightCardOverlay
 import com.example.unifiedreader.feature.annotations.HighlightNoteDialog
+import com.example.unifiedreader.feature.dictionary.ReaderDictionaryOverlay
 import com.example.unifiedreader.feature.annotations.PageBookmarkJumpEffect
 import com.example.unifiedreader.feature.annotations.PageBookmarkRibbon
 import com.example.unifiedreader.feature.annotations.PageBookmarks
@@ -276,6 +277,9 @@ private fun PdfReaderBars(
 private fun PdfHighlightCards(marks: PdfTextMarks) {
     HighlightCardOverlay(editor = marks.editor, highlights = marks.highlights)
     HighlightNoteDialog(editor = marks.editor, highlights = marks.highlights)
+    marks.dictionary?.let { dictionary ->
+        ReaderDictionaryOverlay(request = dictionary.request, onDismiss = { dictionary.request = null })
+    }
 }
 
 /** The ribbon on a bookmarked page, and a bookmark opened from the Bookmarks page or the book's page. */

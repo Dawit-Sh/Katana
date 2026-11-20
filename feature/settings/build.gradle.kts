@@ -33,6 +33,7 @@ dependencies {
     implementation(project(":feature:navigation"))
     implementation(project(":feature:updates"))
     implementation(project(":feature:translation"))
+    implementation(project(":feature:dictionary"))
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
