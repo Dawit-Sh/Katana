@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Katana Desk · a reader for your Grimmory books, on your computer</title>
+  <meta name="description" content="Katana Desk is a book reader for Windows and Linux that syncs with your Grimmory server: reading places, highlights and bookmarks. Free under the GPL.">
+  <meta property="og:title" content="Katana Desk">
+  <meta property="og:description" content="A book reader for your computer that keeps up with your Grimmory server. Download it here.">
+  <meta property="og:image" content="https://dawitsh.dev/Katana/desk/library.jpg">
+  <meta property="og:url" content="https://dawitsh.dev/Katana/desk/">
+  <meta name="theme-color" content="#0b0c0e">
+  <link rel="icon" href="../katana-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Noto+Serif+JP:wght@500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ground: #0b0c0e;
+      --card: #15171a;
+      --line: #26292e;
+      --ink: #eceae6;
+      --quiet: #a3a19c;
+      --accent: #d9d4ca;
+      --on-accent: #0b0c0e;
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--ground);
+      color: var(--ink);
+      font: 400 17px/1.6 "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    main { max-width: 640px; margin: 0 auto; padding: 56px 20px 40px; }
+    a { color: var(--ink); text-underline-offset: 3px; }
+    a:hover { color: #fff; }
+
+    .head { display: flex; align-items: center; gap: 18px; }
+    .head img { width: 84px; height: 84px; border-radius: 20px; border: 1px solid var(--line); }
+    h1 { margin: 0; font-size: 40px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; }
+    h1 .kanji { font-family: "Noto Serif JP", serif; font-weight: 500; font-size: 28px; color: var(--quiet); margin-left: 6px; }
+    .tagline { margin: 6px 0 0; color: var(--quiet); }
+
+    .intro { margin: 32px 0 0; }
+
+    .shot { margin: 28px 0 0; }
+    .shot img { display: block; width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--line); }
+    .shot figcaption { margin: 8px 0 0; font-size: 14px; color: var(--quiet); text-align: center; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0 0; }
+    .pair img { display: block; width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); }
+
+    .download {
+      margin: 32px 0 0; padding: 22px; border: 1px solid var(--line); border-radius: 18px; background: var(--card);
+    }
+    .button {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%; min-height: 56px; padding: 14px 20px; border-radius: 14px;
+      background: var(--accent); color: var(--on-accent); text-decoration: none;
+      font-weight: 700; font-size: 18px;
+    }
+    .button:hover { color: var(--on-accent); background: #fff; }
+    .button svg { width: 22px; height: 22px; flex: none; }
+    .for { margin: 10px 0 0; text-align: center; color: var(--quiet); font-size: 15px; }
+    .others { margin: 18px 0 0; padding: 16px 0 0; border-top: 1px solid var(--line); font-size: 15px; color: var(--quiet); }
+    .others ul { margin: 6px 0 0; padding: 0; list-style: none; }
+    .others li { padding: 4px 0; }
+    .others a { font-weight: 600; }
+    .install { margin: 14px 0 0; font-size: 14px; color: var(--quiet); }
+    .install code { font-size: 13px; }
+
+    h2 { margin: 44px 0 10px; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+    ul.features { margin: 0; padding-left: 20px; }
+    ul.features li { margin: 6px 0; }
+    ul.features li::marker { color: var(--quiet); }
+
+    .note { margin: 0; }
+    footer { margin: 52px 0 0; padding: 20px 0 0; border-top: 1px solid var(--line); font-size: 14px; color: var(--quiet); }
+    footer p { margin: 4px 0; }
+
+    @media (max-width: 420px) {
+      main { padding-top: 36px; }
+      .head img { width: 68px; height: 68px; border-radius: 16px; }
+      h1 { font-size: 34px; }
+      .pair { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="head">
+      <img src="../katana-icon.png" alt="Katana icon: an ink katana on black" width="84" height="84">
+      <div>
+        <h1>Katana Desk<span class="kanji" lang="ja">刀</span></h1>
+        <p class="tagline">A reader for your computer that keeps up with your book server.</p>
+      </div>
+    </header>
+
+    <p class="intro">
+      Katana Desk is <a href="../">Katana</a> for Windows and Linux. It reads the books on
+      your <a href="https://github.com/grimmory-tools/grimmory">Grimmory</a> server and the ones already sitting in
+      your folders, and it keeps your place, highlights and bookmarks in sync. So you can read a chapter at your desk,
+      pick up the tablet later, and land on the same page.
+    </p>
+
+    <figure class="shot">
+      <img src="library.jpg" alt="Katana Desk's library: a grid of book covers in a dark window" width="1280" height="801">
+    </figure>
+
+    <section class="download" aria-label="Download">
+      <a class="button" id="download" href="https://github.com/Dawit-Sh/katana-desk/releases/latest">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>
+        <span id="download-label">Download the latest version</span>
+      </a>
+      <p class="for" id="download-for">For Windows 10 and 11, and Linux</p>
+      <div class="others">
+        All the downloads:
+        <ul>
+          <li><a id="link-windows" href="https://github.com/Dawit-Sh/katana-desk/releases/latest">Windows</a>: an installer, no admin needed</li>
+          <li><a id="link-appimage" href="https://github.com/Dawit-Sh/katana-desk/releases/latest">Linux AppImage</a>: runs on any distro and updates itself</li>
+          <li><a id="link-deb" href="https://github.com/Dawit-Sh/katana-desk/releases/latest">.deb</a> for Debian, Ubuntu and Mint, or <a id="link-rpm" href="https://github.com/Dawit-Sh/katana-desk/releases/latest">.rpm</a> for Fedora and openSUSE</li>
+        </ul>
+      </div>
+      <p class="install">
+        Windows may say the app isn't common yet: click More info, then Run anyway. On Linux, make the AppImage
+        runnable first (<code>chmod +x</code>). The Windows app and the AppImage check for updates once a day and
+        ask before installing one, and an update keeps your books, highlights and words.
+      </p>
+    </section>
+    <script>
+      // The Website workflow writes Katana Desk's newest release in here and the version into the button above, when it
+      // builds the site after each release, so the page shows them from its first frame with nothing to load.
+      // This only points the links at the files, picking this computer's for the big button; a link's target isn't
+      // drawn, so nothing on the page changes. Without the data, the links go to the latest release page.
+      (function () {
+        var latest = /*KATANA_DESK_LATEST*/null;
+        if (!latest || !latest.files) return;
+        var files = latest.files;
+        ["windows", "appimage", "deb", "rpm"].forEach(function (kind) {
+          var link = document.getElementById("link-" + kind);
+          if (link && files[kind] && files[kind].url) link.href = files[kind].url;
+        });
+        var ua = navigator.userAgent || "";
+        var pick = /Windows/i.test(ua) ? "windows" : (/Linux|X11/i.test(ua) && !/Android/i.test(ua) ? "appimage" : null);
+        if (pick && files[pick] && files[pick].url) {
+          document.getElementById("download").href = files[pick].url;
+          document.getElementById("download-for").textContent = pick === "windows" ? "For Windows 10 and 11" : "The AppImage, for any Linux";
+        }
+      })();
+    </script>
+
+    <h2>What it does</h2>
+    <ul class="features">
+      <li>Reads EPUB, MOBI, AZW3, FB2, PDF, DjVu and comics (CBZ and CBR).</li>
+      <li>Your whole Grimmory library shows up, and books download for offline reading, picking up where they stopped if the connection drops.</li>
+      <li>Your reading place, highlights and bookmarks sync both ways, so they show up in Katana on Android, Grimmory's web reader and KOReader too.</li>
+      <li>Reads the books in your own folders where they are, keeping the folder structure.</li>
+      <li>Highlights and notes in five colours and four styles, in books and PDFs, and a Markdown export of all of them.</li>
+      <li>Double-click any word for its meaning. English Wiktionary and WordNet are built in and work offline, and your own StarDict dictionaries work too. Save words and go over them as flashcards.</li>
+      <li>A Journal of your reading: the days you read, streaks, books finished and the hours you read most.</li>
+      <li>Ctrl K finds anything: books, authors, highlights, notes, bookmarks and words.</li>
+      <li>Eight themes, your own covers for any book, reading lists, and a second window when you want two books open.</li>
+    </ul>
+
+    <div class="pair">
+      <img src="reading.jpg" alt="Reading in two pages with a highlight and the selection card" width="1280" height="801" loading="lazy">
+      <img src="word-card.jpg" alt="The word card with a Wiktionary definition and the sentence from the book" width="1280" height="801" loading="lazy">
+    </div>
+
+    <h2>What it isn't</h2>
+    <p class="note">
+      It isn't trying to be a reader with every feature piled in. It does the reading things that matter to me,
+      and I'll keep fixing what breaks. If you want something it doesn't do, fork it and make it yours with
+      whatever AI agent you like to work with.
+    </p>
+
+    <footer>
+      <p>The books in the pictures are public domain, from Standard Ebooks and Project Gutenberg.
+        Dictionaries: Wiktionary (CC BY-SA 4.0) and Open English WordNet (CC BY 4.0).</p>
+      <p>Katana Desk is free software under the
+        <a href="https://github.com/Dawit-Sh/katana-desk/blob/main/LICENSE">GNU GPL v3</a>.</p>
+      <p><a href="https://github.com/Dawit-Sh/katana-desk">Source code</a> · <a href="https://github.com/Dawit-Sh/katana-desk/releases">All releases</a> · <a href="../">Katana for Android</a> · <a href="https://dawitsh.dev">dawitsh.dev</a></p>
+    </footer>
+  </main>
+
+</body>
+</html>

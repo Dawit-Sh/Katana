@@ -2,6 +2,8 @@
 # Every published release runs it again: it writes site/latest.json (the version, the notes and the three APKs'
 # links, sizes and SHA-256 digests, which the in-app updater reads instead of GitHub's API)
 # and bakes them into index.html, so the Download button says the newest version from its first frame.
+# It also writes Katana Desk's newest release (github.com/Dawit-Sh/katana-desk) into site/desk/, the desktop
+# app's page at https://dawitsh.dev/Katana/desk/. A daily run picks up a new Katana Desk release within a day.
 name: Website
 
 on:
@@ -10,8 +12,12 @@ on:
     paths:
       - "site/**"
       - ".github/workflows/pages.yml"
+      - ".github/scripts/bake_desk.py"
   release:
     types: [published]
+  schedule:
+    # once a day, for Katana Desk releases (they live in another repo, so they can't start this run)
+    - cron: "23 5 * * *"
   workflow_dispatch:
 
 permissions:
@@ -55,6 +61,29 @@ jobs:
           cat site/latest.json
       - name: Write the version and links into the page
         run: python3 .github/scripts/bake_site.py site/latest.json site/index.html
+      - name: Write Katana Desk's newest release into its page
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api repos/Dawit-Sh/katana-desk/releases/latest > desk-release.json; then
+            jq '{
+              version: (.tag_name | ltrimstr("v")),
+              tag: .tag_name,
+              published: .published_at,
+              page: .html_url,
+              files: ([.assets[] | select(.name | test("(setup\\.exe|\\.AppImage|\\.deb|\\.rpm)$")) | {
+                key: (if (.name | endswith("setup.exe")) then "windows"
+                      elif (.name | endswith(".AppImage")) then "appimage"
+                      elif (.name | endswith(".deb")) then "deb"
+                      else "rpm" end),
+                value: {name, url: .browser_download_url, size, digest}
+              }] | from_entries)
+            }' desk-release.json > site/desk/latest.json
+            cat site/desk/latest.json
+            python3 .github/scripts/bake_desk.py site/desk/latest.json site/desk/index.html
+          else
+            echo "No Katana Desk release yet: its links go to the releases page."
+          fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
