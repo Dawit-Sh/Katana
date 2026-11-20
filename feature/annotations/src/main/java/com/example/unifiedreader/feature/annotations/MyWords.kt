@@ -73,6 +73,29 @@ fun wordSpan(sentence: String, word: String): IntRange? {
 }
 
 /**
+ * The part of [sentence] shown around [word] on My words, on one line: all of it when it is short,
+ * else up to [before] characters before the word and [after] after it, cut between words, with "…"
+ * where it was cut, so the word itself always shows ("…the deadliest piece of ironmongery in the trade.").
+ */
+fun sentenceAround(sentence: String, word: String, before: Int = SNIPPET_BEFORE, after: Int = SNIPPET_AFTER): String {
+    val text = sentence.oneLine()
+    val span = wordSpan(text, word) ?: return text
+    val start = if (span.first <= before) {
+        0
+    } else {
+        text.indexOf(' ', span.first - before).takeIf { it in 0 until span.first }?.plus(1) ?: (span.first - before)
+    }
+    val end = if (text.length - span.last - 1 <= after) {
+        text.length
+    } else {
+        text.lastIndexOf(' ', span.last + after).takeIf { it > span.last } ?: (span.last + 1 + after)
+    }
+    val head = if (start > 0) "…" else ""
+    val tail = if (end < text.length) "…" else ""
+    return head + text.substring(start, end).trim() + tail
+}
+
+/**
  * The meaning line under [word] on My words: what [WordMeanings] gave for it. A meaning stored with
  * the word itself (a dictionary's Add to My words) goes first here once saved words keep one.
  */
@@ -87,3 +110,5 @@ internal fun locatorPosition(locatorJson: String): Int? = try {
 }
 
 private const val PERCENT = 100
+private const val SNIPPET_BEFORE = 50
+private const val SNIPPET_AFTER = 70

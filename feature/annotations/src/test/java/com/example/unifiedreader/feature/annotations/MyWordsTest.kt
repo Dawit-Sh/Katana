@@ -89,6 +89,17 @@ class MyWordsTest {
     }
 
     @Test
+    fun `a long sentence is cut around the word between words, so the word always shows`() {
+        val long = "and then hurried on, Alice started to her feet, for it flashed across her mind that she had never " +
+            "before seen a rabbit with either a waistcoat-pocket, or a watch to take out of it, and burning with " +
+            "curiosity, she ran across the field after it"
+        val shown = sentenceAround(long, "curiosity", before = 40, after = 20)
+        assertEquals("…to take out of it, and burning with curiosity, she ran across…", shown)
+        assertEquals("A frosty rime was on his head", sentenceAround("A frosty  rime was\non his head", "rime"))
+        assertEquals("No word here.", sentenceAround("No word here.", "rime"))
+    }
+
+    @Test
     fun `my words export lists every book's words under it, by title, with sentences and notes`() {
         val text = MyWordsMarkdown.words(list.words, LocalDate.of(2026, 11, 20))
         assertEquals(

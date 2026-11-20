@@ -220,12 +220,21 @@ private fun BookFilter(list: MyWordsList, selected: MyWordsBook?, onSelect: (Str
             )
             list.books.forEach { book ->
                 AppMenuItem(
-                    text = { Text(MyWordsCopy.bookChoice(book), maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                    text = { Text(book.book.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     onClick = {
                         open = false
                         onSelect(book.book.itemId)
                     },
-                    trailingIcon = if (selected?.book?.itemId == book.book.itemId) checkMark() else null,
+                    // The count stays in view however long the title; a check on the book shown.
+                    trailingIcon = {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(text = book.count.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (selected?.book?.itemId == book.book.itemId) checkMark().invoke()
+                        }
+                    },
                 )
             }
         }
@@ -349,10 +358,10 @@ private fun WordContext(word: SavedWord, modifier: Modifier = Modifier) {
     }
 }
 
-/** The sentence on one line with the saved word in bold. */
+/** The sentence around the saved word, on one line, with the word in bold. */
 @Composable
 private fun sentenceWithWord(sentence: String, word: String): AnnotatedString {
-    val text = sentence.oneLine()
+    val text = sentenceAround(sentence, word)
     val span = wordSpan(text, word)
     val strong = SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
     return buildAnnotatedString {
@@ -367,5 +376,5 @@ private fun sentenceWithWord(sentence: String, word: String): AnnotatedString {
 }
 
 private const val WordColumnWeight = 0.42f
-private const val SentenceLines = 4
-private const val MetaLines = 2
+private const val SentenceLines = 6
+private const val MetaLines = 3

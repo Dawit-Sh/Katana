@@ -104,9 +104,6 @@ object MyWordsCopy {
         "${MarkCounts.words(list.words.size)} from ${MarkCounts.books(list.books.size)}"
     }
 
-    /** "A Christmas Carol · 7", a book on the filter. */
-    fun bookChoice(book: MyWordsBook): String = "${book.book.title} · ${book.count}"
-
     /** "from every book", or "from Hamlet" while the list shows one book. */
     fun reviewFrom(book: MyWordsBook?): String = if (book == null) "from every book" else "from ${book.book.title}"
 }
