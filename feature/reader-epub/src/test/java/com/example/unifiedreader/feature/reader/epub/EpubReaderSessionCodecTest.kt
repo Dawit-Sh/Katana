@@ -294,6 +294,19 @@ class EpubReaderSessionCodecTest {
     }
 
     @Test
+    fun `page turn none is saved for the book and for new books`() {
+        val preferences = EpubReaderPreferences(pageTurnStyle = PageTurnStyle.None)
+        val saved = buildEpubPreferencesMap(preferences)
+
+        assertEquals(PageTurnStyle.None.name, saved[EpubPageTurnStyleKey])
+        assertEquals(
+            PageTurnStyle.None,
+            restoreEpubPreferences(ReaderSessionSnapshot(itemId = "book", preferences = saved)).pageTurnStyle,
+        )
+        assertEquals(PageTurnStyle.None.name, preferences.newBookLook()[EpubPageTurnStyleKey])
+    }
+
+    @Test
     fun `original typography mode enables publisher styles and omits forced typography`() {
         val preferences = EpubReaderPreferences(
             typographyMode = EpubTypographyMode.Original,

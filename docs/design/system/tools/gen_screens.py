@@ -1701,7 +1701,7 @@ pages_comic = pages_card(
     pages_row("Pages", ["Turn", "Scroll"], "Scroll")
     + pages_row("Direction", ["Top to bottom", "Left to right", "Right to left"], "Right to left", stacked=True)
     + pages_row("Two pages", ["Auto", "Off", "On"], "Auto", disabled=True)
-    + pages_row("Page turn", ["Slide", "Curl"], "Slide", disabled=True)
+    + pages_row("Page turn", ["Slide", "Curl", "None"], "Slide", disabled=True)
     + pages_row("Fit", ["Screen", "Width", "Height"], "Screen", disabled=True)
     + pages_row("Page number", ["Show", "Hide"], "Show")
 )
@@ -1709,7 +1709,7 @@ pages_epub = pages_card(
     pages_row("Pages", ["Turn", "Scroll"], "Turn")
     + pages_row("Two pages", ["Auto", "Off", "On"], "Auto")
     + '<div style="padding:0 20px 4px;font:12px/16px var(--font-sans);color:var(--on-surface-variant)">Auto: two in landscape</div>'
-    + pages_row("Page turn", ["Slide", "Curl"], "Slide")
+    + pages_row("Page turn", ["Slide", "Curl", "None"], "Slide")
 )
 
 comp("ReaderPages", "Screens", 1200, """
@@ -1720,6 +1720,7 @@ Every reader offers both ways of reading, as the first row of its settings (Kata
 - **PDF and DjVu** get the reading settings card the comics reader has (the `tune` button after Previous and Next in the top bar, `settings-width` 400, a bottom sheet on phones): Pages, then Page number. Scrolling, the pages run top to bottom as wide as the view, 6 apart on `surface-container-high`; a page not drawn yet is a plain page-coloured box. Pinch zoom works (up to 4×); zoomed, a drag pans sideways as well as down the strip, and a double tap zooms to 2.5× and back. The page number, the slider and the page strip follow the page across the middle of the screen; a tap shows or hides the bars; a pull past the last page finishes the book, as Next on the last page does.
 - **Comics:** Pages, then **Direction**: Left to right or Right to left when turning, and also **Top to bottom** (webtoons) when scrolling, where left and right run the strip sideways with each page shown whole. Direction is always stacked under its label, so the card keeps its height. Then the rows that only apply to turning pages, disabled while scrolling: **Two pages** (Auto, Off, On), Page turn, Fit. The slider fills the way the pages go.
 - **EPUB** (and MOBI, AZW, AZW3, FB2): Layout's first row is Pages; then, where a spread fits (Readium needs a page area 960 wide), **Two pages** (Auto, Off, On, "Auto: two in landscape"), and Page turn, both disabled while scrolling. Scrolling is Readium's: each chapter scrolls, and a drag up that starts at a chapter's end goes on into the next (down at its top, back to the one before).
+- **Page turn** (comics and EPUB): **Slide**, **Curl**, or **None**, where the page just changes with no animation, from a tap, a volume key or a swipe alike (a swipe still has to go sideways past the touch slop, and a drag up or down, a long press or a second finger stays with the page). PDF and DjVu turning has no animation of its own, so it has no Page turn row.
 - **Kept per book**, in the book's reader session. A book not set yet: a PDF or DjVu book opens the way you last picked in any of them; an EPUB with the look "Use these for new books" saved (it now keeps Pages and Two pages too, and Settings › Default look for new books lists them); a comic with its library's reading defaults (Settings › a server › Reading defaults: Turn or Scroll), its series' choice, then its own. A comic's scroll direction is its own, top to bottom until picked.
 - **The place carries over:** switching keeps the page you are on (scrolling, the page across the middle of the screen); a scrolling book reopens where it was left, down to the spot in the page, unless the saved page has moved since (another device, or turning pages).
 """, f"""
