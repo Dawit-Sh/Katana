@@ -565,6 +565,15 @@ class AppViewModel @Inject constructor(
         comicPageSourceCacheController.trimReaderMemoryCaches(request)
     }
 
+    /**
+     * Katana back on screen: the places shown are refreshed, and a server marked offline is checked again at
+     * once, so a Wi-Fi drop that has ended doesn't keep it offline until the retry loop's next turn.
+     */
+    fun onAppResumed() {
+        refreshProgress()
+        if (remoteSourceConnectivityPolicy.offlineRemoteSources().isNotEmpty()) retryPendingRemoteSync()
+    }
+
     /** Retry (Settings, a failure notice) and the retry loop: what waits to upload, and every server marked offline. */
     fun retryPendingRemoteSync() {
         retryPendingRemoteSync(

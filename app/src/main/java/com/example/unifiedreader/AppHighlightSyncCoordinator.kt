@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /** What the app shell asks of highlight sync. */
@@ -46,9 +47,11 @@ interface HighlightSyncTriggers {
  * files here that are copies of them ([GrimmoryLocalCopies], checked again before each sync):
  * - a change made here goes a few seconds after the last one (more often follow), when Grimmory is
  *   online, and as soon as it is online again;
- * - a book opened brings its marks down (and sends its waiting changes);
+ * - a book opened brings its marks down (and sends its waiting changes); opened while Grimmory is marked
+ *   offline, it checks Grimmory at once, and the marks come down when it answers ([OpenBookMarksPulls]);
  * - a library sync brings every book's down;
- * - the retry timer (two minutes, then longer, as for reading progress) tries what still waits.
+ * - the retry timer (half a minute, then longer up to five, as for reading progress) tries what still waits,
+ *   and so does Katana coming back on screen while Grimmory is marked offline.
  */
 @Singleton
 class AppHighlightSyncCoordinator @Inject constructor(
@@ -61,6 +64,7 @@ class AppHighlightSyncCoordinator @Inject constructor(
     private val readerWork: ReaderWorkCoordinator,
     private val connectivity: RemoteSourceConnectivityPolicy,
     private val localCopies: GrimmoryLocalCopies,
+    private val reconnect: RemoteSourceConnectivityStartupCoordinator,
 ) : HighlightSyncTriggers {
     private val waiting = MutableStateFlow<List<WaitingHighlightKey>>(emptyList())
     private val waitingBookmarks = MutableStateFlow<List<WaitingBookmarkKey>>(emptyList())
@@ -83,17 +87,25 @@ class AppHighlightSyncCoordinator @Inject constructor(
                 }
         }
         scope.launch {
-            var openItemIds = emptySet<String>()
-            readerWork.activeReaderItemIds.collect { itemIds ->
-                val opened = itemIds - openItemIds
-                openItemIds = itemIds
-                if (opened.isEmpty() || connectivity.isUnavailable(SourceType.GRIMMORY)) return@collect
-                val books = marksBooks(itemsWithIds(opened, localFile = { true }))
-                if (books.isNotEmpty()) {
-                    sync.syncMarksBooks(books)
-                    bookmarkSync.syncMarksBooks(books)
+            val pulls = OpenBookMarksPulls()
+            val grimmory = connectivity.reachabilityFlow
+                .map { states -> states[SourceType.GRIMMORY] ?: SourceConnectivityState.Unknown }
+                .distinctUntilChanged()
+            combine(readerWork.activeReaderItemIds, grimmory) { itemIds, state -> itemIds to state }
+                .collect { (itemIds, state) ->
+                    when (val step = pulls.next(itemIds, state)) {
+                        OpenBookMarksPulls.Step.Wait -> Unit
+                        OpenBookMarksPulls.Step.CheckServer -> scope.launch { reconnect.retrySource(SourceType.GRIMMORY) }
+                        is OpenBookMarksPulls.Step.Pull -> {
+                            val books = marksBooks(itemsWithIds(step.itemIds, localFile = { true }))
+                            if (books.isNotEmpty()) {
+                                val highlightsDown = sync.syncMarksBooks(books)
+                                val bookmarksDown = bookmarkSync.syncMarksBooks(books)
+                                if (!highlightsDown || !bookmarksDown) pulls.failed(step.itemIds)
+                            }
+                        }
+                    }
                 }
-            }
         }
         scope.launchPendingSyncRetries(hasWork = ::hasWaitingUploads, retry = ::retry)
     }

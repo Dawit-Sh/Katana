@@ -48,6 +48,21 @@ class RemoteSourceConnectivityPolicyTest {
         assertFalse(policy.canAttemptProgressSync(SourceType.LOCAL))
     }
 
+    // His Pixel, 2026-11-20: the first PDF opened after Katana started kept p. 2 though Grimmory had a newer p. 1.
+    @Test
+    fun `a downloaded book asks the server for its place unless the server is known to be offline`() {
+        val policy = RemoteSourceConnectivityPolicy()
+
+        assertTrue(policy.canAttemptDownloadedProgressSync(SourceType.GRIMMORY))
+        policy.markChecking(SourceType.GRIMMORY)
+        assertTrue(policy.canAttemptDownloadedProgressSync(SourceType.GRIMMORY))
+        policy.markReachable(SourceType.GRIMMORY)
+        assertTrue(policy.canAttemptDownloadedProgressSync(SourceType.GRIMMORY))
+        policy.markUnavailable(SourceType.GRIMMORY)
+        assertFalse(policy.canAttemptDownloadedProgressSync(SourceType.GRIMMORY))
+        assertFalse(policy.canAttemptDownloadedProgressSync(SourceType.LOCAL))
+    }
+
     @Test
     fun `explicit probes are allowed for remote sources`() {
         val policy = RemoteSourceConnectivityPolicy()

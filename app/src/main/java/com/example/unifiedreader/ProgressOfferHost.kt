@@ -23,9 +23,9 @@ internal fun ProgressOfferHost(
     val item = prompt.item
     val local = store.getProgress(item)
     val pageCount = store.getSession(item)?.pageCount ?: item.pageCount
-    val here = progressPlaceLabel(local?.page, local?.percent, pageCount) ?: ProgressOfferCopy.Here
-    val there = progressPlaceLabel(prompt.offer.server.page, prompt.offer.server.percent, pageCount)
-        ?: ProgressOfferCopy.There
+    val here = local?.let { progressPlaceLabel(it.locatorType, it.page, it.percent, pageCount) } ?: ProgressOfferCopy.Here
+    val server = prompt.offer.server
+    val there = progressPlaceLabel(server.locatorType, server.page, server.percent, pageCount) ?: ProgressOfferCopy.There
     AppDialog(
         onDismissRequest = onDismiss,
         title = { Text(item.title) },

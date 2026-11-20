@@ -99,9 +99,14 @@ class RemoteSourceConnectivityPolicy @Inject constructor(
         sourceType: SourceType,
     ): Boolean = sourceType != SourceType.LOCAL
 
+    /**
+     * A downloaded book opens after a short, bounded wait for its place, so it asks the server unless that is
+     * known to be offline: the first book opened after Katana starts, before anything has reached the server,
+     * asks too. (Before 1.1.2 it opened at the place on this device without asking.)
+     */
     fun canAttemptDownloadedProgressSync(
         sourceType: SourceType,
-    ): Boolean = canAttemptProgressSync(sourceType)
+    ): Boolean = sourceType != SourceType.LOCAL && reachabilityFor(sourceType) != SourceConnectivityState.Offline
 
     fun canFlushDownloadedStartupProgress(
         sourceType: SourceType,

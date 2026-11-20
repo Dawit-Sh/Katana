@@ -163,7 +163,7 @@ fun UnifiedReaderAppContent(
     DisposableEffect(lifecycleOwner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refreshProgress()
+                viewModel.onAppResumed()
             } else if (event == Lifecycle.Event.ON_STOP) {
                 viewModel.onAppStopped()
             }

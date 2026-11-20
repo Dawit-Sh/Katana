@@ -91,9 +91,17 @@ class BackwardProgressOffersTest {
 
     @Test
     fun `places read as pages, or as a share of the book`() {
-        assertEquals("p. 8", progressPlaceLabel(page = 8, percent = 0.09, pageCount = 90))
-        assertEquals("p. 5", progressPlaceLabel(page = null, percent = 0.06, pageCount = 90))
-        assertEquals("6%", progressPlaceLabel(page = null, percent = 0.06, pageCount = null))
-        assertNull(progressPlaceLabel(page = null, percent = null, pageCount = 90))
+        assertEquals("p. 8", progressPlaceLabel(LocatorType.CFI, page = 8, percent = 0.09, pageCount = 90))
+        assertEquals("p. 5", progressPlaceLabel(LocatorType.CFI, page = null, percent = 0.06, pageCount = 90))
+        assertEquals("6%", progressPlaceLabel(LocatorType.PERCENT, page = null, percent = 0.06, pageCount = null))
+        assertNull(progressPlaceLabel(LocatorType.CFI, page = null, percent = null, pageCount = 90))
+    }
+
+    // His Pixel, 2026-11-20: a PDF on page 5 with the server on page 2 was asked "Stay on p. 4 or go to p. 1?".
+    @Test
+    fun `a page book's place counts from 0, so it reads one higher`() {
+        assertEquals("p. 5", progressPlaceLabel(LocatorType.PAGE, page = 4, percent = 0.008, pageCount = 589))
+        assertEquals("p. 2", progressPlaceLabel(LocatorType.PAGE, page = 1, percent = 0.003, pageCount = 589))
+        assertEquals("p. 1", progressPlaceLabel(LocatorType.PAGE, page = 0, percent = 0.0, pageCount = 589))
     }
 }

@@ -1,5 +1,6 @@
 package com.example.unifiedreader
 
+import com.example.unifiedreader.core.model.LocatorType
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SyncState
 import com.example.unifiedreader.core.model.progress.ProgressSyncLocator
@@ -70,9 +71,17 @@ internal fun RemoteProgressSyncDecision.OfferRemote.toOffer(itemId: String) = Ba
     serverUpdatedAtEpochMillis = updatedAtEpochMillis,
 )
 
-/** "p. 4", or the share of the book when the page isn't known ("6%"); null when neither is. */
-internal fun progressPlaceLabel(page: Int?, percent: Double?, pageCount: Int?): String? {
-    val knownPage = page?.takeIf { it > 0 }
+/**
+ * "p. 4", or the share of the book when the page isn't known ("6%"); null when neither is. A book read by
+ * the page ([LocatorType.PAGE]: PDFs, comics) keeps its page counted from 0, an EPUB the page it shows, from
+ * 1. (Before 1.1.2 a PDF on page 5 was asked about as "p. 4".)
+ */
+internal fun progressPlaceLabel(locatorType: LocatorType, page: Int?, percent: Double?, pageCount: Int?): String? {
+    val shownPage = when (locatorType) {
+        LocatorType.PAGE -> page?.takeIf { it >= 0 }?.plus(1)
+        LocatorType.CFI, LocatorType.PERCENT -> page?.takeIf { it > 0 }
+    }
+    val knownPage = shownPage
         ?: percent?.let { share -> pageCount?.takeIf { it > 0 }?.let { (share * it).roundToInt().coerceIn(1, it) } }
     return when {
         knownPage != null -> "p. $knownPage"
