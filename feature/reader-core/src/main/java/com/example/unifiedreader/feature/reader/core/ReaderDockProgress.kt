@@ -186,23 +186,17 @@ private val ReaderDockProgressMeasurePolicy = MeasurePolicy { measurables, const
     val gap = ReaderDockDefaults.labelGap.roundToPx()
     val sliderHeight = ReaderDockDefaults.sliderTouchHeight.roundToPx()
     val percentLabel = percent.measure(Constraints(maxWidth = width))
-    val positionLabel = position.measure(Constraints(maxWidth = (width - percentLabel.width - gap).coerceAtLeast(0)))
+    val positionWidth = position.maxIntrinsicWidth(Constraints.Infinity)
+    val besidePercent = (width - percentLabel.width - gap).coerceAtLeast(0)
     val stacked = readerDockLabelsAboveSlider(
         width = width,
         percentWidth = percentLabel.width,
-        positionWidth = positionLabel.width,
+        positionWidth = positionWidth,
         gap = gap,
         minSliderWidth = ReaderDockDefaults.minSliderWidth.roundToPx(),
     )
-    if (stacked) {
-        val labelsHeight = maxOf(percentLabel.height, positionLabel.height)
-        val track = slider.measure(Constraints.fixed(width, sliderHeight))
-        layout(width, labelsHeight + sliderHeight) {
-            percentLabel.placeRelative(0, labelsHeight - percentLabel.height)
-            positionLabel.placeRelative(width - positionLabel.width, labelsHeight - positionLabel.height)
-            track.placeRelative(0, labelsHeight)
-        }
-    } else {
+    if (!stacked) {
+        val positionLabel = position.measure(Constraints(maxWidth = besidePercent))
         val sliderWidth = (width - percentLabel.width - positionLabel.width - 2 * gap).coerceAtLeast(0)
         val track = slider.measure(Constraints.fixed(sliderWidth, sliderHeight))
         val height = maxOf(percentLabel.height, sliderHeight, positionLabel.height)
@@ -210,6 +204,26 @@ private val ReaderDockProgressMeasurePolicy = MeasurePolicy { measurables, const
             percentLabel.placeRelative(0, (height - percentLabel.height) / 2)
             track.placeRelative(percentLabel.width + gap, (height - sliderHeight) / 2)
             positionLabel.placeRelative(width - positionLabel.width, (height - positionLabel.height) / 2)
+        }
+    } else {
+        // Over the slider the two labels share a row, or, when even that is too narrow, the position gets its own.
+        val sharedRow = positionWidth <= besidePercent
+        val positionLabel = position.measure(Constraints(maxWidth = if (sharedRow) besidePercent else width))
+        val track = slider.measure(Constraints.fixed(width, sliderHeight))
+        val labelsHeight = if (sharedRow) {
+            maxOf(percentLabel.height, positionLabel.height)
+        } else {
+            percentLabel.height + positionLabel.height
+        }
+        layout(width, labelsHeight + sliderHeight) {
+            if (sharedRow) {
+                percentLabel.placeRelative(0, labelsHeight - percentLabel.height)
+                positionLabel.placeRelative(width - positionLabel.width, labelsHeight - positionLabel.height)
+            } else {
+                percentLabel.placeRelative(0, 0)
+                positionLabel.placeRelative(width - positionLabel.width, percentLabel.height)
+            }
+            track.placeRelative(0, labelsHeight)
         }
     }
 }
@@ -247,8 +261,11 @@ object ReaderDockDefaults {
     /** Between the percentage, the slider and the position (the dock row's own spacing). */
     val labelGap: Dp = 12.dp
 
-    /** Narrower than this beside its labels, the slider gets a row of its own under them. */
-    val minSliderWidth: Dp = 120.dp
+    /**
+     * Narrower than this beside its labels, the slider gets a row of its own under them. At normal text a 384 dp
+     * phone leaves it about 114 dp ("p. 10 / 357"), a 360 dp one about 90; 200% text leaves it nothing.
+     */
+    val minSliderWidth: Dp = 64.dp
 }
 
 internal fun orientReaderProgress(

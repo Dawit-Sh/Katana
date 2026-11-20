@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import com.example.unifiedreader.feature.annotations.LocalBookIdentity
+import com.example.unifiedreader.feature.annotations.LocalReadingPlace
 import com.example.unifiedreader.feature.annotations.PendingLocalMarks
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +34,23 @@ internal class PendingLocalMarksStore(
     override suspend fun takeSameFile(file: LocalBookIdentity): List<LocalBookIdentity> =
         update { waiting -> waiting.partition { it.sameFileAs(file) }.let { (same, others) -> others to same } }
 
+    override suspend fun rememberPlaces(places: List<LocalReadingPlace>) {
+        if (places.isEmpty()) return
+        updatePlaces { waiting -> (waiting.filterNot { old -> places.any { it.itemId == old.itemId } } + places) to Unit }
+    }
+
+    override suspend fun takePlaces(itemIds: Set<String>): List<LocalReadingPlace> =
+        updatePlaces { waiting -> waiting.partition { it.itemId in itemIds }.let { (taken, others) -> others to taken } }
+
+    private suspend fun <T> updatePlaces(change: (List<LocalReadingPlace>) -> Pair<List<LocalReadingPlace>, T>): T =
+        mutex.withLock {
+            withContext(ioDispatcher) {
+                val (kept, result) = change(decodePendingPlaces(preferences.getString(KEY_PLACES, null)))
+                preferences.edit { putString(KEY_PLACES, encodePendingPlaces(kept)) }
+                result
+            }
+        }
+
     private suspend fun <T> update(change: (List<LocalBookIdentity>) -> Pair<List<LocalBookIdentity>, T>): T =
         mutex.withLock {
             withContext(ioDispatcher) {
@@ -45,6 +63,7 @@ internal class PendingLocalMarksStore(
     private companion object {
         const val PREFERENCES_NAME = "pending_local_marks"
         const val KEY_BOOKS = "books"
+        const val KEY_PLACES = "places"
     }
 }
 
@@ -74,6 +93,38 @@ internal fun decodePendingBooks(text: String?): List<LocalBookIdentity> {
             format = book.optString("format"),
             fileSize = if (book.isNull("fileSize")) null else book.optLong("fileSize"),
             partialMd5 = book.optStringOrNull("partialMd5"),
+        )
+    }
+}
+
+internal fun encodePendingPlaces(places: List<LocalReadingPlace>): String = JSONArray().apply {
+    places.forEach { place ->
+        put(
+            JSONObject()
+                .put("itemId", place.itemId)
+                .put("locatorType", place.locatorType)
+                .put("page", place.page ?: JSONObject.NULL)
+                .put("cfi", place.cfi ?: JSONObject.NULL)
+                .put("percent", place.percent ?: JSONObject.NULL)
+                .put("isFinished", place.isFinished)
+                .put("updatedAt", place.updatedAtEpochMillis),
+        )
+    }
+}.toString()
+
+internal fun decodePendingPlaces(text: String?): List<LocalReadingPlace> {
+    val array = text?.takeIf(String::isNotBlank)?.let { json -> runCatching { JSONArray(json) }.getOrNull() }
+        ?: return emptyList()
+    return (0 until array.length()).mapNotNull { index ->
+        val place = array.optJSONObject(index) ?: return@mapNotNull null
+        LocalReadingPlace(
+            itemId = place.optString("itemId").takeIf(String::isNotEmpty) ?: return@mapNotNull null,
+            locatorType = place.optString("locatorType").takeIf(String::isNotEmpty) ?: return@mapNotNull null,
+            page = if (place.isNull("page")) null else place.optInt("page"),
+            cfi = place.optStringOrNull("cfi"),
+            percent = if (place.isNull("percent")) null else place.optDouble("percent"),
+            isFinished = place.optBoolean("isFinished"),
+            updatedAtEpochMillis = place.optLong("updatedAt"),
         )
     }
 }

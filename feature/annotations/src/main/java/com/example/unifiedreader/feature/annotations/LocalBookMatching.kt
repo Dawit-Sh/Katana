@@ -51,6 +51,12 @@ interface PendingLocalMarks {
 
     /** The remembered books whose file is [file], forgotten as they are returned. */
     suspend fun takeSameFile(file: LocalBookIdentity): List<LocalBookIdentity>
+
+    /** Remembers the reading places of books not here yet (under their backed-up ids) until their files are imported. */
+    suspend fun rememberPlaces(places: List<LocalReadingPlace>) = Unit
+
+    /** The remembered places of [itemIds], forgotten as they are returned. */
+    suspend fun takePlaces(itemIds: Set<String>): List<LocalReadingPlace> = emptyList()
 }
 
 /** Moves a book's marks to another id; the number of marks moved. */
