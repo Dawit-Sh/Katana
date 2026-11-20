@@ -167,7 +167,7 @@ fun UnifiedReaderAppContent(
         }
         ApplyLaunchSplashTheme(uiState.themeMode)
         // The start flow: the first launch, "Add a server", Connect on an empty library.
-        var sourceStartRequest by rememberSourceStartRequest()
+        var sourceStartRequest by rememberSourceStartRequest(uiState)
         val isReaderMode = uiState.activeReader != null && uiState.selectedItem != null
         // Leaving the reader is handled by the screen host below, with the predictive gesture.
         BackHandler(
