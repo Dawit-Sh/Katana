@@ -43,7 +43,7 @@ internal fun versionRowCopy(
         button = AppUpdateButton("Check for updates", AppUpdateAction.Check),
     )
     AppUpdateStatus.Checking -> VersionRowCopy(
-        supporting = "$versionName · asking GitHub…",
+        supporting = "$versionName · checking for updates…",
         button = AppUpdateButton("Checking", AppUpdateAction.Check, busy = true),
     )
     AppUpdateStatus.UpToDate -> VersionRowCopy(
@@ -74,7 +74,7 @@ internal fun versionRowCopy(
     )
     is AppUpdateStatus.Failed -> when (status.failure) {
         AppUpdateFailure.CheckFailed -> VersionRowCopy(
-            supporting = "Couldn't reach GitHub. Check the connection.",
+            supporting = "Couldn't check for updates. Check the connection.",
             tone = AppUpdateTone.Error,
             button = AppUpdateButton("Try again", AppUpdateAction.Retry),
         )
@@ -103,7 +103,7 @@ internal fun failureCopy(failure: AppUpdateFailure, installedVersion: String): D
     val openOnGitHub = AppUpdateButton("Open on GitHub", AppUpdateAction.OpenReleasePage, filled = true)
     return when (failure) {
         AppUpdateFailure.CheckFailed -> DialogCopy(
-            title = "Couldn't reach GitHub",
+            title = "Couldn't check for updates",
             body = "Check the connection and try again.",
             dismiss = close,
             confirm = tryAgain,
