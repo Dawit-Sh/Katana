@@ -61,6 +61,7 @@ import com.example.unifiedreader.feature.lists.UserListPage
 import com.example.unifiedreader.feature.lists.books
 import com.example.unifiedreader.feature.lists.keepDownloadedLine
 import com.example.unifiedreader.feature.lists.nextToKeepDownloaded
+import com.example.unifiedreader.feature.lists.showsKeepDownloaded
 import com.example.unifiedreader.feature.lists.orderedForScreen
 import com.example.unifiedreader.feature.lists.readingOrderUnderWay
 import com.example.unifiedreader.feature.lists.sortedEntries
@@ -285,7 +286,7 @@ internal fun ListsRoute(
                     },
                     onDeviceItemIds = uiState.locallyAvailableRemoteItemIds,
                     tagKindOf = tagKindOf,
-                    keepDownloadedLine = if (shownList.kind == UserListKind.User || shownList.kind == UserListKind.WantToRead) {
+                    keepDownloadedLine = if (shownList.kind.canKeepDownloaded() && shownList.showsKeepDownloaded()) {
                         keepDownloadedLine(
                             next = remember(shownList, itemsById, progress) { shownList.nextToKeepDownloaded(itemsById, progress) },
                             onDevice = uiState.locallyAvailableRemoteItemIds,
@@ -839,3 +840,6 @@ internal fun magicShelfServers(connected: Set<SourceType>, listsViewModel: AppLi
  */
 internal fun Map<SourceType, LibraryTagSorting>.tagKindOf(tag: String): LibraryTagKind =
     values.map { sorting -> sorting.kindOf(tag) }.firstOrNull { kind -> kind != LibraryTagKind.THEME } ?: LibraryTagKind.THEME
+
+// Lists whose books can be kept downloaded: one of yours, and Want to read.
+private fun UserListKind.canKeepDownloaded(): Boolean = this == UserListKind.User || this == UserListKind.WantToRead

@@ -75,6 +75,26 @@ internal fun AppUiState.withActiveRouteSnapshot(
 }
 
 /**
+ * Katana starting up inside a book that was open when it last closed: a book whose place a server keeps
+ * ([asksServerBeforeOpen]) isn't shown straight away. The library comes up instead, and the book is to be
+ * opened the way the library opens it, asking the server for its place first: another device may have read
+ * on meanwhile. (Before 1.1.4 it reopened at this device's place without asking.) A book on this device
+ * reopens as it was. Returns the state to start with and the book to open, if any.
+ */
+internal fun AppUiState.reopeningServerBookThroughOpen(
+    asksServerBeforeOpen: (ReadableItem) -> Boolean,
+): Pair<AppUiState, ReadableItem?> {
+    val book = selectedItem?.takeIf { activeReader != null && asksServerBeforeOpen(it) } ?: return this to null
+    val library = copy(
+        selectedItemId = null,
+        activeReader = null,
+        selectedReaderOpenMode = ReaderOpenMode.Default,
+        selectedReaderItem = null,
+    )
+    return library to book
+}
+
+/**
  * Keeps a series sub-screen while its source's catalog is still loading (a cold start lists only
  * part of it, or nothing), and drops it once the loaded catalog has no item in that series.
  */

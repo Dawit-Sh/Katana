@@ -73,6 +73,7 @@ internal fun SourceStartHost(
     onFinished: () -> Unit,
 ) {
     val finish = onFinished
+    val localBooks = LocalLocalBookActions.current
     SourceStartFlow(
         mode = request.mode,
         initialServer = request.server,
@@ -83,6 +84,20 @@ internal fun SourceStartHost(
             finish()
             viewModel.openLibrarySource(SourceType.LOCAL)
             onImportLocalFileClick()
+        },
+        onAddFolder = localBooks?.let { actions ->
+            {
+                finish()
+                viewModel.openLibrarySource(SourceType.LOCAL)
+                actions.onAddFolder()
+            }
+        },
+        onFindOnPhone = localBooks?.let { actions ->
+            {
+                finish()
+                viewModel.openLibrarySource(SourceType.LOCAL)
+                actions.onFindOnPhone()
+            }
         },
         onServerConnected = { server ->
             // The first server connected opens when the app starts.

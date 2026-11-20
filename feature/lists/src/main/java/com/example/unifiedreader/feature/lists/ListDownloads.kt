@@ -1,6 +1,7 @@
 package com.example.unifiedreader.feature.lists
 
 import com.example.unifiedreader.core.model.ReadableItem
+import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.core.model.isKavitaSeriesContainer
 import com.example.unifiedreader.core.model.isStumpSeriesContainer
 import com.example.unifiedreader.feature.library.ItemProgressSummary
@@ -25,6 +26,14 @@ fun UserList.nextToKeepDownloaded(
     .filter { item -> item.supportsOfflineDownload() && !item.isKavitaSeriesContainer() && !item.isStumpSeriesContainer() }
     .take(count)
     .toList()
+
+/**
+ * Whether Keep the next 3 downloaded means anything for this list: it holds a server's book. A list of books
+ * on this device only (most of his friends read only their own files) doesn't show it, unless it was turned
+ * on before, so it can be turned off.
+ */
+fun UserList.showsKeepDownloaded(): Boolean =
+    keepNextDownloaded || entries.any { entry -> entry.sourceType != SourceType.LOCAL }
 
 /**
  * What to queue now for every list that keeps its next books downloaded: the books not on the

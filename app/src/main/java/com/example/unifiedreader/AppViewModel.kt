@@ -110,6 +110,7 @@ class AppViewModel @Inject constructor(
                 }
             }
         }
+        reopenRestoredServerBook()
         observeAppState()
         coldStartLibraryViewCoordinator.startCapture(viewModelScope, snapshotFlow { uiState })
         viewModelScope.launch { initialUiStateFactory.hydrateAfterInitialState() }
@@ -285,6 +286,27 @@ class AppViewModel @Inject constructor(
 
     fun onItemSelected(item: ReadableItem) {
         onListItemSelected(item, listContext = null)
+    }
+
+    /**
+     * Starting up inside a server's book: opens it the library's way, asking the server for its place
+     * ([reopeningServerBookThroughOpen]), once this device's places have loaded to weigh it against.
+     */
+    private fun reopenRestoredServerBook() {
+        val (startState, book) = uiState.reopeningServerBookThroughOpen(readerCoordinator::asksServerBeforeOpen)
+        book ?: return
+        uiState = startState
+        viewModelScope.launch {
+            readerSessionStore.isHydratedFlow.first { hydrated -> hydrated }
+            readerCoordinator.onItemSelected(
+                item = book,
+                updateState = ::updateUiState,
+                scope = viewModelScope,
+                refreshProgress = ::refreshProgress,
+                onSyncFailures = ::reportProgressSyncFailures,
+                placeWaitMillis = RESTORED_BOOK_PLACE_WAIT_MILLIS,
+            )
+        }
     }
 
     /** A book opened from a list: with a [listContext], Read next follows the list instead of the series. */
@@ -1218,3 +1240,6 @@ private fun AppUiState.withStartupSourceErrors(
 
 /** How long the journal tab's full snapshot is kept after the tab is left. */
 private const val JournalSnapshotKeepAliveMillis = 2 * 60_000L
+
+// Katana starting inside a server's book: its first request also renews the sign-in, so it waits longer than a tap.
+private const val RESTORED_BOOK_PLACE_WAIT_MILLIS = 8_000L

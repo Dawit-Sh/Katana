@@ -136,8 +136,12 @@ fun LibraryTopBar(
                             )
                         }
                         DownloadsButton(state = downloadsButtonState, onClick = onDownloadsClick)
+                        val localBooks = LocalLocalBookActions.current
                         LibraryTopBarMoreMenu(
                             onImportFile = onImportLocalFileClick,
+                            onAddFolder = localBooks?.onAddFolder,
+                            onFindOnPhone = localBooks.findOnPhoneItem(),
+                            findsOnPhone = localBooks.isFindingOnPhone(),
                             refresh = if (refreshState.isVisible) {
                                 LibraryRefreshAction(
                                     enabled = refreshState.isEnabled,

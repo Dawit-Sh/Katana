@@ -53,8 +53,48 @@ data class LibraryRefreshAction(
     val onRefresh: () -> Unit,
 )
 
+/** Import a file, Add a folder, and Find books on this phone (Check for new books once it is on). */
+@Composable
+private fun LocalBookMenuItems(
+    onImportFile: () -> Unit,
+    onAddFolder: (() -> Unit)?,
+    onFindOnPhone: (() -> Unit)?,
+    findsOnPhone: Boolean,
+    onPicked: () -> Unit,
+) {
+    AppMenuItem(
+        text = { Text(text = "Import a file") },
+        leadingIcon = { Icon(imageVector = AppIcons.Add, contentDescription = null) },
+        onClick = {
+            onPicked()
+            onImportFile()
+        },
+    )
+    if (onAddFolder != null) {
+        AppMenuItem(
+            text = { Text(text = "Add a folder") },
+            leadingIcon = { Icon(imageVector = AppIcons.Add, contentDescription = null) },
+            onClick = {
+                onPicked()
+                onAddFolder()
+            },
+        )
+    }
+    if (onFindOnPhone != null) {
+        AppMenuItem(
+            text = { Text(text = if (findsOnPhone) "Check for new books" else "Find books on this phone") },
+            leadingIcon = { Icon(imageVector = AppIcons.Refresh, contentDescription = null) },
+            onClick = {
+                onPicked()
+                onFindOnPhone()
+            },
+        )
+    }
+}
+
 /**
- * The library top bar's "•••": Import a file and, on a server, Refresh library. With [showSelectionTip]
+ * The library top bar's "•••": Import a file, Add a folder, Find books on this phone and, on a server,
+ * Refresh library. With [showSelectionTip]
  * it also explains, under the items, that a long-press selects books. The button turns a ring
  * while the library refreshes.
  */
@@ -64,6 +104,9 @@ fun LibraryTopBarMoreMenu(
     modifier: Modifier = Modifier,
     refresh: LibraryRefreshAction? = null,
     showSelectionTip: Boolean = false,
+    onAddFolder: (() -> Unit)? = null,
+    onFindOnPhone: (() -> Unit)? = null,
+    findsOnPhone: Boolean = false,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val refreshing = refresh?.refreshing == true
@@ -85,14 +128,7 @@ fun LibraryTopBarMoreMenu(
             onDismissRequest = { expanded = false },
             modifier = Modifier.width(LibraryTopBarMenuWidth),
         ) {
-            AppMenuItem(
-                text = { Text(text = "Import a file") },
-                leadingIcon = { Icon(imageVector = AppIcons.Add, contentDescription = null) },
-                onClick = {
-                    expanded = false
-                    onImportFile()
-                },
-            )
+            LocalBookMenuItems(onImportFile, onAddFolder, onFindOnPhone, findsOnPhone) { expanded = false }
             if (refresh != null) {
                 AppMenuItem(
                     text = { Text(text = if (refreshing) "Refreshing library" else "Refresh library") },

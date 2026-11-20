@@ -81,6 +81,9 @@ fun SourceStartFlow(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
     initialServer: SourceType? = null,
+    // Books on this device found where they are: a folder picked once, or the whole phone.
+    onAddFolder: (() -> Unit)? = null,
+    onFindOnPhone: (() -> Unit)? = null,
 ) {
     var page by rememberSaveable { mutableStateOf(initialServer) }
     // A server's page opened from the choices goes back to them; one opened directly closes the flow.
@@ -105,6 +108,8 @@ fun SourceStartFlow(
                     onServerSelected = { server -> page = server },
                     onImportFile = onImportFile,
                     onClose = onClose,
+                    onAddFolder = onAddFolder,
+                    onFindOnPhone = onFindOnPhone,
                 )
             } else {
                 SourceConnectPage(
@@ -120,6 +125,45 @@ fun SourceStartFlow(
     }
 }
 
+/** Books on this device: a folder picked once, the whole phone, or files one by one. */
+@Composable
+private fun DeviceStartChoices(
+    onImportFile: () -> Unit,
+    onAddFolder: (() -> Unit)?,
+    onFindOnPhone: (() -> Unit)?,
+) {
+    val divider = @Composable {
+        AppDivider(
+            modifier = Modifier.padding(start = 76.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AppDividerDefaults.alpha),
+        )
+    }
+    if (onAddFolder != null) {
+        SourceStartChoice(
+            icon = SourceType.LOCAL.navigationIcon(),
+            title = "A folder on this device",
+            supporting = "Pick a folder once: its books show here, and new ones as you add them",
+            onClick = onAddFolder,
+        )
+        divider()
+    }
+    if (onFindOnPhone != null) {
+        SourceStartChoice(
+            icon = SourceType.LOCAL.navigationIcon(),
+            title = "Find books on this phone",
+            supporting = "Katana looks through the phone for books (needs All files access)",
+            onClick = onFindOnPhone,
+        )
+        divider()
+    }
+    SourceStartChoice(
+        icon = SourceType.LOCAL.navigationIcon(),
+        title = "Files on this device",
+        supporting = "Import EPUB, PDF, DjVu, CBZ, CBR, MOBI, AZW, AZW3 or FB2 files",
+        onClick = onImportFile,
+    )
+}
+
 @Composable
 private fun SourceStartChoices(
     mode: SourceStartMode,
@@ -127,6 +171,8 @@ private fun SourceStartChoices(
     onServerSelected: (SourceType) -> Unit,
     onImportFile: () -> Unit,
     onClose: () -> Unit,
+    onAddFolder: (() -> Unit)? = null,
+    onFindOnPhone: (() -> Unit)? = null,
 ) {
     SourceStartPage(onBack = onClose.takeIf { mode == SourceStartMode.AddSource }) {
         val scheme = MaterialTheme.colorScheme
@@ -156,12 +202,7 @@ private fun SourceStartChoices(
                 )
             }
             if (servers.isNotEmpty()) AppDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AppDividerDefaults.alpha))
-            SourceStartChoice(
-                icon = SourceType.LOCAL.navigationIcon(),
-                title = "Files on this device",
-                supporting = "Import EPUB, PDF, DjVu, CBZ, CBR, MOBI, AZW, AZW3 or FB2 files",
-                onClick = onImportFile,
-            )
+            DeviceStartChoices(onImportFile = onImportFile, onAddFolder = onAddFolder, onFindOnPhone = onFindOnPhone)
         }
         if (mode == SourceStartMode.FirstLaunch) {
             Column(

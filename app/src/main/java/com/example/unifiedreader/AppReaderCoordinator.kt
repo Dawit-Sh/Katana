@@ -66,6 +66,10 @@ class AppReaderCoordinator @Inject constructor(
         }
     }
 
+    /** A server's book whose place it keeps: opening it asks the server first ([onItemSelected]). */
+    fun asksServerBeforeOpen(item: ReadableItem): Boolean =
+        item.sourceType != SourceType.LOCAL && syncItemProgressUseCase.hasSyncFor(item)
+
     fun onItemSelected(
         item: ReadableItem,
         updateState: AppUiStateUpdater,
@@ -75,6 +79,9 @@ class AppReaderCoordinator @Inject constructor(
         selectedReaderItem: ReadableItem? = null,
         openMode: ReaderOpenMode = ReaderOpenMode.Default,
         skipProgressSyncBeforeOpen: Boolean = false,
+        // How long a downloaded book waits for its place from the server: longer when Katana has just started
+        // inside it, where the first request also renews the sign-in.
+        placeWaitMillis: Long = DOWNLOADED_PROGRESS_PULL_BEFORE_OPEN_MILLIS,
     ) {
         val requestId = ++readerSelectionRequestId
         if (item.isKavitaSeriesContainer()) {
@@ -135,9 +142,15 @@ class AppReaderCoordinator @Inject constructor(
                 val pullFirst = item.format.isBookReaderFormat()
                 if (!pullFirst) open()
                 scope.launch {
-                    withTimeoutOrNull(DOWNLOADED_PROGRESS_PULL_BEFORE_OPEN_MILLIS) {
+                    val startedAt = System.currentTimeMillis()
+                    val pulled = withTimeoutOrNull(placeWaitMillis) {
                         syncProgressForDownloadedItem(item, requestId, refreshProgress, onSyncFailures)
                     }
+                    Log.i(
+                        LOG_TAG,
+                        "Place of ${item.id} from ${item.sourceType}: ${System.currentTimeMillis() - startedAt} ms" +
+                            if (pulled == null) ", opened without it" else "",
+                    )
                     if (pullFirst && readerSelectionRequestId == requestId) open()
                 }
                 return

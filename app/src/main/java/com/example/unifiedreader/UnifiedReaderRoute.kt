@@ -74,6 +74,8 @@ fun UnifiedReaderRoute(
     readerDisplay: AppReaderDisplayViewModel = hiltViewModel(),
     // The offline dictionary, for the readers' Dictionary card and Settings › Reading.
     dictionary: AppDictionaryViewModel = hiltViewModel(),
+    // Folders and Find books on this phone, for the library's "•••" and the start screen.
+    localBooks: AppLocalBooksViewModel = hiltViewModel(),
 ) {
     val viewModel: AppViewModel = hiltViewModel()
     val updates: AppUpdatesViewModel = hiltViewModel()
@@ -81,6 +83,7 @@ fun UnifiedReaderRoute(
     val tags: AppLibraryTagsViewModel = hiltViewModel()
     val translation: AppTranslationViewModel = hiltViewModel()
     val context = LocalContext.current
+    val localBookActions = rememberLocalBookActions(localBooks = localBooks, viewModel = viewModel)
     val localFileImportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -102,6 +105,7 @@ fun UnifiedReaderRoute(
             viewModel.onTopLevelSelected(TopLevelDestination.Settings)
         },
         LocalAppSettingsTools provides settingsTools,
+        LocalLocalBookActions provides localBookActions,
         LocalReaderComfortPreferences provides readerDisplay.preferences.comfort,
     ) {
         UnifiedReaderAppContent(

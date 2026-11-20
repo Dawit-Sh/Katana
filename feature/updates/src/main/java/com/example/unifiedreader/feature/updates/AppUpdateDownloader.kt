@@ -46,7 +46,10 @@ class KtorAppUpdateDownloader(
         val channel = response.bodyAsChannel()
         val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE)
         var downloadedBytes = 0L
-        destination.outputStream().use { output ->
+        // The network hands over a few kilobytes at a time: written to storage in large blocks, and the
+        // progress shown a few times a second, not thousands of times (that slowed the download on phones).
+        var progressShownAt = 0L
+        destination.outputStream().buffered(DOWNLOAD_WRITE_BUFFER_SIZE).use { output ->
             while (true) {
                 val bytesRead = channel.readAvailable(buffer, 0, buffer.size)
                 if (bytesRead == -1) break
@@ -54,10 +57,15 @@ class KtorAppUpdateDownloader(
                     output.write(buffer, 0, bytesRead)
                     digest.update(buffer, 0, bytesRead)
                     downloadedBytes += bytesRead
-                    onProgress(downloadedBytes, totalBytes)
+                    val now = System.nanoTime()
+                    if (now - progressShownAt >= PROGRESS_INTERVAL_NANOS) {
+                        progressShownAt = now
+                        onProgress(downloadedBytes, totalBytes)
+                    }
                 }
             }
         }
+        onProgress(downloadedBytes, totalBytes)
         if (totalBytes > 0 && downloadedBytes < totalBytes) {
             throw IOException("The download stopped at $downloadedBytes of $totalBytes bytes")
         }
@@ -66,3 +74,5 @@ class KtorAppUpdateDownloader(
 }
 
 private const val DOWNLOAD_BUFFER_SIZE = 64 * 1024
+private const val DOWNLOAD_WRITE_BUFFER_SIZE = 512 * 1024
+private const val PROGRESS_INTERVAL_NANOS = 250_000_000L
