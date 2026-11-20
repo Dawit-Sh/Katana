@@ -104,6 +104,22 @@ class MarkUndoTest {
     }
 
     @Test
+    fun `the toast's Undo brings a removed word back with its id, sentence, place, note and review state`() = runBlocking {
+        val saved = store.saveWord(hole, "liminal", "The liminal field.", place)
+        store.setWordNote(saved.id, "in between")
+        store.reviewWord(saved.id, known = true)
+        val before = store.allWords.first().single()
+
+        val toast = store.removeWordForUndo(before, TestScope(UnconfinedTestDispatcher()), BookmarksCopy.WordRemoved)
+        assertTrue(store.allWords.first().isEmpty())
+        assertEquals(BookmarksCopy.WordRemoved, toast.text)
+        assertEquals(BookmarksCopy.Undo, toast.actionLabel)
+        toast.onAction!!.invoke()
+
+        assertEquals(before, store.allWords.first().single())
+    }
+
+    @Test
     fun `restored before a sync, the sync sees it as never removed`() {
         val inStep = row(remoteId = "r1", syncState = HIGHLIGHT_IN_STEP, title = "the box")
         val removedRow = inStep.copy(deleted = true, syncState = HIGHLIGHT_WAITING, updatedAtEpochMillis = 2_000)

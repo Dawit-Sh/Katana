@@ -59,6 +59,7 @@ object BookmarksCopy {
     const val NothingDueTitle = "Nothing to review today"
     const val NothingDueBody = "Every word is resting. Words you know come back after a day, then 3, 7, 14 and 30 days."
     const val ReviewAll = "Review all words"
+    const val FromEveryBook = "from every book"
     const val RoundDoneTitle = "Round done"
     const val NoWordsTitle = "No saved words yet"
     const val NoWordsBody = "Select a word in a book, then Add to dictionary. It comes back here as a card."
@@ -80,7 +81,7 @@ object BookmarksCopy {
 
     fun continueAt(progress: String?): String = if (progress == null) Continue else "$Continue · $progress"
 
-    fun roundProgress(position: Int, total: Int): String = "$position of $total · from every book"
+    fun roundProgress(position: Int, total: Int, from: String = FromEveryBook): String = "$position of $total · $from"
 
     fun roundDone(known: Int): String = if (known == 1) "You went through 1 word." else "You went through $known words."
 

@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -66,13 +67,43 @@ internal fun WordReviewPage(
     contentTopInset: Dp,
     modifier: Modifier = Modifier,
 ) {
-    val words = library.words
-    LaunchedEffect(state.round == null) {
-        if (state.round == null) {
-            state.round = WordReviewRound.of(WordReviewSchedule.round(words, System.currentTimeMillis()))
+    WordReviewPage(
+        words = library.words,
+        round = state.round,
+        onRound = { state.round = it },
+        onBack = { state.back() },
+        backLabel = BookmarksCopy.Back,
+        actions = actions,
+        contentTopInset = contentTopInset,
+        modifier = modifier,
+    )
+}
+
+/**
+ * The flashcards over [words] (My words' list, or the Bookmarks page's every word): [round] is the
+ * round under way, which [onRound] replaces; [onBack] leaves, its button saying [backLabel].
+ * [from] says where the words come from ("from every book").
+ */
+@Composable
+internal fun WordReviewPage(
+    words: List<SavedWord>,
+    round: WordReviewRound?,
+    onRound: (WordReviewRound?) -> Unit,
+    onBack: () -> Unit,
+    backLabel: String,
+    actions: WordStudyActions,
+    contentTopInset: Dp,
+    modifier: Modifier = Modifier,
+    from: String = BookmarksCopy.FromEveryBook,
+) {
+    val latestOnRound by rememberUpdatedState(onRound)
+    val latestWords by rememberUpdatedState(words)
+    LaunchedEffect(round == null) {
+        if (round == null) {
+            latestOnRound(WordReviewRound.of(WordReviewSchedule.round(latestWords, System.currentTimeMillis())))
         }
     }
-    val round = state.round ?: return
+    val active = round ?: return
     val gutter = appGutter()
     Column(
         modifier = modifier
@@ -80,35 +111,36 @@ internal fun WordReviewPage(
             .padding(start = gutter, top = contentTopInset + AppLayout.contentTop, end = gutter, bottom = AppLayout.contentBottom),
         verticalArrangement = Arrangement.spacedBy(AppLayout.gridGap),
     ) {
-        val current = round.current?.let { id -> words.firstOrNull { it.id == id } }
+        val current = active.current?.let { id -> words.firstOrNull { it.id == id } }
         when {
             words.isEmpty() -> AppEmptyState(title = BookmarksCopy.NoWordsTitle, body = BookmarksCopy.NoWordsBody)
-            round.total == 0 -> AppEmptyState(
+            active.total == 0 -> AppEmptyState(
                 title = BookmarksCopy.NothingDueTitle,
                 body = BookmarksCopy.NothingDueBody,
                 actions = {
-                    AppButton(onClick = { state.round = everyWord(words) }) {
+                    AppButton(onClick = { onRound(everyWord(words)) }) {
                         Text(BookmarksCopy.ReviewAll)
                     }
                 },
             )
-            round.isFinished || current == null -> AppEmptyState(
+            active.isFinished || current == null -> AppEmptyState(
                 title = BookmarksCopy.RoundDoneTitle,
-                body = BookmarksCopy.roundDone(round.known),
+                body = BookmarksCopy.roundDone(active.known),
                 actions = {
-                    AppTonalButton(onClick = { state.back() }) { Text(BookmarksCopy.Back) }
-                    AppButton(onClick = { state.round = everyWord(words) }) {
+                    AppTonalButton(onClick = onBack) { Text(backLabel) }
+                    AppButton(onClick = { onRound(everyWord(words)) }) {
                         Text(BookmarksCopy.ReviewAll)
                     }
                 },
             )
             else -> ReviewCard(
                 word = current,
-                round = round,
+                round = active,
+                from = from,
                 onNote = { note -> actions.setWordNote(current.id, note) },
                 onAnswer = { known ->
                     actions.reviewWord(current.id, known)
-                    state.round = round.answer(known)
+                    onRound(active.answer(known))
                 },
                 modifier = Modifier.weight(1f),
             )
@@ -120,6 +152,7 @@ internal fun WordReviewPage(
 private fun ReviewCard(
     word: SavedWord,
     round: WordReviewRound,
+    from: String,
     onNote: (String) -> Unit,
     onAnswer: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -127,7 +160,13 @@ private fun ReviewCard(
     val context = LocalContext.current
     var editingNote by rememberSaveable(word.id) { mutableStateOf(false) }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(AppLayout.gridGap)) {
-        ReviewCardBody(word = word, round = round, onEditNote = { editingNote = true }, onLookUp = { context.lookUpWord(word.word) })
+        ReviewCardBody(
+            word = word,
+            round = round,
+            from = from,
+            onEditNote = { editingNote = true },
+            onLookUp = { context.lookUpWord(word.word) },
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(AppLayout.gridGap)) {
             AppTonalButton(onClick = { onAnswer(false) }, modifier = Modifier.weight(1f).heightIn(min = AnswerHeight)) {
                 Text(BookmarksCopy.Again)
@@ -160,11 +199,12 @@ private fun ReviewCard(
 private fun ColumnScope.ReviewCardBody(
     word: SavedWord,
     round: WordReviewRound,
+    from: String,
     onEditNote: () -> Unit,
     onLookUp: () -> Unit,
 ) {
     Text(
-        text = BookmarksCopy.roundProgress(round.position, round.total),
+        text = BookmarksCopy.roundProgress(round.position, round.total, from),
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -274,7 +314,7 @@ private fun NoteCard(note: String?, onClick: () -> Unit) {
 }
 
 @Composable
-private fun WordNoteDialog(word: SavedWord, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+internal fun WordNoteDialog(word: SavedWord, onDismiss: () -> Unit, onSave: (String) -> Unit) {
     var text by rememberSaveable(word.id) { mutableStateOf(word.note.orEmpty()) }
     AppDialog(
         onDismissRequest = onDismiss,

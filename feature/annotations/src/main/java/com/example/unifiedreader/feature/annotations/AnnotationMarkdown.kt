@@ -92,12 +92,7 @@ object AnnotationMarkdown {
             appendLine()
             appendLine("$section Words")
             appendLine()
-            words.inReadingOrderWords().forEach { word ->
-                val sentence = word.sentence?.oneLine()?.takeIf(String::isNotBlank)?.let { ": \"$it\"" }.orEmpty()
-                val chapterTitle = word.place?.chapterTitle?.oneLine()?.takeIf(String::isNotBlank)?.let { " ($it)" }.orEmpty()
-                appendLine("- **${word.word.oneLine()}**$sentence$chapterTitle")
-                appendListNote(word.note)
-            }
+            appendWordList(words)
         }
     }
 
@@ -152,4 +147,14 @@ object AnnotationMarkdown {
 /** A bookmark's or a word's own note, under its line in the list. */
 private fun StringBuilder.appendListNote(note: String?) {
     note?.trim()?.takeIf(String::isNotEmpty)?.let { appendLine("  Note: ${it.replace("\n", "\n  ")}") }
+}
+
+/** Words as a list in reading order: each word, the sentence it came from, its chapter and its note. */
+internal fun StringBuilder.appendWordList(words: List<SavedWord>) {
+    words.inReadingOrderWords().forEach { word ->
+        val sentence = word.sentence?.oneLine()?.takeIf(String::isNotBlank)?.let { ": \"$it\"" }.orEmpty()
+        val chapterTitle = word.place?.chapterTitle?.oneLine()?.takeIf(String::isNotBlank)?.let { " ($it)" }.orEmpty()
+        appendLine("- **${word.word.oneLine()}**$sentence$chapterTitle")
+        appendListNote(word.note)
+    }
 }

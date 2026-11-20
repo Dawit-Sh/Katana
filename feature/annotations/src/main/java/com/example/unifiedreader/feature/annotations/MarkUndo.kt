@@ -125,7 +125,7 @@ internal suspend fun HighlightRemovalStore.removeHighlightForUndo(
     }
 }
 
-private fun undoToast(text: String, canUndo: Boolean, undo: () -> Unit): AppToastMessage = AppToastMessage(
+internal fun undoToast(text: String, canUndo: Boolean, undo: () -> Unit): AppToastMessage = AppToastMessage(
     text = text,
     icon = AppToastIcon.Removed,
     actionLabel = BookmarksCopy.Undo.takeIf { canUndo },

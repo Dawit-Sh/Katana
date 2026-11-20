@@ -57,6 +57,12 @@ interface ReaderAnnotationStore : ReaderBookmarkStore, SavedWordStudyStore, High
     suspend fun deleteWord(id: String)
 
     /**
+     * Puts back a word [deleteWord] took away, exactly as it was: the same id, sentence, place, note
+     * and review state (Undo). Nothing for a store that can't.
+     */
+    suspend fun restoreWord(word: SavedWord) = Unit
+
+    /**
      * Where the reader works out the places of a book's highlights for their server sync; nothing
      * for a store that doesn't sync.
      */
@@ -192,6 +198,8 @@ class RoomReaderAnnotationStore(
 
     override suspend fun deleteWord(id: String) = io { dao.deleteWord(id) }
 
+    override suspend fun restoreWord(word: SavedWord) = io { dao.upsertWord(word.toEntity()) }
+
     private suspend fun <T> io(block: () -> T): T = withContext(ioDispatcher) { block() }
 
     private companion object {
@@ -225,6 +233,23 @@ internal fun SavedWordEntity.toModel(): SavedWord = SavedWord(
     place = locatorJson?.let { json ->
         AnnotationPlace(href = "", locatorJson = json, chapterTitle = chapterTitle, progression = progression)
     },
+    note = note,
+    createdAtEpochMillis = createdAtEpochMillis,
+    reviewLevel = reviewLevel,
+    reviewDueAtEpochMillis = reviewDueAtEpochMillis,
+    reviewedAtEpochMillis = reviewedAtEpochMillis,
+)
+
+internal fun SavedWord.toEntity(): SavedWordEntity = SavedWordEntity(
+    id = id,
+    itemId = book.itemId,
+    bookTitle = book.title,
+    bookAuthor = book.author,
+    word = word,
+    sentence = sentence,
+    chapterTitle = place?.chapterTitle,
+    locatorJson = place?.locatorJson,
+    progression = place?.progression,
     note = note,
     createdAtEpochMillis = createdAtEpochMillis,
     reviewLevel = reviewLevel,

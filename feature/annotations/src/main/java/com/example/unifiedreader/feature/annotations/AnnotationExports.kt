@@ -28,6 +28,12 @@ class AnnotationExports(
         return MarkdownExport(fileName = AnnotationMarkdown.fileName(book, day), text = text)
     }
 
+    /** [words] (My words' list) as Markdown under their books. */
+    fun words(words: List<SavedWord>): MarkdownExport {
+        val day = today()
+        return MarkdownExport(fileName = MyWordsMarkdown.fileName(day), text = MyWordsMarkdown.words(words, day))
+    }
+
     /** Every book's marks as one Markdown notebook. */
     suspend fun library(): MarkdownExport {
         val day = today()

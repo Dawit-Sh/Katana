@@ -62,8 +62,15 @@ interface BookmarkEdits {
     fun nameBookmark(id: String, title: String, note: String)
 }
 
+/** Studying the saved words: a word's own note, and its flashcard answers. */
+interface WordStudyActions {
+    fun setWordNote(id: String, note: String)
+
+    fun reviewWord(id: String, known: Boolean)
+}
+
 /** What the Bookmarks screens ask of the app and the store. */
-interface BookmarksActions : BookmarkEdits {
+interface BookmarksActions : BookmarkEdits, WordStudyActions {
     /** Opens the book where it was left. */
     fun continueReading(book: AnnotatedBook)
 
@@ -75,10 +82,6 @@ interface BookmarksActions : BookmarkEdits {
 
 
     fun deleteWord(id: String)
-
-    fun setWordNote(id: String, note: String)
-
-    fun reviewWord(id: String, known: Boolean)
 
     suspend fun exportBook(book: AnnotatedBook): MarkdownExport
 
