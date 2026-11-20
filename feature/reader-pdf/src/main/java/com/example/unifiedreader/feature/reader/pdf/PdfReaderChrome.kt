@@ -50,6 +50,7 @@ import com.example.unifiedreader.feature.reader.core.ReaderDockProgress
 import com.example.unifiedreader.feature.reader.core.ReaderDocumentState
 import com.example.unifiedreader.feature.reader.core.ReaderTopBar
 import com.example.unifiedreader.feature.reader.core.readerOverlayTokens
+import com.example.unifiedreader.feature.reader.core.stackedDockStrips
 import com.example.unifiedreader.ui.components.AppCircularProgress
 import com.example.unifiedreader.ui.components.AppIcons
 import kotlin.math.roundToInt
@@ -80,6 +81,8 @@ internal fun PdfReaderChrome(
     onPageSelected: (Int) -> Unit,
     // Bookmarks the page on screen, or takes its bookmark off; null when the book can't keep them.
     bookmark: PdfBookmarkButton? = null,
+    // Previous and Next through the bookmarks, over the page strip, after one was opened from a list.
+    markStrip: (@Composable () -> Unit)? = null,
 ) {
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(overlayVisible) {
@@ -126,6 +129,7 @@ internal fun PdfReaderChrome(
                 currentPageIndex = currentPageIndex,
                 progress = progress,
                 onPageSelected = onPageSelected,
+                markStrip = markStrip,
             )
         },
     ) { slot ->
@@ -147,6 +151,7 @@ private fun PdfReaderDock(
     currentPageIndex: Int,
     progress: Float,
     onPageSelected: (Int) -> Unit,
+    markStrip: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val configuration = LocalConfiguration.current
@@ -156,20 +161,23 @@ private fun PdfReaderDock(
     )
     ReaderDock(
         modifier = modifier,
-        strip = if (pageCount > 0) {
-            {
-                PdfPagePreviewStrip(
-                    pageRenderer = pageRenderer,
-                    documentState = documentState,
-                    pageCount = pageCount,
-                    currentPageIndex = currentPageIndex,
-                    thumbnailHeight = thumbnailHeight,
-                    onPageSelected = onPageSelected,
-                )
-            }
-        } else {
-            null
-        },
+        strip = stackedDockStrips(
+            markStrip,
+            if (pageCount > 0) {
+                {
+                    PdfPagePreviewStrip(
+                        pageRenderer = pageRenderer,
+                        documentState = documentState,
+                        pageCount = pageCount,
+                        currentPageIndex = currentPageIndex,
+                        thumbnailHeight = thumbnailHeight,
+                        onPageSelected = onPageSelected,
+                    )
+                }
+            } else {
+                null
+            },
+        ),
     ) {
         ReaderDockProgress(
             progress = progress,
