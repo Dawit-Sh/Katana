@@ -28,6 +28,36 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 class GrimmoryProgressSyncServiceTest {
+    // The Fire, 2026-11-20: page 5 went up, the PDF reader saved page 5 again as the book closed, and that copy,
+    // left unsent, went up again on the next open over a newer page 2 from another device.
+    @Test
+    fun `the same place saved again while its push was out is in step once the push is done`() = runBlocking {
+        val store = ProgressSyncTestReaderSessionStore()
+        store.savePdfPage(pageIndex = 4, at = 1_000L)
+        val sent = requireNotNull(store.getProgress(pdfItem))
+        store.savePdfPage(pageIndex = 4, at = 2_000L)
+
+        store.settlePendingProgress(sent, PendingProgressPush.Pushed)
+
+        val now = requireNotNull(store.getProgress(pdfItem))
+        assertEquals(SyncState.CLEAN, now.syncState)
+        assertEquals(2_000L, now.updatedAtEpochMillis)
+    }
+
+    @Test
+    fun `a page turned while the push was out still waits to go up`() = runBlocking {
+        val store = ProgressSyncTestReaderSessionStore()
+        store.savePdfPage(pageIndex = 4, at = 1_000L)
+        val sent = requireNotNull(store.getProgress(pdfItem))
+        store.savePdfPage(pageIndex = 5, at = 2_000L)
+
+        store.settlePendingProgress(sent, PendingProgressPush.Pushed)
+
+        val now = requireNotNull(store.getProgress(pdfItem))
+        assertEquals(SyncState.DIRTY, now.syncState)
+        assertEquals(5, now.page)
+    }
+
     @Test
     fun `push pending progress only uploads items with remote Grimmory ids`() = runBlocking {
         val activeItem = grimmoryItem(remoteId = "active-book")
@@ -594,3 +624,21 @@ private class RecordingGrimmoryApi(
         resetProgressBookIds += bookId
     }
 }
+
+private val pdfItem = ReadableItem(
+    id = "grimmory:3426",
+    sourceType = SourceType.GRIMMORY,
+    libraryId = "grimmory:1",
+    title = "A PDF",
+    format = FormatType.PDF,
+)
+
+private fun ReaderSessionStore.savePdfPage(pageIndex: Int, at: Long) = saveProgress(
+    item = pdfItem,
+    locator = ReaderLocator(locatorType = LocatorType.PAGE, page = pageIndex, percent = (pageIndex + 1) / 589.0),
+    isFinished = false,
+    isExplicitUnreadReset = false,
+    syncState = SyncState.DIRTY,
+    pageCount = null,
+    updatedAtEpochMillis = at,
+)

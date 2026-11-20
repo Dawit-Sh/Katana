@@ -80,5 +80,22 @@ internal suspend fun ReaderSessionStore.settlePendingProgress(
         is PendingProgressPush.ServerNewer -> push.serverCopy
         PendingProgressPush.Skipped -> return
     }
-    replaceProgressIfCurrent(expected = progress, replacement = replacement)
+    val settled = replaceProgressIfCurrent(expected = progress, replacement = replacement)
+    if (!settled && push == PendingProgressPush.Pushed && replacement != null) settleSamePlaceSavedMeanwhile(progress)
 }
+
+/**
+ * The reader saving the very same place again while the push of [sent] was out (the Fire does as a book
+ * closes) saved what was sent, so it is in step too. Left unsent, it went again on the next open and, saved
+ * under two minutes before another device's newer read, put this device's older place back over it.
+ */
+private suspend fun ReaderSessionStore.settleSamePlaceSavedMeanwhile(sent: ReaderProgressSnapshot) {
+    val current = progressByItemIdFlow.value[sent.itemId]
+    if (current != null && current.syncState == SyncState.DIRTY && current.isSamePlaceAs(sent)) {
+        replaceProgressIfCurrent(expected = current, replacement = current.copy(syncState = SyncState.CLEAN))
+    }
+}
+
+// The same place, finish and reset: everything but when it was saved and whether it was sent.
+private fun ReaderProgressSnapshot.isSamePlaceAs(other: ReaderProgressSnapshot): Boolean =
+    copy(syncState = other.syncState, updatedAtEpochMillis = other.updatedAtEpochMillis) == other

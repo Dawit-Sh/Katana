@@ -213,6 +213,13 @@ internal fun ReaderSessionStore.savePdfProgress(
 ) {
     val safePageCount = pageCount.coerceAtLeast(0)
     val safePageIndex = if (safePageCount > 0) pageIndex.coerceIn(0, safePageCount - 1) else 0
+    // As in comics: the reader saves where it settles and again as the book closes. Re-saving the stored page
+    // would only stamp it as read now, and that stamp beat newer progress from another device (the Fire put
+    // its page 6 back over a page 2 read after it, 2026-11-20).
+    if (getProgress(item)?.isPdfPlace(safePageIndex, isFinished) == true) {
+        updateSession(item = item, pageCount = safePageCount)
+        return
+    }
     saveProgress(
         item = item,
         locator = ReaderLocator(
@@ -225,6 +232,10 @@ internal fun ReaderSessionStore.savePdfProgress(
         pageCount = safePageCount,
     )
 }
+
+// The stored place is already this page, finished or not (a reset to unread is never the same place).
+private fun ReaderProgressSnapshot.isPdfPlace(pageIndex: Int, finished: Boolean): Boolean =
+    !isExplicitUnreadReset && locatorType == LocatorType.PAGE && page == pageIndex && isFinished == finished
 
 /** Until the first page is drawn: the opening; a document or first page that can't be read: why. */
 internal fun pdfOpenStatus(
