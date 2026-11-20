@@ -457,7 +457,7 @@ fun ComicsReaderScreen(
             goToPage(targetPage)
         }
         // A bookmark opened from the Bookmarks page or the book's page.
-        PageBookmarkJumpEffect(pageBookmarks, item.id, ready = progressHydrated && preferencesHydrated) { pageIndex ->
+        PageBookmarkJumpEffect(pageBookmarks, item.id, ready = progressRestoreCompleted && preferencesRestoreCompleted) { pageIndex ->
             goToPage(pageIndex.coerceIn(0, pages.lastIndex))
         }
         ImmersiveReaderOverlay(

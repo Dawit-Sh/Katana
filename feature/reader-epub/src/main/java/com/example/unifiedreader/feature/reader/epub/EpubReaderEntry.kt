@@ -119,6 +119,10 @@ fun EpubReaderScreen(
         return
     }
     var initialRestoreLocked by rememberSaveable(item.id) { mutableStateOf(false) }
+    // Whether the page has shown the book in this visit. Unlike initialRestoreLocked it isn't saved, so a
+    // book reopened right after reading in it doesn't take a jump (from My words or Bookmarks) before its
+    // page is up, which the saved place then overrode.
+    var bookShownThisVisit by remember(item.id) { mutableStateOf(false) }
     // Locations reported before the page is touched or navigated are the book opening and settling
     // where it was. Saving them would stamp it as read now, over newer progress from another device.
     var readerTouched by remember(item.id) { mutableStateOf(false) }
@@ -498,7 +502,7 @@ fun EpubReaderScreen(
             }
             val markSteps = rememberMarkSteps(item.id, bookHighlights, bookBookmarks)
             // A bookmark or highlight opened from the Bookmarks page: go there once the book shows.
-            EpubPendingJumpEffect(annotationJumps, item.id, ready = initialRestoreLocked) { locator ->
+            EpubPendingJumpEffect(annotationJumps, item.id, ready = bookShownThisVisit) { locator ->
                 markSteps.openedAt(locator)
                 jumpTo(locator)
             }
@@ -612,6 +616,9 @@ fun EpubReaderScreen(
                             val shouldPersistProgress = initialRestoreLocked
                             if (!initialRestoreLocked) {
                                 initialRestoreLocked = true
+                            }
+                            if (!bookShownThisVisit) {
+                                bookShownThisVisit = true
                             }
                             currentLocator = locator
                             currentHref = locator.href.removeFragment().toString()
