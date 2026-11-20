@@ -22,7 +22,7 @@ class BookmarkSyncPlanTest {
         assertTrue(plan(listOf(unplaced), emptyList()).uploads.isEmpty())
 
         val upload = plan(listOf(row("b1", remoteCfi = cfi)), emptyList()).uploads.single() as BookmarkUpload.Create
-        assertEquals(cfi, upload.cfi)
+        assertEquals(cfi, upload.place)
         assertEquals("Chapter Two", upload.title)
     }
 
@@ -78,7 +78,14 @@ class BookmarkSyncPlanTest {
     }
 
     private fun remote(id: String, title: String? = null, note: String? = null, updated: Long = now) =
-        RemoteBookmark(remoteId = id, cfi = cfi, title = title, note = note, createdAtEpochMillis = updated, updatedAtEpochMillis = updated)
+        RemoteBookmark(
+            remoteId = id,
+            place = cfi,
+            title = title,
+            note = note,
+            createdAtEpochMillis = updated,
+            updatedAtEpochMillis = updated,
+        )
 
     private fun row(
         id: String,

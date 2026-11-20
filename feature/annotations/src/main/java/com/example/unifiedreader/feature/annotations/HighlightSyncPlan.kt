@@ -5,6 +5,8 @@ import com.example.unifiedreader.core.database.entity.HIGHLIGHT_WAITING
 import com.example.unifiedreader.core.database.entity.HighlightRowPurge
 import com.example.unifiedreader.core.database.entity.HighlightRowWrite
 import com.example.unifiedreader.core.database.entity.ReaderHighlightEntity
+import com.example.unifiedreader.core.model.clampedToNowIfBeyondLimit
+import com.example.unifiedreader.core.model.trustedAt
 
 /**
  * A highlight as the book's server has it. [cfi] is its place (an EPUB CFI range), null when the
@@ -83,7 +85,8 @@ const val HIGHLIGHT_CLOCK_MARGIN_MILLIS: Long = 2 * 60 * 1000L
  *   a lost answer, KOReader making a changed highlight again, or the same words highlighted in
  *   KOReader and here don't leave two.
  * - The last change wins. A change on this device not yet sent loses only to a server copy newer by
- *   [HIGHLIGHT_CLOCK_MARGIN_MILLIS]; a highlight in step simply takes the server's copy.
+ *   [HIGHLIGHT_CLOCK_MARGIN_MILLIS]; a highlight in step simply takes the server's copy. A time more than
+ *   a day ahead of this device's clock doesn't count: a server's is read as no time, one here as now.
  * - A highlight removed on one side is removed on the other, unless the other side changed it later
  *   (a change on this device not yet sent puts it back on the server).
  * - A new highlight on this device goes up once its place on the server is worked out (by the reader).
@@ -95,18 +98,19 @@ fun planHighlightSync(
     nowEpochMillis: Long,
     newId: () -> String,
 ): HighlightSyncPlan {
-    val remoteIds = remote.mapTo(mutableSetOf(), RemoteHighlight::remoteId)
+    val serverList = remote.map { server -> server.withTrustedTimes(nowEpochMillis) }
+    val remoteIds = serverList.mapTo(mutableSetOf(), RemoteHighlight::remoteId)
     val byRemoteId = local.filter { row -> row.remoteId != null }.associateBy { row -> row.remoteId }
     // Highlights the server may have under an id this device doesn't know.
     val unmatchedOnServer = local.filter { row -> row.remoteId == null || row.remoteId !in remoteIds }
-    val placesKnown = remote.all { highlight -> highlight.cfi != null }
-    if (!placesKnown && remote.any { it.remoteId !in byRemoteId } && unmatchedOnServer.any(::mayBeOnServerUnderAnotherId)) {
+    val placesKnown = serverList.all { highlight -> highlight.cfi != null }
+    if (!placesKnown && serverList.any { it.remoteId !in byRemoteId } && unmatchedOnServer.any(::mayBeOnServerUnderAnotherId)) {
         return HighlightSyncPlan(needsPlaces = true)
     }
 
-    val plan = PlanBuilder()
+    val plan = PlanBuilder(nowEpochMillis)
     val matchedLocalIds = mutableSetOf<String>()
-    remote.forEach { server ->
+    serverList.forEach { server ->
         val row = byRemoteId[server.remoteId]
             ?: unmatchedOnServer.firstOrNull { row -> row.id !in matchedLocalIds && row.isSameHighlightAs(server) }
         if (row == null) {
@@ -145,7 +149,13 @@ private fun ReaderHighlightEntity.isUnplacedNew(): Boolean =
 private fun mayBeOnServerUnderAnotherId(row: ReaderHighlightEntity): Boolean =
     !row.deleted && (row.remoteId != null || (row.syncState == HIGHLIGHT_WAITING && row.remoteCfi != null))
 
-private class PlanBuilder {
+// Server times more than a day ahead of this device's clock are no times to go by.
+private fun RemoteHighlight.withTrustedTimes(nowEpochMillis: Long) = copy(
+    createdAtEpochMillis = createdAtEpochMillis?.trustedAt(nowEpochMillis),
+    updatedAtEpochMillis = updatedAtEpochMillis?.trustedAt(nowEpochMillis),
+)
+
+private class PlanBuilder(private val nowEpochMillis: Long) {
     val writes = mutableListOf<HighlightRowWrite>()
     val purges = mutableListOf<HighlightRowPurge>()
     val uploads = mutableListOf<HighlightUpload>()
@@ -154,7 +164,9 @@ private class PlanBuilder {
 
     fun matched(row: ReaderHighlightEntity, server: RemoteHighlight) {
         val linked = row.copy(remoteId = server.remoteId, remoteCfi = row.remoteCfi ?: server.cfi)
-        val serverNewer = server.updatedAtEpochMillis?.let { it > row.updatedAtEpochMillis + HIGHLIGHT_CLOCK_MARGIN_MILLIS } ?: false
+        // A change made here while this device's clock ran days ahead counts as made now.
+        val changedHereAt = row.updatedAtEpochMillis.clampedToNowIfBeyondLimit(nowEpochMillis)
+        val serverNewer = server.updatedAtEpochMillis?.let { it > changedHereAt + HIGHLIGHT_CLOCK_MARGIN_MILLIS } ?: false
         when {
             row.syncState == HIGHLIGHT_IN_STEP && !row.deleted ->
                 write(row, if (row.differsFrom(server)) linked.takingServerCopy(server) else linked)
@@ -191,13 +203,16 @@ private class PlanBuilder {
         if (row != stored) writes += HighlightRowWrite(row, expectedUpdatedAt = stored.updatedAtEpochMillis)
     }
 
-    private fun ReaderHighlightEntity.takingServerCopy(server: RemoteHighlight) = copy(
-        note = server.note,
-        color = server.color.name,
-        style = server.style.name,
-        updatedAtEpochMillis = maxOf(updatedAtEpochMillis, server.updatedAtEpochMillis ?: updatedAtEpochMillis),
-        syncState = HIGHLIGHT_IN_STEP,
-    )
+    private fun ReaderHighlightEntity.takingServerCopy(server: RemoteHighlight): ReaderHighlightEntity {
+        val changedHereAt = updatedAtEpochMillis.clampedToNowIfBeyondLimit(nowEpochMillis)
+        return copy(
+            note = server.note,
+            color = server.color.name,
+            style = server.style.name,
+            updatedAtEpochMillis = maxOf(changedHereAt, server.updatedAtEpochMillis ?: changedHereAt),
+            syncState = HIGHLIGHT_IN_STEP,
+        )
+    }
 }
 
 private fun ReaderHighlightEntity.differsFrom(server: RemoteHighlight): Boolean =

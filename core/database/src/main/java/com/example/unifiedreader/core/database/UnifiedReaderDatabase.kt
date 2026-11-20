@@ -13,6 +13,7 @@ import com.example.unifiedreader.core.database.dao.DownloadQueueDao
 import com.example.unifiedreader.core.database.dao.ItemDetailsDao
 import com.example.unifiedreader.core.database.dao.JournalDao
 import com.example.unifiedreader.core.database.dao.LibraryTagChoiceDao
+import com.example.unifiedreader.core.database.dao.LocalServerLinkDao
 import com.example.unifiedreader.core.database.dao.ReadingProgressDao
 import com.example.unifiedreader.core.database.dao.ReaderSessionStateDao
 import com.example.unifiedreader.core.database.dao.RemoteCatalogDao
@@ -34,6 +35,7 @@ import com.example.unifiedreader.core.database.entity.LibraryEntity
 import com.example.unifiedreader.core.database.entity.LibraryGridRootEntity
 import com.example.unifiedreader.core.database.entity.LibraryRootFacetEntity
 import com.example.unifiedreader.core.database.entity.LibraryRootMemberEntity
+import com.example.unifiedreader.core.database.entity.LocalServerLinkEntity
 import com.example.unifiedreader.core.database.entity.ReadableItemEntity
 import com.example.unifiedreader.core.database.entity.RemoteCatalogSyncGroupEntity
 import com.example.unifiedreader.core.database.entity.RemoteLibraryCacheEntity
@@ -78,8 +80,9 @@ import com.example.unifiedreader.core.database.entity.UserListEntryEntity
         ReaderHighlightEntity::class,
         SavedWordEntity::class,
         ReaderBookmarkEntity::class,
+        LocalServerLinkEntity::class,
     ],
-    version = 40,
+    version = 41,
     exportSchema = true,
 )
 abstract class UnifiedReaderDatabase : RoomDatabase() {
@@ -100,6 +103,7 @@ abstract class UnifiedReaderDatabase : RoomDatabase() {
     abstract fun readerBookmarkDao(): ReaderBookmarkDao
     abstract fun readerBookmarkSyncDao(): ReaderBookmarkSyncDao
     abstract fun savedWordStudyDao(): SavedWordStudyDao
+    abstract fun localServerLinkDao(): LocalServerLinkDao
 }
 
 object UnifiedReaderDatabaseMigrations {
@@ -1041,4 +1045,5 @@ internal val allMigrations: Array<Migration> = arrayOf(
     MIGRATION_37_38,
     MIGRATION_38_39,
     MIGRATION_39_40,
+    MIGRATION_40_41,
 )

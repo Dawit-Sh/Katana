@@ -7,6 +7,8 @@ import com.example.unifiedreader.core.database.entity.HIGHLIGHT_ON_DEVICE
 import com.example.unifiedreader.core.database.entity.HIGHLIGHT_WAITING
 import com.example.unifiedreader.core.database.entity.ReaderBookmarkEntity
 import com.example.unifiedreader.core.database.entity.WaitingBookmarkKey
+import com.example.unifiedreader.core.model.clampedToNowIfBeyondLimit
+import com.example.unifiedreader.core.model.trustedAt
 import java.util.UUID
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -16,12 +18,12 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 
 /**
- * A bookmark as the book's server has it: its place ([cfi], an EPUB CFI), the reader's name for it
- * ([title]) and [note]. [updatedAtEpochMillis] is the server's time of its last change.
+ * A bookmark as the book's server has it: its [place] (as [BookmarkPlaces] says), the reader's name for
+ * it ([title]) and [note]. [updatedAtEpochMillis] is the server's time of its last change.
  */
 data class RemoteBookmark(
     val remoteId: String,
-    val cfi: String,
+    val place: String,
     val title: String?,
     val note: String?,
     val createdAtEpochMillis: Long?,
@@ -33,10 +35,11 @@ sealed interface BookmarkUpload {
     val localId: String
     val expectedUpdatedAt: Long
 
+    /** [place] as [BookmarkPlaces] says: a CFI, or a page from 1. */
     data class Create(
         override val localId: String,
         override val expectedUpdatedAt: Long,
-        val cfi: String,
+        val place: String,
         val title: String?,
         val note: String?,
     ) : BookmarkUpload
@@ -73,32 +76,39 @@ data class BookmarkSyncPlan(
  * Brings one book's bookmarks here ([local], removed ones included) and on the server ([remote], the
  * book's whole list there) in step, by the same rules as highlights:
  * - The same bookmark on both sides by the server's id. One made here without an id yet (its answer
- *   lost, or the server already had one there) is matched by its place, however the CFI is written.
+ *   lost, or the server already had one there) is matched by its place: the same CFI however it is
+ *   written, or the same page.
  * - The last change wins: a change here not yet sent loses only to a server copy newer by
- *   [HIGHLIGHT_CLOCK_MARGIN_MILLIS]; a bookmark in step takes the server's name and note.
+ *   [HIGHLIGHT_CLOCK_MARGIN_MILLIS]; a bookmark in step takes the server's name and note. A time more
+ *   than a day ahead of this device's clock doesn't count (a server's is read as no time, one here as now).
  * - Removed on one side is removed on the other, unless the other side changed it later.
- * - A new bookmark here goes up once the reader has worked out its place the server's way.
- * A name is compared as the server sees it: a bookmark not named here goes up named by its chapter
- * (as Grimmory's web reader names its own), and that name coming back doesn't name it here.
+ * - A new bookmark here goes up once its place the server's way is known: worked out by the reader in
+ *   an EPUB, its page in a book read by the page.
+ * A name is compared as the server sees it: a bookmark not named here goes up named by its chapter (as
+ * Grimmory's web reader names its own) or "Page 12", and that name coming back doesn't name it here.
  */
+@Suppress("LongParameterList")
 fun planBookmarkSync(
     book: AnnotatedBook,
     local: List<ReaderBookmarkEntity>,
     remote: List<RemoteBookmark>,
     nowEpochMillis: Long,
     newId: () -> String,
+    places: BookmarkPlaces = BookmarkPlaces.EpubCfi,
 ): BookmarkSyncPlan {
-    val remoteIds = remote.mapTo(mutableSetOf(), RemoteBookmark::remoteId)
+    // A place of the other kind (another format of the same server book) is no place in this copy: left alone there.
+    val trusted = remote.filter { server -> places.holds(server.place) }.map { server -> server.withTrustedTimes(nowEpochMillis) }
+    val remoteIds = trusted.mapTo(mutableSetOf(), RemoteBookmark::remoteId)
     val byRemoteId = local.filter { it.remoteId != null }.associateBy { it.remoteId }
     val unmatched = local.filter { row -> row.remoteId == null || row.remoteId !in remoteIds }
-    val plan = BookmarkPlanBuilder()
+    val plan = BookmarkPlanBuilder(places, nowEpochMillis)
     val matched = mutableSetOf<String>()
-    remote.forEach { server ->
+    trusted.forEach { server ->
         val row = byRemoteId[server.remoteId] ?: unmatched.firstOrNull { row ->
-            row.id !in matched && !(row.deleted && row.remoteId == null) && sameCfiPlace(row.remoteCfi, server.cfi)
+            row.id !in matched && !(row.deleted && row.remoteId == null) && places.same(row.serverPlace(places), server.place)
         }
         if (row == null) {
-            plan.writes += BookmarkRowWrite(server.toNewRow(book, newId(), nowEpochMillis), expectedUpdatedAt = null)
+            plan.writes += BookmarkRowWrite(server.toNewRow(book, newId(), nowEpochMillis, places), expectedUpdatedAt = null)
         } else {
             matched += row.id
             plan.matched(row, server)
@@ -108,10 +118,13 @@ fun planBookmarkSync(
     return plan.build()
 }
 
-/** The name the server has, or would have, for [this]: its own, else its chapter's. */
-internal fun ReaderBookmarkEntity.serverTitle(): String? = title ?: chapterTitle?.trim()?.takeIf(String::isNotEmpty)
+// Server times more than a day ahead of this device's clock are no times to go by.
+private fun RemoteBookmark.withTrustedTimes(nowEpochMillis: Long) = copy(
+    createdAtEpochMillis = createdAtEpochMillis?.trustedAt(nowEpochMillis),
+    updatedAtEpochMillis = updatedAtEpochMillis?.trustedAt(nowEpochMillis),
+)
 
-private class BookmarkPlanBuilder {
+private class BookmarkPlanBuilder(private val places: BookmarkPlaces, private val nowEpochMillis: Long) {
     val writes = mutableListOf<BookmarkRowWrite>()
     val purges = mutableListOf<BookmarkRowPurge>()
     val uploads = mutableListOf<BookmarkUpload>()
@@ -119,10 +132,11 @@ private class BookmarkPlanBuilder {
     fun build() = BookmarkSyncPlan(writes, purges, uploads)
 
     fun matched(row: ReaderBookmarkEntity, server: RemoteBookmark) {
-        val linked = row.copy(remoteId = server.remoteId, remoteCfi = row.remoteCfi ?: server.cfi)
-        val serverNewer = server.updatedAtEpochMillis?.let { it > row.updatedAtEpochMillis + HIGHLIGHT_CLOCK_MARGIN_MILLIS } ?: false
+        val linked = row.linkedTo(server)
+        val serverNewer = server.isNewerThan(row)
         when {
             row.syncState == HIGHLIGHT_IN_STEP && !row.deleted -> write(row, linked.takingServerCopy(server))
+            row.remoteId == null && !row.deleted && row.syncState == HIGHLIGHT_WAITING -> firstPairing(row, linked, server, serverNewer)
             serverNewer -> write(row, linked.takingServerCopy(server).copy(deleted = false))
             row.deleted -> {
                 write(row, linked)
@@ -136,6 +150,43 @@ private class BookmarkPlanBuilder {
         }
     }
 
+    private fun ReaderBookmarkEntity.linkedTo(server: RemoteBookmark): ReaderBookmarkEntity = when (places) {
+        BookmarkPlaces.EpubCfi -> copy(remoteId = server.remoteId, remoteCfi = remoteCfi ?: server.place)
+        is BookmarkPlaces.Pages -> copy(remoteId = server.remoteId)
+    }
+
+    // Newer than [row]'s change by the margin; a change made here while this device's clock ran days ahead counts as made now.
+    private fun RemoteBookmark.isNewerThan(row: ReaderBookmarkEntity): Boolean {
+        val changedHereAt = row.updatedAtEpochMillis.clampedToNowIfBeyondLimit(nowEpochMillis)
+        return updatedAtEpochMillis?.let { it > changedHereAt + HIGHLIGHT_CLOCK_MARGIN_MILLIS } ?: false
+    }
+
+    /**
+     * A bookmark made here meets the server's at its place for the first time: its own copy whose answer was
+     * lost (sent before the note, which follows in a second request), or one made there too. Neither side's
+     * name or note is dropped for being older: an empty one takes the other's; only two different ones go by
+     * time.
+     */
+    private fun firstPairing(row: ReaderBookmarkEntity, linked: ReaderBookmarkEntity, server: RemoteBookmark, serverNewer: Boolean) {
+        val serverTitle = server.title.asText()?.takeUnless { it == row.defaultServerTitle() }
+        val title = pick(row.title.asText(), serverTitle, serverNewer)
+        val note = pick(row.note.asText(), server.note.asText(), serverNewer)
+        val merged = linked.copy(title = title, note = note)
+        if (merged.differsFrom(server)) {
+            write(row, merged)
+            uploads += BookmarkUpload.Update(row.id, row.updatedAtEpochMillis, server.remoteId, merged.serverTitle(), merged.note)
+        } else {
+            write(row, merged.copy(syncState = HIGHLIGHT_IN_STEP))
+        }
+    }
+
+    private fun pick(here: String?, there: String?, thereNewer: Boolean): String? = when {
+        here == null -> there
+        there == null || here == there -> here
+        thereNewer -> there
+        else -> here
+    }
+
     fun notOnServer(row: ReaderBookmarkEntity) {
         when {
             row.deleted || (row.remoteId != null && row.syncState == HIGHLIGHT_IN_STEP) ->
@@ -143,8 +194,8 @@ private class BookmarkPlanBuilder {
             row.syncState != HIGHLIGHT_WAITING -> Unit
             else -> {
                 if (row.remoteId != null) write(row, row.copy(remoteId = null))
-                row.remoteCfi?.let { cfi ->
-                    uploads += BookmarkUpload.Create(row.id, row.updatedAtEpochMillis, cfi, row.serverTitle(), row.note)
+                row.serverPlace(places)?.let { place ->
+                    uploads += BookmarkUpload.Create(row.id, row.updatedAtEpochMillis, place, row.serverTitle(), row.note)
                 }
             }
         }
@@ -154,13 +205,16 @@ private class BookmarkPlanBuilder {
         if (row != stored) writes += BookmarkRowWrite(row, expectedUpdatedAt = stored.updatedAtEpochMillis)
     }
 
-    // The server's name stays off this device while it is only the chapter's.
-    private fun ReaderBookmarkEntity.takingServerCopy(server: RemoteBookmark) = copy(
-        title = server.title?.takeUnless { it == chapterTitle?.trim() },
-        note = server.note,
-        updatedAtEpochMillis = maxOf(updatedAtEpochMillis, server.updatedAtEpochMillis ?: updatedAtEpochMillis),
-        syncState = HIGHLIGHT_IN_STEP,
-    )
+    // The server's name stays off this device while it is only the chapter's or the page's.
+    private fun ReaderBookmarkEntity.takingServerCopy(server: RemoteBookmark): ReaderBookmarkEntity {
+        val changedHereAt = updatedAtEpochMillis.clampedToNowIfBeyondLimit(nowEpochMillis)
+        return copy(
+            title = server.title?.takeUnless { it.trim() == defaultServerTitle() },
+            note = server.note,
+            updatedAtEpochMillis = maxOf(changedHereAt, server.updatedAtEpochMillis ?: changedHereAt),
+            syncState = HIGHLIGHT_IN_STEP,
+        )
+    }
 }
 
 private fun ReaderBookmarkEntity.differsFrom(server: RemoteBookmark): Boolean =
@@ -168,10 +222,16 @@ private fun ReaderBookmarkEntity.differsFrom(server: RemoteBookmark): Boolean =
 
 private fun String?.asText(): String? = this?.trim()?.takeIf(String::isNotEmpty)
 
-// A bookmark new to this device: no place in its copy of the book yet (the reader finds it there).
-private fun RemoteBookmark.toNewRow(book: AnnotatedBook, id: String, nowEpochMillis: Long): ReaderBookmarkEntity {
+// A bookmark new to this device. In an EPUB it has no place in this copy of the book yet (the reader finds
+// it there); by the page, its page is its place.
+private fun RemoteBookmark.toNewRow(
+    book: AnnotatedBook,
+    id: String,
+    nowEpochMillis: Long,
+    places: BookmarkPlaces,
+): ReaderBookmarkEntity {
     val updatedAt = updatedAtEpochMillis ?: createdAtEpochMillis ?: nowEpochMillis
-    return ReaderBookmarkEntity(
+    val row = ReaderBookmarkEntity(
         id = id,
         itemId = book.itemId,
         bookTitle = book.title,
@@ -188,9 +248,22 @@ private fun RemoteBookmark.toNewRow(book: AnnotatedBook, id: String, nowEpochMil
         deleted = false,
         syncState = HIGHLIGHT_IN_STEP,
         remoteId = remoteId,
-        remoteCfi = cfi,
+        remoteCfi = place,
         title = title.asText(),
         note = note.asText(),
+    )
+    val pageNumber = place.toPageNumberOrNull()
+    if (places !is BookmarkPlaces.Pages || pageNumber == null) return row
+    val pageIndex = pageNumber - 1
+    val pageCount = places.pageCount?.takeIf { it > 0 }
+    return row.copy(
+        href = "$PAGE_HREF_PREFIX$pageIndex",
+        locatorJson = "{\"page\":$pageIndex}",
+        progression = pageCount?.let { count -> if (count > 1) (pageIndex.toDouble() / (count - 1)).coerceIn(0.0, 1.0) else 0.0 },
+        page = pageNumber,
+        pageCount = pageCount,
+        remoteCfi = null,
+        title = title.asText()?.takeUnless { it == pageTitle(pageNumber) },
     )
 }
 
@@ -246,8 +319,13 @@ class BookmarkSyncEngine(
     private val now: () -> Long = System::currentTimeMillis,
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) {
-    suspend fun syncBook(book: AnnotatedBook, remote: List<RemoteBookmark>, server: BookmarkServer): BookmarkSync {
-        val plan = planBookmarkSync(book, store.rowsOf(book.itemId), remote, now(), newId)
+    suspend fun syncBook(
+        book: AnnotatedBook,
+        remote: List<RemoteBookmark>,
+        server: BookmarkServer,
+        places: BookmarkPlaces = BookmarkPlaces.EpubCfi,
+    ): BookmarkSync {
+        val plan = planBookmarkSync(book, store.rowsOf(book.itemId), remote, now(), newId, places)
         if (plan.writes.isNotEmpty() || plan.purges.isNotEmpty()) store.apply(plan.writes, plan.purges)
         val serverChanged = plan.uploads.map { upload -> send(upload, server) }.any { it }
         return if (serverChanged) BookmarkSync.ServerChangedMeanwhile else BookmarkSync.Done

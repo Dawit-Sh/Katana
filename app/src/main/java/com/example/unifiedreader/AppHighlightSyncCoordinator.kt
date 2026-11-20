@@ -40,10 +40,11 @@ interface HighlightSyncTriggers {
 
 /**
  * When highlights and bookmarks sync with Grimmory ([GrimmoryHighlightSync] and [GrimmoryBookmarkSync]
- * say how), so a change made offline goes up later and is never lost:
+ * say how), so a change made offline goes up later and is never lost. Grimmory's books sync, and so do
+ * files here that are copies of them ([GrimmoryLocalCopies], checked again before each sync):
  * - a change made here goes a few seconds after the last one (more often follow), when Grimmory is
  *   online, and as soon as it is online again;
- * - a book opened brings its highlights down (and sends its waiting changes);
+ * - a book opened brings its marks down (and sends its waiting changes);
  * - a library sync brings every book's down;
  * - the retry timer (two minutes, then longer, as for reading progress) tries what still waits.
  */
@@ -57,6 +58,7 @@ class AppHighlightSyncCoordinator @Inject constructor(
     private val catalog: ReadableItemRepository,
     private val readerWork: ReaderWorkCoordinator,
     private val connectivity: RemoteSourceConnectivityPolicy,
+    private val localCopies: GrimmoryLocalCopies,
 ) : HighlightSyncTriggers {
     private val waiting = MutableStateFlow<List<WaitingHighlightKey>>(emptyList())
     private val waitingBookmarks = MutableStateFlow<List<WaitingBookmarkKey>>(emptyList())
@@ -65,6 +67,7 @@ class AppHighlightSyncCoordinator @Inject constructor(
     @OptIn(FlowPreview::class)
     override fun start() {
         if (!started.compareAndSet(false, true)) return
+        localCopies.start()
         scope.launch { store.observeWaiting().collect { keys -> waiting.value = keys } }
         scope.launch { bookmarkStore.observeWaiting().collect { keys -> waitingBookmarks.value = keys } }
         scope.launch {
@@ -83,19 +86,19 @@ class AppHighlightSyncCoordinator @Inject constructor(
                 val opened = itemIds - openItemIds
                 openItemIds = itemIds
                 if (opened.isEmpty() || connectivity.isUnavailable(SourceType.GRIMMORY)) return@collect
-                catalog.getItems()
-                    .filter { item -> item.id in opened && item.syncsHighlightsWithGrimmory() }
-                    .takeIf(List<ReadableItem>::isNotEmpty)
-                    ?.let { books ->
-                        sync.syncBooks(books)
-                        bookmarkSync.syncBooks(books)
-                    }
+                val books = marksBooks(itemsWithIds(opened, localFile = { true }))
+                if (books.isNotEmpty()) {
+                    sync.syncMarksBooks(books)
+                    bookmarkSync.syncMarksBooks(books)
+                }
             }
         }
         scope.launchPendingSyncRetries(hasWork = ::hasWaitingUploads, retry = ::retry)
     }
 
-    override fun hasWaitingUploads(): Boolean = waitingBooks().isNotEmpty() || waitingBookmarkBooks().isNotEmpty()
+    override fun hasWaitingUploads(): Boolean =
+        waitingItems(waiting.value.mapTo(mutableSetOf(), WaitingHighlightKey::itemId)).isNotEmpty() ||
+            waitingItems(waitingBookmarks.value.mapTo(mutableSetOf(), WaitingBookmarkKey::itemId)).isNotEmpty()
 
     override fun retry() {
         scope.launch { syncWaitingBooks() }
@@ -104,28 +107,39 @@ class AppHighlightSyncCoordinator @Inject constructor(
     override fun afterLibrarySync() {
         scope.launch {
             val items = catalog.getItems()
-            sync.syncLibrary(items, store.booksOnServer())
-            bookmarkSync.syncLibrary(items, bookmarkStore.booksOnServer())
+            val highlightBooks = store.booksOnServer()
+            val bookmarkBooks = bookmarkStore.booksOnServer()
+            val candidates = localCopies.linkedItemIds() + highlightBooks + bookmarkBooks
+            val copies = localCopies.copiesAmong(localCopies.localItems().filter { it.id in candidates })
+            sync.syncLibrary(items, highlightBooks, copies)
+            bookmarkSync.syncLibrary(items, bookmarkBooks, copies)
         }
     }
 
     private suspend fun syncWaitingBooks() {
-        val books = waitingBooks()
-        if (books.isNotEmpty()) sync.syncBooks(books)
-        val bookmarkBooks = waitingBookmarkBooks()
-        if (bookmarkBooks.isNotEmpty()) bookmarkSync.syncBooks(bookmarkBooks)
+        val highlightIds = waiting.value.mapTo(mutableSetOf(), WaitingHighlightKey::itemId)
+        val bookmarkIds = waitingBookmarks.value.mapTo(mutableSetOf(), WaitingBookmarkKey::itemId)
+        val books = marksBooks(waitingItems(highlightIds + bookmarkIds))
+        books.filter { it.item.id in highlightIds }.takeIf(List<GrimmoryMarksBook>::isNotEmpty)?.let { sync.syncMarksBooks(it) }
+        books.filter { it.item.id in bookmarkIds }.takeIf(List<GrimmoryMarksBook>::isNotEmpty)?.let { bookmarkSync.syncMarksBooks(it) }
     }
 
-    private fun waitingBookmarkBooks(): List<ReadableItem> {
-        val itemIds = waitingBookmarks.value.mapTo(mutableSetOf(), WaitingBookmarkKey::itemId)
-        if (itemIds.isEmpty()) return emptyList()
-        return catalog.getItems().filter { item -> item.id in itemIds && item.syncsHighlightsWithGrimmory() }
-    }
+    // Grimmory's books as they are; files here only when a check now finds them still copies of one.
+    private suspend fun marksBooks(items: List<ReadableItem>): List<GrimmoryMarksBook> =
+        items.mapNotNull(ReadableItem::asGrimmoryMarksBook) +
+            localCopies.copiesAmong(items.filter { it.sourceType == SourceType.LOCAL })
 
-    private fun waitingBooks(): List<ReadableItem> {
-        val itemIds = waiting.value.mapTo(mutableSetOf(), WaitingHighlightKey::itemId)
+    // The books among [itemIds] whose marks may sync: Grimmory's, and files here linked at their last check.
+    private fun waitingItems(itemIds: Set<String>): List<ReadableItem> = itemsWithIds(itemIds, localFile = localCopies::isLinked)
+
+    // Grimmory's books among [itemIds] whose marks sync, and the files here among them that [localFile] lets in.
+    private fun itemsWithIds(itemIds: Set<String>, localFile: (ReadableItem) -> Boolean): List<ReadableItem> {
         if (itemIds.isEmpty()) return emptyList()
-        return catalog.getItems().filter { item -> item.id in itemIds && item.syncsHighlightsWithGrimmory() }
+        val books = catalog.getItems().filter { item -> item.id in itemIds && item.syncsBookmarksWithGrimmory() }
+        val files = localCopies.localItems().filter { item ->
+            item.id in itemIds && item.format.sharesBookmarksWithGrimmory() && localFile(item)
+        }
+        return books + files
     }
 
     private companion object {

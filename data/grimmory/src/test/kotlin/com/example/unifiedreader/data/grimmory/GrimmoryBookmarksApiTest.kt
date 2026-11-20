@@ -83,7 +83,7 @@ class GrimmoryBookmarksApiTest {
     @Test
     fun `a new bookmark goes with its book, place and name, and a place already taken says so`() = runBlocking {
         val saved = api { json("""{"id": 40, "bookId": 34, "cfi": "epubcfi(/6/8!/4/2,/1:0,/1:9)", "title": "XLIII"}""") }
-            .create("token", "34", "epubcfi(/6/8!/4/2,/1:0,/1:9)", "XLIII")
+            .create("token", "34", GrimmoryBookmarkPlace.Cfi("epubcfi(/6/8!/4/2,/1:0,/1:9)"), "XLIII")
 
         val request = requests.single()
         assertEquals(HttpMethod.Post, request.method)
@@ -93,8 +93,33 @@ class GrimmoryBookmarksApiTest {
         assertEquals("40", (saved as GrimmoryBookmarkWrite.Saved).bookmark.id)
 
         val taken = api { json("""{"status": 409, "message": "Bookmark already exists at this location"}""", HttpStatusCode.Conflict) }
-            .create("token", "34", "epubcfi(/6/8!/4/2,/1:0,/1:9)", null)
+            .create("token", "34", GrimmoryBookmarkPlace.Cfi("epubcfi(/6/8!/4/2,/1:0,/1:9)"), null)
         assertEquals(GrimmoryBookmarkWrite.AlreadyThere, taken)
+    }
+
+    @Test
+    fun `a PDF page bookmark goes as its page number with no CFI, and a page already bookmarked says so`() = runBlocking {
+        val saved = api { json("""{"id": 41, "bookId": 35, "pageNumber": 12, "title": "Page 12"}""") }
+            .create("token", "35", GrimmoryBookmarkPlace.PdfPage(12), "Page 12")
+
+        val body = requests.single().jsonBody()
+        assertEquals("12", body["pageNumber"]!!.jsonPrimitive.content)
+        assertFalse("a PDF bookmark has no CFI", body.containsKey("cfi"))
+        assertEquals(12, (saved as GrimmoryBookmarkWrite.Saved).bookmark.pageNumber)
+
+        val taken = api { json("""{"status": 409, "message": "A bookmark already exists on this page"}""", HttpStatusCode.Conflict) }
+            .create("token", "35", GrimmoryBookmarkPlace.PdfPage(12), null)
+        assertEquals(GrimmoryBookmarkWrite.AlreadyThere, taken)
+    }
+
+    @Test
+    fun `a comic page bookmark keeps its page in the CFI field, as Grimmory's comic reader does`() = runBlocking {
+        api { json("""{"id": 42, "bookId": 36, "cfi": "7", "title": "Page 7"}""") }
+            .create("token", "36", GrimmoryBookmarkPlace.Cfi("7"), "Page 7")
+
+        val body = requests.single().jsonBody()
+        assertEquals("7", body["cfi"]!!.jsonPrimitive.content)
+        assertFalse(body.containsKey("pageNumber"))
     }
 
     @Test
