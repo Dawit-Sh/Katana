@@ -12,6 +12,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -20,6 +21,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.unifiedreader.core.model.SourceType
+import com.example.unifiedreader.feature.library.LibraryLocalBookItems
 import com.example.unifiedreader.ui.components.AppToastIcon
 import com.example.unifiedreader.ui.components.AppToastMessage
 
@@ -29,72 +31,113 @@ class LocalBookActions(
     val onFindOnPhone: () -> Unit,
     val findsOnPhone: Boolean,
     val onCheckForNewBooks: () -> Unit,
+    val hasPlaces: Boolean = false,
+    val onBookFolders: () -> Unit = {},
 )
 
 val LocalLocalBookActions = staticCompositionLocalOf<LocalBookActions?> { null }
 
-/** The menu's phone item: Find books on this phone, or Check for new books once it is on. */
-internal fun LocalBookActions?.findOnPhoneItem(): (() -> Unit)? =
-    this?.let { actions -> if (actions.findsOnPhone) actions.onCheckForNewBooks else actions.onFindOnPhone }
-
-internal fun LocalBookActions?.isFindingOnPhone(): Boolean = this?.findsOnPhone == true
+/** The library "•••" items: Check for new books and Book folders once there is a folder or the phone search. */
+internal fun LocalBookActions.menuItems(): LibraryLocalBookItems = LibraryLocalBookItems(
+    onAddFolder = onAddFolder,
+    onFindOnPhone = onFindOnPhone.takeUnless { findsOnPhone },
+    onCheckForNewBooks = onCheckForNewBooks.takeIf { hasPlaces },
+    onBookFolders = onBookFolders.takeIf { hasPlaces },
+)
 
 /**
  * The folder picker, the permission Find books on this phone needs (All files access from Android 11, asked
- * in the system's own screen; storage before), and a look through the folders whenever the Local library
- * shows. What changed shows as a toast.
+ * in the system's own screen; storage before), Book folders, and a look through the folders whenever the Local
+ * library shows. What changed shows as a toast.
  */
 @Composable
 internal fun rememberLocalBookActions(localBooks: AppLocalBooksViewModel, viewModel: AppViewModel): LocalBookActions {
     val context = LocalContext.current
+    val toasts = viewModel.toasts
     val report: (LocalBookRefresh, Boolean) -> Unit = { result, asked ->
-        result.toastText(asked)?.let { text -> viewModel.toasts.show(AppToastMessage(text = text, icon = AppToastIcon.Added)) }
+        result.toastText(asked)?.let { text -> toasts.show(AppToastMessage(text = text, icon = AppToastIcon.Added)) }
     }
+    val toastRemoved: (Int) -> Unit = { removed ->
+        toasts.show(AppToastMessage(text = removedToastText(removed), icon = AppToastIcon.Removed))
+    }
+    val findOnPhone = { localBooks.findOnWholePhone { result -> report(result, true) } }
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree: Uri? ->
         if (tree != null) localBooks.addFolder(tree) { result -> report(result, true) }
     }
     val storagePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) localBooks.findOnWholePhone { result -> report(result, true) }
+        if (granted) findOnPhone()
     }
     // Back from the system's All files access screen: on, if it was allowed there.
     var waitingForAllFilesAccess by rememberSaveable { mutableStateOf(false) }
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME && waitingForAllFilesAccess) {
-                waitingForAllFilesAccess = false
-                if (hasWholePhoneAccess(context)) localBooks.findOnWholePhone { result -> report(result, true) }
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    OnResume(enabled = waitingForAllFilesAccess) {
+        waitingForAllFilesAccess = false
+        if (hasWholePhoneAccess(context)) findOnPhone()
     }
     val state = viewModel.uiState
-    LaunchedEffect(state.selectedSource, state.activeReader == null) {
-        if (state.selectedSource == SourceType.LOCAL && state.activeReader == null) {
-            localBooks.refreshIfDue { result -> report(result, false) }
-        }
+    WhenLocalLibraryShows(source = state.selectedSource, readerOpen = state.activeReader != null) {
+        localBooks.refreshIfDue { result -> report(result, false) }
     }
-    return remember(localBooks, localBooks.findsOnWholePhone) {
+    var showingBookFolders by rememberSaveable { mutableStateOf(false) }
+    if (showingBookFolders) {
+        BookFoldersDialog(
+            places = localBooks.shownPlaces,
+            onRemoveFolder = { tree -> localBooks.removeFolder(tree, toastRemoved) },
+            onStopPhone = { localBooks.stopFindingOnPhone(toastRemoved) },
+            onAddFolder = {
+                showingBookFolders = false
+                folderPicker.launch(null)
+            },
+            onDismiss = { showingBookFolders = false },
+        )
+    }
+    return remember(localBooks, localBooks.shownPlaces) {
         LocalBookActions(
             onAddFolder = { folderPicker.launch(null) },
             onFindOnPhone = {
                 when {
-                    hasWholePhoneAccess(context) -> localBooks.findOnWholePhone { result -> report(result, true) }
+                    hasWholePhoneAccess(context) -> findOnPhone()
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> {
                         waitingForAllFilesAccess = true
-                        val forKatana = Intent(
-                            Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                            Uri.parse("package:${context.packageName}"),
-                        )
-                        runCatching { context.startActivity(forKatana) }
-                            .recoverCatching { context.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) }
+                        openAllFilesAccess(context)
                     }
                     else -> storagePermission.launch(android.Manifest.permission.READ_EXTERNAL_STORAGE)
                 }
             },
             findsOnPhone = localBooks.findsOnWholePhone,
             onCheckForNewBooks = { localBooks.refresh { result -> report(result, true) } },
+            hasPlaces = localBooks.shownPlaces.any,
+            onBookFolders = { showingBookFolders = true },
         )
+    }
+}
+
+// Android's All files access screen for Katana; the general list where a phone doesn't open it for one app.
+private fun openAllFilesAccess(context: android.content.Context) {
+    val forKatana = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${context.packageName}"))
+    runCatching { context.startActivity(forKatana) }
+        .recoverCatching { context.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) }
+}
+
+/** Calls [onResumed] when the app comes back to the front while [enabled]. */
+@Composable
+private fun OnResume(enabled: Boolean, onResumed: () -> Unit) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val latestEnabled by rememberUpdatedState(enabled)
+    val latestOnResumed by rememberUpdatedState(onResumed)
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && latestEnabled) latestOnResumed()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+}
+
+/** Calls [onShown] each time the Local library shows (no book open). */
+@Composable
+private fun WhenLocalLibraryShows(source: SourceType, readerOpen: Boolean, onShown: () -> Unit) {
+    val latestOnShown by rememberUpdatedState(onShown)
+    LaunchedEffect(source, readerOpen) {
+        if (source == SourceType.LOCAL && !readerOpen) latestOnShown()
     }
 }

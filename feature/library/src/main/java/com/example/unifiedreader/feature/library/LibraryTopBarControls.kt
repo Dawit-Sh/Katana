@@ -53,43 +53,46 @@ data class LibraryRefreshAction(
     val onRefresh: () -> Unit,
 )
 
-/** Import a file, Add a folder, and Find books on this phone (Check for new books once it is on). */
+/**
+ * Books on this device in the library's "•••": Add a folder, Find books on this phone (until it is on), Check
+ * for new books and Book folders (once there is a folder or the phone search).
+ */
+class LibraryLocalBookItems(
+    val onAddFolder: () -> Unit,
+    val onFindOnPhone: (() -> Unit)?,
+    val onCheckForNewBooks: (() -> Unit)?,
+    val onBookFolders: (() -> Unit)?,
+)
+
 @Composable
 private fun LocalBookMenuItems(
     onImportFile: () -> Unit,
-    onAddFolder: (() -> Unit)?,
-    onFindOnPhone: (() -> Unit)?,
-    findsOnPhone: Boolean,
+    localBooks: LibraryLocalBookItems?,
+    onPicked: () -> Unit,
+) {
+    LocalBookMenuItem("Import a file", AppIcons.Add, onImportFile, onPicked)
+    if (localBooks == null) return
+    LocalBookMenuItem("Add a folder", AppIcons.Add, localBooks.onAddFolder, onPicked)
+    localBooks.onFindOnPhone?.let { LocalBookMenuItem("Find books on this phone", AppIcons.Refresh, it, onPicked) }
+    localBooks.onCheckForNewBooks?.let { LocalBookMenuItem("Check for new books", AppIcons.Refresh, it, onPicked) }
+    localBooks.onBookFolders?.let { LocalBookMenuItem("Book folders", AppIcons.MoreHoriz, it, onPicked) }
+}
+
+@Composable
+private fun LocalBookMenuItem(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
     onPicked: () -> Unit,
 ) {
     AppMenuItem(
-        text = { Text(text = "Import a file") },
-        leadingIcon = { Icon(imageVector = AppIcons.Add, contentDescription = null) },
+        text = { Text(text = label) },
+        leadingIcon = { Icon(imageVector = icon, contentDescription = null) },
         onClick = {
             onPicked()
-            onImportFile()
+            onClick()
         },
     )
-    if (onAddFolder != null) {
-        AppMenuItem(
-            text = { Text(text = "Add a folder") },
-            leadingIcon = { Icon(imageVector = AppIcons.Add, contentDescription = null) },
-            onClick = {
-                onPicked()
-                onAddFolder()
-            },
-        )
-    }
-    if (onFindOnPhone != null) {
-        AppMenuItem(
-            text = { Text(text = if (findsOnPhone) "Check for new books" else "Find books on this phone") },
-            leadingIcon = { Icon(imageVector = AppIcons.Refresh, contentDescription = null) },
-            onClick = {
-                onPicked()
-                onFindOnPhone()
-            },
-        )
-    }
 }
 
 /**
@@ -104,9 +107,7 @@ fun LibraryTopBarMoreMenu(
     modifier: Modifier = Modifier,
     refresh: LibraryRefreshAction? = null,
     showSelectionTip: Boolean = false,
-    onAddFolder: (() -> Unit)? = null,
-    onFindOnPhone: (() -> Unit)? = null,
-    findsOnPhone: Boolean = false,
+    localBooks: LibraryLocalBookItems? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val refreshing = refresh?.refreshing == true
@@ -128,7 +129,7 @@ fun LibraryTopBarMoreMenu(
             onDismissRequest = { expanded = false },
             modifier = Modifier.width(LibraryTopBarMenuWidth),
         ) {
-            LocalBookMenuItems(onImportFile, onAddFolder, onFindOnPhone, findsOnPhone) { expanded = false }
+            LocalBookMenuItems(onImportFile, localBooks) { expanded = false }
             if (refresh != null) {
                 AppMenuItem(
                     text = { Text(text = if (refreshing) "Refreshing library" else "Refresh library") },

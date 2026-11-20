@@ -2,6 +2,9 @@ package com.example.unifiedreader
 
 import android.content.Context
 import android.net.Uri
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.Module
@@ -42,19 +45,49 @@ class AppLocalBooksViewModel @Inject constructor(
 ) : ViewModel() {
     private var lastRefreshAt = 0L
 
-    val findsOnWholePhone: Boolean get() = places.findsOnWholePhone
+    /** The places as Book folders lists them; the menu and the list follow it. */
+    var shownPlaces by mutableStateOf(currentPlaces())
+        private set
+
+    val findsOnWholePhone: Boolean get() = shownPlaces.wholePhone
+
+    private fun currentPlaces() = LocalBookPlacesShown(
+        folders = places.folders.map { tree -> tree to folderLabel(tree) },
+        wholePhone = places.findsOnWholePhone,
+    )
+
+    /** Removes a folder from Book folders and its books from the library; [onResult] gets how many left. */
+    fun removeFolder(tree: Uri, onResult: (Int) -> Unit) = forget(LocalBookPlace.Folder(tree), onResult) {
+        runCatching {
+            context.contentResolver.releasePersistableUriPermission(tree, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+    }
+
+    /** Stops looking through the whole phone; the books it found leave the library. */
+    fun stopFindingOnPhone(onResult: (Int) -> Unit) = forget(LocalBookPlace.WholePhone, onResult) {}
+
+    private fun forget(place: LocalBookPlace, onResult: (Int) -> Unit, after: () -> Unit) {
+        viewModelScope.launch {
+            val removed = refresher.forget(place)
+            after()
+            shownPlaces = currentPlaces()
+            onResult(removed)
+        }
+    }
 
     fun addFolder(tree: Uri, onResult: (LocalBookRefresh) -> Unit) {
         runCatching {
             context.contentResolver.takePersistableUriPermission(tree, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         places.addFolder(tree)
+        shownPlaces = currentPlaces()
         refresh(onResult)
     }
 
     /** Turns the whole-phone search on, once Katana may read the phone ([hasWholePhoneAccess]). */
     fun findOnWholePhone(onResult: (LocalBookRefresh) -> Unit) {
         places.findsOnWholePhone = true
+        shownPlaces = currentPlaces()
         refresh(onResult)
     }
 
@@ -84,3 +117,17 @@ internal fun LocalBookRefresh.toastText(asked: Boolean): String? = when {
 }
 
 private fun books(count: Int) = if (count == 1) "1 book" else "$count books"
+
+/** The places Book folders lists: each picked folder with its label, and whether the whole phone is looked through. */
+data class LocalBookPlacesShown(
+    val folders: List<Pair<Uri, String>>,
+    val wholePhone: Boolean,
+) {
+    val any: Boolean get() = wholePhone || folders.isNotEmpty()
+}
+
+internal fun removedToastText(removed: Int): String = if (removed == 1) {
+    "Removed, with its 1 book. The file stays on the phone"
+} else {
+    "Removed, with its $removed books. The files stay on the phone"
+}

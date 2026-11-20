@@ -167,6 +167,20 @@ internal fun String.isBookFileName(): Boolean = substringAfterLast('.', "").lowe
 
 private val BookFileExtensions = setOf("epub", "pdf", "djvu", "djv", "cbz", "cbr", "mobi", "azw", "azw3", "fb2")
 
+/** How a picked folder reads in Book folders: "Download/Books" on the phone, "SD card · Books" on a card. */
+internal fun folderLabelOf(treeDocumentId: String): String {
+    val volume = treeDocumentId.substringBefore(':')
+    val path = treeDocumentId.substringAfter(':', "").trim('/')
+    return when {
+        volume == "primary" -> path.ifEmpty { "The phone's storage" }
+        path.isEmpty() -> "SD card"
+        else -> "SD card · $path"
+    }
+}
+
+fun folderLabel(tree: Uri): String =
+    runCatching { folderLabelOf(DocumentsContract.getTreeDocumentId(tree)) }.getOrNull() ?: tree.lastPathSegment.orEmpty()
+
 /** What a refresh of the places changed: books added, and books gone from the phone. */
 data class LocalBookRefresh(val added: Int, val removed: Int)
 
@@ -201,5 +215,20 @@ class LocalBookRefresher(
             uri.toString() !in found && search.readPlaces.any { place -> place.holds(uri) } && library.removeById(itemId)
         }
         LocalBookRefresh(added = added, removed = removed)
+    }
+
+    /**
+     * Takes a place out of Book folders: Katana stops looking there, and its books leave the library. The files
+     * stay on the phone, and their highlights, bookmarks and places come back with the folder. Returns how many
+     * books left.
+     */
+    suspend fun forget(place: LocalBookPlace): Int = running.withLock {
+        when (place) {
+            is LocalBookPlace.Folder -> places.removeFolder(place.tree)
+            LocalBookPlace.WholePhone -> places.findsOnWholePhone = false
+        }
+        library.getImportedItems().count { item ->
+            library.getDocumentUri(item)?.let(place::holds) == true && library.removeById(item.id)
+        }
     }
 }

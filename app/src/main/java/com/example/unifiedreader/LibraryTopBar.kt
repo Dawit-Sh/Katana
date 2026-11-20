@@ -139,9 +139,7 @@ fun LibraryTopBar(
                         val localBooks = LocalLocalBookActions.current
                         LibraryTopBarMoreMenu(
                             onImportFile = onImportLocalFileClick,
-                            onAddFolder = localBooks?.onAddFolder,
-                            onFindOnPhone = localBooks.findOnPhoneItem(),
-                            findsOnPhone = localBooks.isFindingOnPhone(),
+                            localBooks = localBooks?.menuItems(),
                             refresh = if (refreshState.isVisible) {
                                 LibraryRefreshAction(
                                     enabled = refreshState.isEnabled,
