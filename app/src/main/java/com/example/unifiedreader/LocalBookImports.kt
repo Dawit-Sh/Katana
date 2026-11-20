@@ -5,6 +5,8 @@ import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.feature.annotations.LocalBookDirectory
 import com.example.unifiedreader.feature.annotations.LocalBookIdentity
 import com.example.unifiedreader.feature.annotations.LocalBookMarksMover
+import com.example.unifiedreader.feature.annotations.LocalReadingPlace
+import com.example.unifiedreader.feature.annotations.LocalReadingPlaces
 import com.example.unifiedreader.feature.annotations.PendingLocalMarks
 
 /**
@@ -72,14 +74,21 @@ class LocalBookImports(
 class LocalMarksHoming(
     private val pending: PendingLocalMarks,
     private val mover: LocalBookMarksMover,
+    /** Puts a waiting reading place back on the new book, only when newer than the one it has. */
+    private val places: LocalReadingPlaces? = null,
 ) {
     /** How many marks moved to [book]. */
-    suspend fun onImported(book: LocalBookIdentity): Int =
-        if (!book.hasFingerprint) {
-            0
-        } else {
-            pending.takeSameFile(book)
-                .filter { it.itemId != book.itemId }
-                .sumOf { waiting -> mover.moveMarks(fromItemId = waiting.itemId, toItemId = book.itemId) }
+    suspend fun onImported(book: LocalBookIdentity): Int {
+        if (!book.hasFingerprint) return 0
+        val waiting = pending.takeSameFile(book)
+        val moved = waiting
+            .filter { it.itemId != book.itemId }
+            .sumOf { old -> mover.moveMarks(fromItemId = old.itemId, toItemId = book.itemId) }
+        if (waiting.isNotEmpty()) {
+            pending.takePlaces(waiting.mapTo(HashSet(), LocalBookIdentity::itemId))
+                .maxByOrNull(LocalReadingPlace::updatedAtEpochMillis)
+                ?.let { place -> places?.restore(place.copy(itemId = book.itemId)) }
         }
+        return moved
+    }
 }

@@ -90,6 +90,7 @@ object AppSettingsToolsModule {
         @ApplicationContext context: Context,
         database: UnifiedReaderDatabase,
         repository: LocalDocumentRepository,
+        sessions: RoomReaderSessionStore,
     ): LocalBookImports = LocalBookImports(
         documents = repository,
         hydrator = repository,
@@ -97,6 +98,11 @@ object AppSettingsToolsModule {
         marksHoming = LocalMarksHoming(
             pending = PendingLocalMarksStore(context),
             mover = localMarksMover(database),
+            places = LocalReadingPlaceBackup(
+                sessions = sessions,
+                hydrate = sessions::hydrate,
+                localItems = { repository.getImportedItems() },
+            ),
         ),
         releaseRead = { uri ->
             runCatching { context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }

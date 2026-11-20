@@ -10,6 +10,8 @@ import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.feature.annotations.LocalBookIdentity
 import com.example.unifiedreader.feature.annotations.LocalBookMarksMover
+import com.example.unifiedreader.feature.annotations.LocalReadingPlace
+import com.example.unifiedreader.feature.annotations.LocalReadingPlaces
 import com.example.unifiedreader.feature.annotations.PendingLocalMarks
 import java.io.File
 import java.io.RandomAccessFile
@@ -113,6 +115,45 @@ class LocalBookIdentityTest {
     }
 
     @Test
+    fun `importing the file later also puts back the place the restore kept for it, never over a newer one`() = runBlocking {
+        val pending = InMemoryPendingMarks()
+        pending.remember(listOf(waiting("document-aa01", calculus)))
+        pending.rememberPlaces(listOf(placeOf("document-aa01", page = 42, at = 5_000)))
+        val restored = mutableListOf<LocalReadingPlace>()
+        val places = object : LocalReadingPlaces {
+            override suspend fun places(): List<LocalReadingPlace> = emptyList()
+
+            override suspend fun restore(place: LocalReadingPlace): Boolean = restored.add(place)
+        }
+        val uri = Uri.parse("content://storage/Calculus.pdf")
+        val books = imports(mapOf(uri.toString() to calculus), LocalMarksHoming(pending, LocalBookMarksMover { _, _ -> 3 }, places))
+
+        val imported = requireNotNull(books.import(uri))
+
+        assertEquals(listOf(placeOf(imported.id, page = 42, at = 5_000)), restored)
+        assertTrue(pending.places.isEmpty())
+    }
+
+    @Test
+    fun `waiting places survive the trip through their stored text`() {
+        val places = listOf(
+            placeOf("document-aa01", page = 42, at = 5_000),
+            LocalReadingPlace(
+                "document-bb02",
+                "CFI",
+                page = null,
+                cfi = "{\"href\":\"c1.xhtml\"}",
+                percent = 0.25,
+                isFinished = true,
+                updatedAtEpochMillis = 7,
+            ),
+        )
+
+        assertEquals(places, decodePendingPlaces(encodePendingPlaces(places)))
+        assertEquals(emptyList<LocalReadingPlace>(), decodePendingPlaces("not json"))
+    }
+
+    @Test
     fun `a file's fingerprint is KOReader's partial MD5 of it and its size`() {
         val file = File(Files.createTempDirectory("local-books").toFile(), "Big.pdf")
         file.writeBytes(ByteArray(70_000) { index -> (index % 251).toByte() })
@@ -186,8 +227,19 @@ private class PickedFiles : LocalDocumentDataSource, LocalDocumentHydrator {
     override fun getDocumentUri(item: ReadableItem): Uri? = uris[item.id]
 }
 
+private fun placeOf(itemId: String, page: Int, at: Long) =
+    LocalReadingPlace(itemId, "PAGE", page = page, updatedAtEpochMillis = at)
+
 private class InMemoryPendingMarks : PendingLocalMarks {
     val books = mutableListOf<LocalBookIdentity>()
+    val places = mutableListOf<LocalReadingPlace>()
+
+    override suspend fun rememberPlaces(places: List<LocalReadingPlace>) {
+        this.places += places
+    }
+
+    override suspend fun takePlaces(itemIds: Set<String>): List<LocalReadingPlace> =
+        places.filter { it.itemId in itemIds }.also { places -= it.toSet() }
 
     override suspend fun remember(books: List<LocalBookIdentity>) {
         this.books += books

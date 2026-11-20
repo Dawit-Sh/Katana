@@ -73,9 +73,11 @@ class AnnotationBackupStore(
             }
             val backup = decoded.rehomed(rehome)
             val restoredPlaces = restorePlaces(decoded.places, rehome, here.orEmpty())
-            pendingLocalMarks?.remember(
-                decoded.books.map(BackupBook::toIdentity).filter { it.itemId in rehome.notHere && it.hasFingerprint },
-            )
+            val waitingBooks = decoded.books.map(BackupBook::toIdentity).filter { it.itemId in rehome.notHere && it.hasFingerprint }
+            pendingLocalMarks?.remember(waitingBooks)
+            // The places of those books come back when their files are imported, as their marks do.
+            val waitingIds = waitingBooks.mapTo(HashSet(), LocalBookIdentity::itemId)
+            pendingLocalMarks?.rememberPlaces(decoded.places.filter { it.itemId in waitingIds }.map { it.toPlace() })
             val plan = planAnnotationRestore(
                 backup = backup,
                 existingHighlights = dao.observeAllHighlights().first(),

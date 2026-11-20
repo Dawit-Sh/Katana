@@ -25,6 +25,7 @@ class LocalBookRestoreTest {
     private val place = AnnotationPlace("c1.xhtml", "{\"href\":\"c1.xhtml\"}", "Chapter 1", 0.07)
     private val epub = LocalBookIdentity("document-aaaa1111", "Pride and Prejudice", "Jane Austen", "EPUB", 831_932, "0f0f")
     private val pending = mutableListOf<LocalBookIdentity>()
+    private val pendingPlaces = mutableListOf<LocalReadingPlace>()
 
     @Before
     fun setUp() {
@@ -197,6 +198,18 @@ class LocalBookRestoreTest {
     }
 
     @Test
+    fun `the place of a book not here yet waits with its marks for the file`() = runBlocking {
+        markUp(epub)
+        val file = backups(source, here = listOf(epub), places = FakePlaces(mutableMapOf(epub.itemId to place(at = 900)))).backUp()
+
+        val result = backups(target, here = emptyList(), places = FakePlaces(mutableMapOf())).restore(file.text)
+
+        assertEquals(0, result.restoredPlaces)
+        assertEquals(listOf(epub.itemId), pending.map(LocalBookIdentity::itemId))
+        assertEquals(listOf(place(at = 900)), pendingPlaces)
+    }
+
+    @Test
     fun `local ids are told from a server's`() {
         assertTrue(isLocalBookId("document-8054263d"))
         assertTrue(isLocalBookId("comic-5c210df4"))
@@ -246,6 +259,10 @@ class LocalBookRestoreTest {
                     }
 
                     override suspend fun takeSameFile(file: LocalBookIdentity): List<LocalBookIdentity> = emptyList()
+
+                    override suspend fun rememberPlaces(places: List<LocalReadingPlace>) {
+                        pendingPlaces += places
+                    }
                 },
                 readingPlaces = places,
             )
