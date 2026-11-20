@@ -16,7 +16,7 @@ internal object AppToasts {
 
     fun unreadableFile(): AppToastMessage = AppToastMessage(
         text = "That file isn't a book Katana can open",
-        supportingText = "EPUB, PDF, CBZ or CBR",
+        supportingText = "EPUB, PDF, DjVu, CBZ, CBR, MOBI, AZW, AZW3 or FB2",
         icon = AppToastIcon.Error,
     )
 
