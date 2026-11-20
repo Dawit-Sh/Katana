@@ -83,6 +83,28 @@ class MarkRemovalHoldTest {
     }
 
     @Test
+    fun `marks brought back by Undo go up again and aren't counted as lost`() = runBlocking {
+        store.rows += (1..6).map { inStep("b$it").copy(syncState = HIGHLIGHT_WAITING) }
+        val created = mutableListOf<String>()
+        val recording = object : BookmarkServer {
+            override suspend fun create(upload: BookmarkUpload.Create): BookmarkServerAnswer {
+                created += upload.place
+                return BookmarkServerAnswer.Saved("n${created.size}")
+            }
+
+            override suspend fun update(upload: BookmarkUpload.Update) = error("not sent")
+
+            override suspend fun delete(upload: BookmarkUpload.Delete) = error("not sent")
+        }
+
+        engine.syncBook(book, emptyList(), recording, BookmarkPlaces.Pages(40))
+
+        assertEquals(6, created.size)
+        assertEquals(6, store.rows.size)
+        assertNull(MarkRemovalHolds.current(book.itemId))
+    }
+
+    @Test
     fun `remove here removes them, put back makes them new for the next sync`() = runBlocking {
         store.rows += (1..6).map { inStep("b$it") }
         engine.syncBook(book, emptyList(), nobody, BookmarkPlaces.Pages(40))
