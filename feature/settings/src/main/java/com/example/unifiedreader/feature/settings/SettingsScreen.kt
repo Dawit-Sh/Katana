@@ -84,6 +84,8 @@ fun SettingsScreen(
     val orderedSources = remember(sources, sourceOrder) {
         sources.sortedBy { entry -> sourceOrder.indexOf(entry.sourceType).takeIf { it >= 0 } ?: Int.MAX_VALUE }
     }
+    // The Library rows' lines name only the sources set up here.
+    val setUpOrder = remember(sources, sourceOrder) { setUpSourceOrder(sourceOrder, sources) }
     val pageContent: @Composable (SettingsPage, Dp) -> Unit = { openPage, horizontalPadding ->
         CompositionLocalProvider(LocalSettingsScrollReporter provides pageScroll) {
             when (openPage) {
@@ -101,7 +103,7 @@ fun SettingsScreen(
                     )
                 }
                 SettingsPage.Library -> LibrarySettingsPage(
-                    sourceOrder = sourceOrder,
+                    sourceOrder = setUpOrder,
                     filterPanelsBySource = libraryFilterPanelsBySource,
                     tagsSummary = tagsPage?.summary,
                     selectedPage = page,
@@ -178,7 +180,7 @@ fun SettingsScreen(
             SettingsHub(
                 themeMode = themeMode,
                 sources = orderedSources,
-                sourceOrder = sourceOrder,
+                sourceOrder = setUpOrder,
                 filterPanelsBySource = libraryFilterPanelsBySource,
                 syncSettings = syncSettings,
                 versionName = versionName,
