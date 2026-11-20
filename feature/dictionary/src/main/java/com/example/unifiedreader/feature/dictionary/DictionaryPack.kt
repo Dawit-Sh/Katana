@@ -63,7 +63,8 @@ fun DictionarySource.lookUp(text: String, maxSenses: Int = DEFAULT_MAX_SENSES): 
     val meanings = mutableListOf<DictionaryMeaning>()
     val seen = mutableSetOf<Pair<String, PartOfSpeech>>()
     fun addMeanings(lemma: String, only: PartOfSpeech?) {
-        senses(lemma).groupBy(PackSense::partOfSpeech).forEach { (part, senses) ->
+        // Nouns, verbs, adjectives, adverbs, as WordNet lists them (the pack's codes sort a, n, r, v).
+        senses(lemma).groupBy(PackSense::partOfSpeech).entries.sortedBy { it.key.ordinal }.forEach { (part, senses) ->
             if ((only == null || part == only) && seen.add(lemma to part)) {
                 meanings += DictionaryMeaning(
                     lemma = lemma,

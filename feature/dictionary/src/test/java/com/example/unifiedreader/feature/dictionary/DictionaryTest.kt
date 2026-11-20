@@ -145,7 +145,11 @@ class DictionaryTest {
             (dictionary.lookUp(word) as? DictionaryLookup.Found)?.entry?.meanings?.map { it.lemma to it.partOfSpeech }.orEmpty()
 
         assertEquals(listOf("goose" to PartOfSpeech.Noun), lemmas("geese"))
-        assertTrue(lemmas("running").contains("run" to PartOfSpeech.Verb))
+        // The word itself first (nouns before adjectives), then its base form.
+        assertEquals(
+            listOf("running" to PartOfSpeech.Noun, "running" to PartOfSpeech.Adjective, "run" to PartOfSpeech.Verb),
+            lemmas("running"),
+        )
         assertEquals(listOf("study" to PartOfSpeech.Noun, "study" to PartOfSpeech.Verb), lemmas("studies"))
         assertEquals(listOf("run" to PartOfSpeech.Verb), lemmas("ran"))
         assertEquals(listOf("big" to PartOfSpeech.Adjective), lemmas("bigger"))
