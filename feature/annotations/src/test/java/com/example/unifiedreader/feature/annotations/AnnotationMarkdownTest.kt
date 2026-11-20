@@ -153,18 +153,11 @@ class AnnotationMarkdownTest {
     @Test
     fun `bookmark names and notes and word notes are exported, in the book and in the notebook`() {
         val bookmarks = listOf(
-            bookmark(
-                "named",
-                page = 11 to 357,
-                text = "In a few days",
-                chapter = "III",
-                at = 0.03,
-                title = "Bingley visit",
-                note = "QA bm note",
-            ),
-            bookmark("plain", page = 40 to 357, text = null, chapter = null, at = 0.11, note = "Two lines\nof note"),
+            bookmark("named", page = 11 to 357, text = "In a few days", chapter = "III", at = 0.03)
+                .copy(title = "Bingley visit", note = "QA bm note"),
+            bookmark("plain", page = 40 to 357, text = null, chapter = null, at = 0.11).copy(note = "Two lines\nof note"),
         )
-        val words = listOf(word("Netherfield", "settled at Netherfield.", chapter = "III", at = 0.03, note = "estate name"))
+        val words = listOf(word("Netherfield", "settled at Netherfield.", chapter = "III", at = 0.03).copy(note = "estate name"))
 
         val book = AnnotationMarkdown.book(book = hole, highlights = emptyList(), words = words, exportedOn = day, bookmarks = bookmarks)
         val notebook = AnnotationMarkdown.library(highlights = emptyList(), words = words, exportedOn = day, bookmarks = bookmarks)
@@ -207,15 +200,7 @@ class AnnotationMarkdownTest {
     )
 
     /** A bookmark on [page] (its number to the book's page count). */
-    private fun bookmark(
-        id: String,
-        page: Pair<Int, Int>?,
-        text: String?,
-        chapter: String?,
-        at: Double?,
-        title: String? = null,
-        note: String? = null,
-    ) = ReaderBookmark(
+    private fun bookmark(id: String, page: Pair<Int, Int>?, text: String?, chapter: String?, at: Double?) = ReaderBookmark(
         id = id,
         book = hole,
         place = AnnotationPlace(href = "c.xhtml", locatorJson = "{}", chapterTitle = chapter, progression = at),
@@ -223,24 +208,15 @@ class AnnotationMarkdownTest {
         pageCount = page?.second,
         text = text,
         createdAtEpochMillis = 1,
-        title = title,
-        note = note,
     )
 
-    private fun word(
-        word: String,
-        sentence: String?,
-        chapter: String?,
-        at: Double?,
-        book: AnnotatedBook = hole,
-        note: String? = null,
-    ) = SavedWord(
+    private fun word(word: String, sentence: String?, chapter: String?, at: Double?, book: AnnotatedBook = hole) = SavedWord(
         id = word,
         book = book,
         word = word,
         sentence = sentence,
         place = AnnotationPlace(href = "", locatorJson = "{}", chapterTitle = chapter, progression = at),
-        note = note,
+        note = null,
         createdAtEpochMillis = 1,
     )
 }
