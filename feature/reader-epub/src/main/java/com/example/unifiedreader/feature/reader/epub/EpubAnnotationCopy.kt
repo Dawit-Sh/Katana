@@ -10,7 +10,7 @@ import com.example.unifiedreader.feature.annotations.HighlightStyle
 internal object EpubAnnotationCopy {
     const val Highlight = HighlightCopy.Highlight
     const val Note = HighlightCopy.Note
-    const val AddToDictionary = "Add to dictionary"
+    const val AddToDictionary = "Add to My words"
     const val Dictionary = "Dictionary"
     const val Copy = HighlightCopy.Copy
     const val Delete = HighlightCopy.Delete
