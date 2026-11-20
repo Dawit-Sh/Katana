@@ -44,4 +44,17 @@ class ReaderChapterPositionTest {
         assertNull(ReaderSessionSnapshot("book", preferences = mapOf(ReaderSessionChapterKey to "7/6")).chapterPosition)
         assertNull(ReaderSessionSnapshot("book", preferences = mapOf(ReaderSessionChapterKey to "two/six")).chapterPosition)
     }
+
+    @Test
+    fun `the page shown counts only at the place it was shown at`() {
+        val session = ReaderSessionSnapshot("book", preferences = readerSessionShownPagePreferences(page = 6, savedPercent = 0.0641025641))
+
+        assertEquals(6, session.shownPageAt(0.0641025641))
+        assertNull(session.shownPageAt(0.077))
+        assertNull(session.shownPageAt(null))
+        fun shown(page: Int, at: Double?) = ReaderSessionSnapshot("book", preferences = readerSessionShownPagePreferences(page, at))
+        assertNull(shown(page = 0, at = 0.2).shownPageAt(0.2))
+        assertNull(shown(page = 4, at = null).shownPageAt(0.2))
+        assertNull(ReaderSessionSnapshot("book").shownPageAt(0.2))
+    }
 }

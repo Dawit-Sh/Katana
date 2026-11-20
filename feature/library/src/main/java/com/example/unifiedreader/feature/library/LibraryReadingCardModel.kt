@@ -72,11 +72,7 @@ private fun ItemProgressSummary.chapterLabel(): String? {
 }
 
 /** "Page 47 of 73", when the page count is known. */
-private fun ItemProgressSummary.pageLabel(): String? {
-    val count = pageCount?.takeIf { it > 0 } ?: return null
-    val page = (currentPage ?: (fraction.coerceIn(0f, 1f) * count).toInt().coerceAtLeast(1)).coerceIn(1, count)
-    return "Page $page of $count"
-}
+private fun ItemProgressSummary.pageLabel(): String? = shownPage?.let { page -> "Page $page of $pageCount" }
 
 // A title that only numbers the chapter ("Chapter 4", "Part II", "IV."), which the label already does.
 private val GenericChapterTitle = Regex("""^(?:(?iu:chapter|ch\.|part|section|глава|часть)\s+)?(?:\d+|[IVXLCDM]+)\.?$""")

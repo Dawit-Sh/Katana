@@ -53,6 +53,7 @@ import com.example.unifiedreader.feature.reader.core.ReportReaderOpening
 import com.example.unifiedreader.feature.reader.core.findContextAncestor
 import com.example.unifiedreader.feature.reader.core.openingStep
 import com.example.unifiedreader.feature.reader.core.readerSessionChapterPreferences
+import com.example.unifiedreader.feature.reader.core.readerSessionShownPagePreferences
 import com.example.unifiedreader.feature.reader.core.rememberReaderDocument
 import com.example.unifiedreader.feature.reader.core.rememberReaderJumpBack
 import com.example.unifiedreader.feature.reader.core.rememberReaderOverlayState
@@ -334,7 +335,13 @@ fun EpubReaderScreen(
                 sessionStore.updateSession(
                     item = item,
                     pageCount = pageCount.takeIf { it > 0 },
-                    preferences = buildEpubPreferencesMap(readerPreferences) + readerSessionChapterPreferences(currentChapter),
+                    preferences = buildEpubPreferencesMap(readerPreferences) +
+                        readerSessionChapterPreferences(currentChapter) +
+                        // A place left as it came keeps its own share read: the page is the one shown there.
+                        readerSessionShownPagePreferences(
+                            page = savedPage,
+                            savedPercent = if (positionMovedSinceOpen) savedProgress else restoreProgressSnapshot?.percent,
+                        ),
                 )
             }
         },

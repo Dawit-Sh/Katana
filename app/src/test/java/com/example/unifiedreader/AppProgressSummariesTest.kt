@@ -8,6 +8,7 @@ import com.example.unifiedreader.feature.reader.core.ReaderChapterPosition
 import com.example.unifiedreader.feature.reader.core.ReaderProgressSnapshot
 import com.example.unifiedreader.feature.reader.core.ReaderSessionSnapshot
 import com.example.unifiedreader.feature.reader.core.readerSessionChapterPreferences
+import com.example.unifiedreader.feature.reader.core.readerSessionShownPagePreferences
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -39,6 +40,23 @@ class AppProgressSummariesTest {
         assertNull(summary.chapterTitle)
         assertEquals(6, summary.chapterCount)
         assertEquals(chapterStarts, summary.chapterStarts)
+    }
+
+    @Test
+    fun `a place from Grimmory shows the page the reader showed there`() {
+        // The Hole on his Pixel: Grimmory keeps 6.4%, the reader opened on page 6 of 78, the card said page 4.
+        val fromServer = ReaderProgressSnapshot(itemId = book.id, locatorType = LocatorType.CFI, percent = 0.064)
+        fun card(shown: Map<String, String>) = buildProgressSummaries(
+            items = listOf(book),
+            progressByItemId = mapOf(book.id to fromServer),
+            sessionByItemId = mapOf(book.id to ReaderSessionSnapshot(book.id, pageCount = 78, preferences = shown)),
+            localPageCountProvider = { 0 },
+        ).getValue(book.id).shownPage
+
+        assertEquals(6, card(readerSessionShownPagePreferences(page = 6, savedPercent = 0.064)))
+        // Another device moved the place on since: the page shown at the old place no longer counts.
+        assertEquals(5, card(readerSessionShownPagePreferences(page = 6, savedPercent = 0.05)))
+        assertEquals(5, card(emptyMap()))
     }
 
     private val chapterStarts = listOf(0f, 0.1f, 0.24f, 0.38f, 0.61f, 0.8f)

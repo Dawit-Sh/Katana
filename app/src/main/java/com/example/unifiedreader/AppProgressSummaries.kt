@@ -9,6 +9,7 @@ import com.example.unifiedreader.feature.reader.core.ReaderChapterPosition
 import com.example.unifiedreader.feature.reader.core.ReaderProgressSnapshot
 import com.example.unifiedreader.feature.reader.core.ReaderSessionSnapshot
 import com.example.unifiedreader.feature.reader.core.chapterPosition
+import com.example.unifiedreader.feature.reader.core.shownPageAt
 import kotlin.math.roundToInt
 
 internal fun buildProgressSummaries(
@@ -45,7 +46,8 @@ internal fun buildProgressSummaries(
         )
         LocatorType.CFI -> buildSavedLocationProgressSummary(
             percent = progress.percent,
-            page = progress.page,
+            // A place from Grimmory keeps no page: the page the reader showed at this very place, if it has.
+            page = progress.page?.takeIf { it > 0 } ?: sessionByItemId[item.id]?.shownPageAt(progress.percent),
             pageCount = sessionPageCount,
             isFinished = progress.isFinished,
             lastReadAtEpochMillis = progress.updatedAtEpochMillis,

@@ -56,7 +56,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlin.math.roundToInt
 import com.example.unifiedreader.core.model.LibraryFilterPanel
 import com.example.unifiedreader.core.model.LibraryFilterState
 import com.example.unifiedreader.core.model.ReadableItem
@@ -656,11 +655,7 @@ private fun UserListBook.rowLine(showSource: Boolean): String {
 }
 
 /** "Page 4 of 74", from the page the reader saved, else the share read. */
-private fun ItemProgressSummary.pageLine(): String? {
-    val count = pageCount?.takeIf { it > 0 } ?: return null
-    val page = (currentPage ?: (fraction.coerceIn(0f, 1f) * count).roundToInt()).coerceIn(1, count)
-    return "Page $page of $count"
-}
+private fun ItemProgressSummary.pageLine(): String? = shownPage?.let { page -> "Page $page of $pageCount" }
 
 /** The rules as the page's pills: each rule, then each group as one pill ("Any of: Genre: Poetry · Pages under 100"). */
 internal fun ListRules.pills(): List<String> = rules.map { it.pill() } + groups.filter { it.rules.isNotEmpty() }.map { group ->

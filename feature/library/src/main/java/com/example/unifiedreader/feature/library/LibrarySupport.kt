@@ -12,6 +12,7 @@ import com.example.unifiedreader.core.model.libraryPrimaryText
 import com.example.unifiedreader.core.model.librarySecondaryText
 import com.example.unifiedreader.core.model.ownIssueTitle
 import com.example.unifiedreader.core.model.volumeNumber
+import kotlin.math.floor
 import kotlin.math.roundToInt
 
 data class ItemProgressSummary(
@@ -32,14 +33,21 @@ data class ItemProgressSummary(
     val percentLabel: String
         get() = "${(fraction.coerceIn(0f, 1f) * 100f).roundToInt()}%"
 
-    val pageProgressLabel: String?
-        get() = pageCount?.takeIf { it > 0 }?.let { count ->
+    /**
+     * The page to show: the one the reader saved, else the page the share read falls on, as the readers
+     * count pages (page n starts (n - 1) / pages of the way in, so 5/78 of the way is page 6). A place that
+     * came from a server that keeps only a percentage has no saved page.
+     */
+    val shownPage: Int?
+        get() {
+            val count = pageCount?.takeIf { it > 0 } ?: return null
             val page = currentPage
-                ?: (fraction.coerceIn(0f, 1f) * count)
-                    .roundToInt()
-                    .coerceIn(1, count)
-            "${page.coerceIn(1, count)}/$count"
+                ?: (floor(fraction.coerceIn(0f, 1f).toDouble() * count + PAGE_EDGE_SLACK).toInt() + 1)
+            return page.coerceIn(1, count)
         }
+
+    val pageProgressLabel: String?
+        get() = shownPage?.let { page -> "$page/$pageCount" }
 
     val detailLabel: String
         get() = listOfNotNull(percentLabel, pageProgressLabel).joinToString(" · ")
@@ -207,3 +215,6 @@ internal fun String.filterLetter(
         "#"
     }
 }
+
+// A share read stored as a Float lands a hair before the page it starts (5/78 x 78 = 4.9999995).
+private const val PAGE_EDGE_SLACK = 0.001

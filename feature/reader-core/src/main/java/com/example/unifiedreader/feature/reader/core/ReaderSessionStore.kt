@@ -4,6 +4,7 @@ import com.example.unifiedreader.core.model.LocatorType
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SyncState
 import java.util.Locale
+import kotlin.math.abs
 import kotlinx.coroutines.flow.StateFlow
 
 data class ReaderProgressSnapshot(
@@ -71,6 +72,29 @@ val ReaderSessionSnapshot.chapterPosition: ReaderChapterPosition?
             starts = starts,
         )
     }
+
+/**
+ * The page the reader showed at a saved place, as "page@share": the share is the saved place's own, so the
+ * library uses the page only while that place is the saved one. A place that came from a server keeping
+ * only a percentage (Grimmory) has no page of its own, and its rounded percentage can't name the page the
+ * reader opens on.
+ */
+const val ReaderSessionShownPageKey = "reader.shownPage"
+
+fun readerSessionShownPagePreferences(page: Int, savedPercent: Double?): Map<String, String> = mapOf(
+    ReaderSessionShownPageKey to if (page > 0 && savedPercent != null) "$page@$savedPercent" else "",
+)
+
+/** The page the reader showed at the saved place whose share read is [savedPercent], if it has shown it. */
+fun ReaderSessionSnapshot.shownPageAt(savedPercent: Double?): Int? {
+    val parts = preferences[ReaderSessionShownPageKey]?.split('@')?.takeIf { it.size == 2 }
+    val page = parts?.get(0)?.toIntOrNull()?.takeIf { it > 0 }
+    val at = parts?.get(1)?.toDoubleOrNull()
+    return page.takeIf { savedPercent != null && at != null && abs(at - savedPercent) < SHOWN_PAGE_PERCENT_MATCH }
+}
+
+// Both shares are the same stored Double written out and read back.
+private const val SHOWN_PAGE_PERCENT_MATCH = 1e-9
 
 data class ReaderLocator(
     val locatorType: LocatorType,
