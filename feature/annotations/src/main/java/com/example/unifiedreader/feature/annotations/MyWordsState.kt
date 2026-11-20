@@ -92,7 +92,7 @@ object MyWordsCopy {
     const val WordActions = "Word actions"
     const val EmptyTitle = "No saved words yet"
     const val EmptyBody =
-        "While you read, select a word and pick Add to dictionary. It shows up here with the sentence you met it in."
+        "While you read, select a word, tap Dictionary, then Add to My words. It shows up here with the sentence you met it in."
     const val NothingFoundTitle = "No words match"
     const val NothingFoundBody = "Try other words, or All books."
     const val NotInLibrary = "This book isn't in your library now"

@@ -6,6 +6,7 @@ import com.example.unifiedreader.core.common.ApplicationScope
 import com.example.unifiedreader.core.network.buildHttpClient
 import com.example.unifiedreader.feature.annotations.WordMeanings
 import com.example.unifiedreader.feature.dictionary.Dictionary
+import com.example.unifiedreader.feature.dictionary.DictionaryPackInfo
 import com.example.unifiedreader.feature.dictionary.DictionaryWordMeanings
 import dagger.Module
 import dagger.Provides
@@ -18,7 +19,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 
-/** The offline English dictionary (downloaded in Settings › Reading); kept out of [AppModule]. */
+/** The offline English dictionary, built into the app; kept out of [AppModule]. */
 @Module
 @InstallIn(SingletonComponent::class)
 object AppDictionaryModule {
@@ -30,6 +31,8 @@ object AppDictionaryModule {
     ): Dictionary = Dictionary.create(
         directory = File(context.filesDir, "dictionary"),
         scope = applicationScope,
+        // Built into the APK (feature:dictionary assets); unpacked on the first lookup.
+        bundled = { context.assets.open(DictionaryPackInfo.English.fileName) },
         // GitHub's release host, on the internet: wait longer than the LAN client does.
         httpClient = buildHttpClient(
             connectTimeoutMillis = DICTIONARY_CONNECT_TIMEOUT_MILLIS,

@@ -180,11 +180,13 @@ private fun ReadingSettingsGroup(
                 onClick = { onOpenPage(SettingsPage.Translation) },
             )
         }
-        if (dictionary != null) {
+        // A built-in dictionary has nothing to download or remove, so it has no row here.
+        val dictionaryRow = dictionary?.takeUnless { it.isBuiltIn }
+        if (dictionaryRow != null) {
             if (newBookLook != null || translation != null) AppSettingsRowDivider()
-            DictionarySettingsRow(dictionary = dictionary)
+            DictionarySettingsRow(dictionary = dictionaryRow)
         }
-        ReaderComfortSettingsRows(leadingDivider = newBookLook != null || translation != null || dictionary != null)
+        ReaderComfortSettingsRows(leadingDivider = newBookLook != null || translation != null || dictionaryRow != null)
     }
 }
 

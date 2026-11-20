@@ -12,6 +12,7 @@ import io.ktor.client.request.url
 import io.ktor.http.isSuccess
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
 import java.security.MessageDigest
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -57,8 +58,9 @@ sealed interface DictionaryInstall {
 }
 
 /**
- * The offline English dictionary: downloaded on request into app storage, checked against its
- * SHA-256, then read from this device only. Nothing is built into the APK.
+ * The offline English dictionary, read from this device only. The app carries it inside the APK
+ * ([bundled], about 8 MB compressed): the first lookup unpacks it into app storage and checks its
+ * SHA-256. Without [bundled] it is downloaded on request instead.
  */
 class Dictionary(
     private val directory: File,
@@ -67,7 +69,12 @@ class Dictionary(
     private val pack: DictionaryPackInfo = DictionaryPackInfo.English,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val openPack: (File) -> DictionarySource = ::SqliteDictionaryPack,
+    private val bundled: (() -> InputStream)? = null,
 ) {
+    /** Whether the app carries the dictionary itself, so there is nothing to download or remove. */
+    val isBuiltIn: Boolean
+        get() = bundled != null
+
     private val packFile = File(directory, pack.fileName)
     private val partial = PartialDownloadFile(File(directory, pack.fileName + PART_SUFFIX))
     private val _state = MutableStateFlow(initialState())
@@ -121,10 +128,21 @@ class Dictionary(
     /** Looks a selected word up off the main thread. */
     suspend fun lookUp(word: String): DictionaryLookup = withContext(ioDispatcher) {
         val source = openLock.withLock {
+            if (!packFile.isFile) unpackBundled()
             open ?: if (packFile.isFile) openPack(packFile).also { open = it } else null
         } ?: return@withContext DictionaryLookup.NotInstalled
         source.lookUp(word)?.let(DictionaryLookup::Found)
             ?: DictionaryLookup.NotFound(WordForms.normalize(word).ifEmpty { word.trim() })
+    }
+
+    /** The first lookup copies the built-in pack out of the APK, checked like a download. Fails quietly. */
+    private fun unpackBundled() {
+        val open = bundled ?: return
+        runCatching {
+            directory.mkdirs()
+            open().use { input -> partial.dataFile.outputStream().use { output -> input.copyTo(output, HASH_BUFFER_SIZE) } }
+            _state.value = finishDownload()
+        }.onFailure { partial.delete() }
     }
 
     private fun finishDownload(): DictionaryInstall {
@@ -159,9 +177,15 @@ class Dictionary(
 
     companion object {
         /** The app's dictionary, downloading with [httpClient] (which follows GitHub's redirect). */
-        fun create(directory: File, scope: CoroutineScope, httpClient: HttpClient): Dictionary = Dictionary(
+        fun create(
+            directory: File,
+            scope: CoroutineScope,
+            httpClient: HttpClient,
+            bundled: (() -> InputStream)? = null,
+        ): Dictionary = Dictionary(
             directory = directory,
             scope = scope,
+            bundled = bundled,
             download = { target, address ->
                 httpClient.downloadResumably(
                     target = target,

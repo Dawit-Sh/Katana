@@ -47,6 +47,9 @@ object DictionaryCopy {
     fun notInstalled(sizeBytes: Long) =
         "Download the English dictionary (${megabytes(sizeBytes)}) in Settings to look words up on this device."
 
+    /** A built-in dictionary that couldn't be unpacked (usually a full device). */
+    const val BuiltInUnavailable = "The dictionary couldn't be set up on this device. Free some space and try again."
+
     fun megabytes(bytes: Long): String = "${(bytes + MEGABYTE / 2) / MEGABYTE} MB"
 
     private const val MEGABYTE = 1_048_576L
@@ -90,13 +93,17 @@ fun ReaderDictionaryOverlay(
                 .padding(horizontal = AppLayout.inset),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            DictionaryBody(result = result, sizeBytes = dictionary?.downloadSizeBytes ?: DictionaryPackInfo.English.sizeBytes)
+            DictionaryBody(
+                result = result,
+                sizeBytes = dictionary?.downloadSizeBytes ?: DictionaryPackInfo.English.sizeBytes,
+                builtIn = dictionary?.isBuiltIn == true,
+            )
         }
         Row(
             modifier = Modifier.fillMaxWidth().padding(AppLayout.inset),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (result == DictionaryLookup.NotInstalled && openSettings != null) {
+            if (result == DictionaryLookup.NotInstalled && openSettings != null && dictionary?.isBuiltIn != true) {
                 AppButton(onClick = {
                     onDismiss()
                     openSettings()
@@ -113,12 +120,14 @@ fun ReaderDictionaryOverlay(
 }
 
 @Composable
-private fun DictionaryBody(result: DictionaryLookup?, sizeBytes: Long) {
+private fun DictionaryBody(result: DictionaryLookup?, sizeBytes: Long, builtIn: Boolean = false) {
     val supporting = MaterialTheme.colorScheme.onSurfaceVariant
     when (result) {
         null -> Text(DictionaryCopy.Looking, style = MaterialTheme.typography.bodyMedium, color = supporting)
-        DictionaryLookup.NotInstalled ->
-            Text(DictionaryCopy.notInstalled(sizeBytes), style = MaterialTheme.typography.bodyMedium)
+        DictionaryLookup.NotInstalled -> Text(
+            if (builtIn) DictionaryCopy.BuiltInUnavailable else DictionaryCopy.notInstalled(sizeBytes),
+            style = MaterialTheme.typography.bodyMedium,
+        )
         is DictionaryLookup.NotFound ->
             Text(DictionaryCopy.notFound(result.word), style = MaterialTheme.typography.bodyMedium)
         is DictionaryLookup.Found -> result.entry.meanings.forEach { meaning ->

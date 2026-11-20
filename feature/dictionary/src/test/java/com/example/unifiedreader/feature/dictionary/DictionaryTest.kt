@@ -191,4 +191,36 @@ class DictionaryTest {
         assertEquals("my own words", meanings.meaningOf("geese", stored = "my own words", language = "en"))
         assertEquals("a race run on foot", meanings.meaningOf("run", stored = " ", language = "en"))
     }
+
+    @Test
+    fun `a dictionary built into the app unpacks on the first lookup, with nothing to download`() = runTest {
+        val dictionary = Dictionary(
+            directory = File(folder.root, "dictionary"),
+            scope = this,
+            download = { _, _ -> error("a built-in dictionary never downloads") },
+            pack = info,
+            ioDispatcher = Dispatchers.Unconfined,
+            bundled = { packBytes.inputStream() },
+        )
+
+        assertTrue(dictionary.isBuiltIn)
+        assertTrue(dictionary.lookUp("geese") is DictionaryLookup.Found)
+        assertTrue(dictionary.state.value is DictionaryInstall.Installed)
+        assertTrue(requested.isEmpty())
+    }
+
+    @Test
+    fun `a damaged built-in copy is not used, and the lookup says the dictionary isn't there`() = runTest {
+        val dictionary = Dictionary(
+            directory = File(folder.root, "dictionary"),
+            scope = this,
+            download = { _, _ -> error("a built-in dictionary never downloads") },
+            pack = info,
+            ioDispatcher = Dispatchers.Unconfined,
+            bundled = { packBytes.copyOf(packBytes.size / 2).inputStream() },
+        )
+
+        assertEquals(DictionaryLookup.NotInstalled, dictionary.lookUp("geese"))
+        assertFalse(File(folder.root, "dictionary/katana-dictionary-en-1.sqlite").exists())
+    }
 }

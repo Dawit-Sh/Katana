@@ -64,7 +64,7 @@ object BookmarksCopy {
     const val FromEveryBook = "from every book"
     const val RoundDoneTitle = "Round done"
     const val NoWordsTitle = "No saved words yet"
-    const val NoWordsBody = "Select a word in a book, then Add to dictionary. It comes back here as a card."
+    const val NoWordsBody = "Select a word in a book, tap Dictionary, then Add to My words. It comes back here as a card."
 
     /** "6 books · 24 highlights · 5 bookmarks · 12 saved words". */
     fun librarySummary(library: MarkedLibrary): String = listOf(

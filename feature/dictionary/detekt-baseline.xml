@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>LongParameterList:Dictionary.kt$Dictionary$( private val directory: File, private val scope: CoroutineScope, private val download: suspend (target: PartialDownloadFile, url: String) -&gt; Unit, private val pack: DictionaryPackInfo = DictionaryPackInfo.English, private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO, private val openPack: (File) -&gt; DictionarySource = ::SqliteDictionaryPack, private val bundled: (() -&gt; InputStream)? = null, )</ID>
+  </CurrentIssues>
+</SmellBaseline>
