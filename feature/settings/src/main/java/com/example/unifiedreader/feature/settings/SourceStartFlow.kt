@@ -125,6 +125,15 @@ fun SourceStartFlow(
     }
 }
 
+/** The line between two choices, starting where their text starts. */
+@Composable
+private fun StartChoiceDivider() {
+    AppDivider(
+        modifier = Modifier.padding(start = 76.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AppDividerDefaults.alpha),
+    )
+}
+
 /** Books on this device: a folder picked once, the whole phone, or files one by one. */
 @Composable
 private fun DeviceStartChoices(
@@ -132,12 +141,6 @@ private fun DeviceStartChoices(
     onAddFolder: (() -> Unit)?,
     onFindOnPhone: (() -> Unit)?,
 ) {
-    val divider = @Composable {
-        AppDivider(
-            modifier = Modifier.padding(start = 76.dp),
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AppDividerDefaults.alpha),
-        )
-    }
     if (onAddFolder != null) {
         SourceStartChoice(
             icon = SourceType.LOCAL.navigationIcon(),
@@ -145,7 +148,7 @@ private fun DeviceStartChoices(
             supporting = "Pick a folder once: its books show here, and new ones as you add them",
             onClick = onAddFolder,
         )
-        divider()
+        StartChoiceDivider()
     }
     if (onFindOnPhone != null) {
         SourceStartChoice(
@@ -154,7 +157,7 @@ private fun DeviceStartChoices(
             supporting = "Katana looks through the phone for books (needs All files access)",
             onClick = onFindOnPhone,
         )
-        divider()
+        StartChoiceDivider()
     }
     SourceStartChoice(
         icon = SourceType.LOCAL.navigationIcon(),
@@ -193,7 +196,7 @@ private fun SourceStartChoices(
         Spacer(modifier = Modifier.height(30.dp))
         AppPanel(modifier = Modifier.fillMaxWidth()) {
             servers.forEachIndexed { index, entry ->
-                if (index > 0) AppDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AppDividerDefaults.alpha))
+                if (index > 0) StartChoiceDivider()
                 SourceStartChoice(
                     icon = entry.sourceType.navigationIcon(),
                     title = entry.sourceType.displayName(),
@@ -201,7 +204,7 @@ private fun SourceStartChoices(
                     onClick = { onServerSelected(entry.sourceType) },
                 )
             }
-            if (servers.isNotEmpty()) AppDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AppDividerDefaults.alpha))
+            if (servers.isNotEmpty()) StartChoiceDivider()
             DeviceStartChoices(onImportFile = onImportFile, onAddFolder = onAddFolder, onFindOnPhone = onFindOnPhone)
         }
         if (mode == SourceStartMode.FirstLaunch) {

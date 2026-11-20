@@ -5,7 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,8 +42,8 @@ internal fun BookFoldersDialog(
                         "books out of the library; the files stay on the phone.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 8.dp),
                 )
+                Spacer(modifier = Modifier.height(8.dp))
                 if (places.wholePhone) {
                     BookFolderRow(label = "The whole phone", action = "Stop", onAction = onStopPhone)
                 }

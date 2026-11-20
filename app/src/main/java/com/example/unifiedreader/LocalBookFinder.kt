@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.DocumentsContract
+import com.example.unifiedreader.core.model.runSuspendCatching
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -75,13 +76,13 @@ class LocalBookFinder(private val context: Context) {
         // The whole phone holds the folders too: searched once, so no book comes in twice.
         val wholePhone = places.findsOnWholePhone && hasWholePhoneAccess(context)
         if (!wholePhone) places.folders.forEach { tree ->
-            runCatching { folderBooks(tree) }.onSuccess { found ->
+            runSuspendCatching { folderBooks(tree) }.onSuccess { found ->
                 books += found
                 read += LocalBookPlace.Folder(tree)
             }
         }
         if (wholePhone) {
-            runCatching { phoneBooks() }.onSuccess { found ->
+            runSuspendCatching { phoneBooks() }.onSuccess { found ->
                 books += found
                 read += LocalBookPlace.WholePhone
             }
@@ -229,7 +230,7 @@ class LocalBookRefresher(
         val added = search.books.filterNot { book -> book.toString() in knownUris }.count { book ->
             val file = finder.fingerprint(book)
             if (file != null && file in knownFiles) return@count false
-            val imported = runCatching { library.import(book) }.getOrNull() != null
+            val imported = runSuspendCatching { library.import(book) }.getOrNull() != null
             if (imported && file != null) knownFiles += file
             imported
         }
