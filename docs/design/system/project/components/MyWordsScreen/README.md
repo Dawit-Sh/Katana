@@ -11,7 +11,7 @@ Every saved word in one list, each with the sentence it was met in. Katana's des
   - where it was met: the sentence in Literata (`body-medium`, `on-surface-variant`, up to six lines, cut around the word so it always shows) with the word in bold `on-surface`;
   - its note in the note box, when it has one;
   - "A Christmas Carol · p. 11 · today, 11:40 AM" (`label-medium`; the page is the reader's page there, else how far through the book; the time follows the device's 12 or 24 hours).
-  - Under 600 dp these stack. From 600 dp the word and its meaning take the start 42% and the rest sits beside them.
+  - Under 600 dp these stack. From 600 dp the word and its meaning take the start 42% and the rest sits beside them; a larger text size needs that much more room (at 200% the Fire stacks too).
 - **A tap** opens the book at the sentence (as a highlight opens from Bookmarks); a word saved without a place opens the book where it was left; a book no longer in the library says so in a toast.
 - **A long press** opens an `AppMenu`: **Look it up** (`search`, a web search for the word), **Edit note** (`edit`, the "What it means" dialog) and **Remove** (`delete`; the toast "Word removed" has **Undo**, which brings the word back exactly: its sentence, place, note and review state).
 - **Empty**: "No saved words yet" with "While you read, select a word and pick Add to dictionary. It shows up here with the sentence you met it in." A search or filter that finds nothing says "No words match".

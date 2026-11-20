@@ -31,7 +31,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -52,7 +54,6 @@ import com.example.unifiedreader.ui.components.AppScreenHost
 import com.example.unifiedreader.ui.components.AppSearchField
 import com.example.unifiedreader.ui.components.AppWindowWidth
 import com.example.unifiedreader.ui.components.appGutter
-import com.example.unifiedreader.ui.components.currentAppWindowWidth
 
 /**
  * My words: every saved word, the newest first, each with its meaning when one is known, the
@@ -122,7 +123,8 @@ private fun MyWordsListPage(
     val scrolled by remember { derivedStateOf { listState.canScrollBackward } }
     LaunchedEffect(scrolled) { state.scrolled = scrolled }
     val shown = remember(list, state.query, state.bookId) { list.shown(state.query, state.bookId) }
-    val wide = currentAppWindowWidth() != AppWindowWidth.Compact
+    // Side by side from 600 dp, as long as the text size leaves room: at 200% a 600 dp window stacks.
+    val wide = LocalConfiguration.current.screenWidthDp >= AppWindowWidth.MediumMinDp * LocalDensity.current.fontScale
     val gutter = appGutter()
     LazyColumn(
         state = listState,
@@ -247,8 +249,8 @@ private fun checkMark(): @Composable () -> Unit = {
 
 /**
  * One saved word: the word in the book's face and its meaning, the sentence it was met in, its note,
- * then its book, page and when it was saved. On a phone these stack; from 600 dp the word and its
- * meaning sit beside the rest. A tap opens the book there; a long press opens its menu.
+ * then its book, page and when it was saved. On a phone these stack; from 600 dp (at the usual text
+ * size) the word and its meaning sit beside the rest. A tap opens the book there; a long press opens its menu.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
