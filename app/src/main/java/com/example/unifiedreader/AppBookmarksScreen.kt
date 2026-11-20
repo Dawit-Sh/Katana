@@ -231,7 +231,7 @@ private class AppBookmarksActions(
     private fun open(book: AnnotatedBook, before: () -> Unit) {
         val item = itemsById[book.itemId]
         if (item == null) {
-            toasts?.show(AppToastMessage(text = NOT_IN_LIBRARY, icon = AppToastIcon.Error))
+            toasts?.show(AppToastMessage(text = BookmarksCopy.BookNotHere, icon = AppToastIcon.Error))
         } else {
             before()
             onOpenBook(item)
@@ -240,6 +240,5 @@ private class AppBookmarksActions(
 
     private companion object {
         const val PERCENT = 100
-        const val NOT_IN_LIBRARY = "This book isn't in your library now"
     }
 }
