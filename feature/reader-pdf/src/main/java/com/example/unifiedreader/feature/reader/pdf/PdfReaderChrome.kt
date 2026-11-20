@@ -47,7 +47,7 @@ import com.example.unifiedreader.feature.annotations.PageBookmarkCopy
 import com.example.unifiedreader.feature.annotations.PageBookmarks
 import com.example.unifiedreader.feature.annotations.PageMarksPanelBody
 import com.example.unifiedreader.feature.annotations.ReaderHighlight
-import com.example.unifiedreader.feature.annotations.pageTitle
+import com.example.unifiedreader.feature.annotations.pageIndexTitle
 import com.example.unifiedreader.feature.reader.core.ReaderBarButton
 import com.example.unifiedreader.feature.reader.core.ReaderChromeDefaults
 import com.example.unifiedreader.feature.reader.core.ReaderChromeFrame
@@ -459,7 +459,7 @@ private fun PdfSearchPanel(
     onDismissRequest: () -> Unit,
 ) {
     val results = controls.search.results
-    val groups = remember(results) { readerSearchGroups(results) { result -> pageTitle(result.pageIndex) } }
+    val groups = remember(results) { readerSearchGroups(results) { result -> pageIndexTitle(result.pageIndex) } }
     ReaderSearchPanel(
         isOpen = isOpen,
         slot = slot,
@@ -481,6 +481,8 @@ internal class PdfMarksPanel(
     val export: BookMarksExport,
     val highlights: List<ReaderHighlight>,
     val onJumpToPage: (Int) -> Unit,
+    /** The pages have text to highlight (a PDF, not a DjVu book). */
+    val hasText: Boolean,
 )
 
 /** The marks panel at the end edge, as the EPUB reader's: open at the marks around page [pageIndex]. */
@@ -504,7 +506,8 @@ private fun PdfMarksPanelSheet(
             bookmarks = panel.bookmarks,
             export = panel.export,
             highlights = panel.highlights,
-            emptyText = BookMarksPanelCopy.EmptyPages,
+            emptyText = if (panel.hasText) BookMarksPanelCopy.EmptyPages else BookMarksPanelCopy.EmptyPictures,
+            hasText = panel.hasText,
             pageIndex = pageIndex,
             pageCount = pageCount,
             onJumpToPage = panel.onJumpToPage,

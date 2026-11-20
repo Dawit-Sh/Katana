@@ -17,6 +17,8 @@ fun ColumnScope.PageMarksPanelBody(
     export: BookMarksExport,
     highlights: List<ReaderHighlight>,
     emptyText: String,
+    // Whether the book's pages have text to highlight (a PDF); a comic or a DjVu book counts only bookmarks.
+    hasText: Boolean,
     pageIndex: Int,
     pageCount: Int,
     onJumpToPage: (Int) -> Unit,
@@ -46,5 +48,9 @@ fun ColumnScope.PageMarksPanelBody(
         emptyText = emptyText,
         onDismissRequest = onDismissRequest,
         here = if (pageCount > 0) pageIndex.toDouble() / pageCount else null,
+        subtitle = listOfNotNull(
+            MarkCounts.highlights(highlights.size).takeIf { hasText },
+            MarkCounts.bookmarks(bookmarks.all.size),
+        ).joinToString(" · "),
     )
 }

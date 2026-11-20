@@ -263,6 +263,7 @@ private fun PdfReaderBars(
                     export = export,
                     highlights = parts.marks?.highlights.orEmpty(),
                     onJumpToPage = onJump,
+                    hasText = parts.marks != null,
                 )
             }
         },

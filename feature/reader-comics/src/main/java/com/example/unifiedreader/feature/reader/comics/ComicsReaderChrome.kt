@@ -204,6 +204,7 @@ private fun ComicsMarksPanel(
             export = export,
             highlights = emptyList(),
             emptyText = BookMarksPanelCopy.EmptyPictures,
+            hasText = false,
             pageIndex = pageIndex,
             pageCount = pageCount,
             onJumpToPage = { page -> onPageSelected(page.coerceIn(0, (pageCount - 1).coerceAtLeast(0))) },

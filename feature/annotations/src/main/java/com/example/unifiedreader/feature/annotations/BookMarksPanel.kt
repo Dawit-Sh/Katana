@@ -115,10 +115,12 @@ fun ColumnScope.BookMarksPanelBody(
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
     here: Double? = null,
+    // The counts under the heading; a reader without some kinds of marks leaves them out.
+    subtitle: String = BookMarksPanelCopy.count(highlights.size, words.size, bookmarks.size),
 ) {
     AppPanelHeader(
         title = BookMarksPanelCopy.Panel,
-        subtitle = BookMarksPanelCopy.count(highlights.size, words.size, bookmarks.size),
+        subtitle = subtitle,
         onClose = onDismissRequest,
     )
     var query by rememberSaveable { mutableStateOf("") }

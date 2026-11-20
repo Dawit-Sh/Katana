@@ -44,7 +44,7 @@ fun pageHighlightPlace(spot: PageTextSpot, pageCount: Int, pageCharCount: Int): 
             .put(EndKey, spot.end)
             .put(RectsKey, JSONArray().apply { spot.rects.forEach { rect -> put(rect.toJson()) } })
             .toString(),
-        chapterTitle = pageTitle(spot.pageIndex),
+        chapterTitle = pageIndexTitle(spot.pageIndex),
         progression = if (pageCount > 0) ((spot.pageIndex + withinPage.coerceIn(0.0, 1.0)) / pageCount).coerceIn(0.0, 1.0) else 0.0,
     )
 }
@@ -68,7 +68,7 @@ fun pageTextSpotOf(locatorJson: String): PageTextSpot? = try {
 }
 
 /** What a page highlight's place calls its page, as the Bookmarks page and the export show it. */
-fun pageTitle(pageIndex: Int): String = "Page ${pageIndex + 1}"
+fun pageIndexTitle(pageIndex: Int): String = pageTitle(pageIndex + 1)
 
 private fun pageHref(pageIndex: Int): String = "page:$pageIndex"
 

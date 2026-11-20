@@ -30,7 +30,7 @@ class BookMarksPanelTest {
         // As pageHighlightPlace names it (its locator needs Android's JSON, so it's left out here).
         val rows = bookMarksRows(
             bookmarks = emptyList(),
-            highlights = listOf(highlightAt("p", AnnotationPlace("page:4", "{}", pageTitle(4), 0.4))),
+            highlights = listOf(highlightAt("p", AnnotationPlace("page:4", "{}", pageIndexTitle(4), 0.4))),
             words = emptyList(),
         )
 
