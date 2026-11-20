@@ -112,3 +112,15 @@ internal fun pageRectToScreen(page: Rect, rect: PageTextRect): Rect = Rect(
     right = page.left + rect.right * page.width,
     bottom = page.top + rect.bottom * page.height,
 )
+
+/** [shown], a line of words running [turn], as its box would be with the words running left to right. */
+internal fun readingLine(shown: Rect, turn: Int): Rect = if (quarterTurn(turn) % 2 == 0) {
+    shown
+} else {
+    Rect(
+        left = shown.center.x - shown.height / 2f,
+        top = shown.center.y - shown.width / 2f,
+        right = shown.center.x + shown.height / 2f,
+        bottom = shown.center.y + shown.width / 2f,
+    )
+}

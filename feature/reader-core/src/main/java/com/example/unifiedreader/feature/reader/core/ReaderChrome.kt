@@ -43,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -144,13 +145,20 @@ fun ReaderTopBar(
 /**
  * The title's room in a top bar [barWidth] wide: clear of the buttons on either side, so it stays centred on the
  * bar, while that leaves it room for a few words; on a narrow bar with several buttons at the end (a phone), the
- * room between Back and the end's buttons ([actionsWidth]), so the title still shows.
+ * room between Back and the end's buttons ([actionsWidth]), so the title still shows. Where even that is less than
+ * a button's width (a very narrow screen or the largest display size), the title isn't drawn rather than showing a
+ * lone "…" that would read as a button; screen readers still read it.
  */
 private fun Modifier.readerTitleRoom(barWidth: Dp, actionsWidth: Dp): Modifier {
     val button = ReaderChromeDefaults.buttonSize
     val centred = maxOf(button * 2, actionsWidth)
     val fitsCentred = barWidth <= 0.dp || barWidth - centred * 2 >= button * 2
-    return if (fitsCentred) padding(horizontal = centred) else padding(start = button, end = actionsWidth)
+    val fitsBeside = barWidth - button - actionsWidth >= button
+    return when {
+        fitsCentred -> padding(horizontal = centred)
+        fitsBeside -> padding(start = button, end = actionsWidth)
+        else -> padding(start = button, end = actionsWidth).alpha(0f)
+    }
 }
 
 /**
