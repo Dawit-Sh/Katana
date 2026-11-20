@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -160,7 +161,8 @@ fun ReaderDock(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(ReaderDockDefaults.rowHeight)
+                // At least the 60 dp row; taller when very large text puts the labels over the slider.
+                .heightIn(min = ReaderDockDefaults.rowHeight)
                 .padding(start = 9.dp, end = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
