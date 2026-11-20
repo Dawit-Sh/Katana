@@ -33,3 +33,6 @@ output/
 
 # Written by the Website workflow from the newest release
 site/latest.json
+
+# Written by the Website workflow from Katana Desk's newest release
+site/desk/latest.json
