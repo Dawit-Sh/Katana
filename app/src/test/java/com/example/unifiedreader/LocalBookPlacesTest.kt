@@ -15,6 +15,16 @@ class LocalBookPlacesTest {
         assertEquals("SD card", folderLabelOf("1A2B-3C4D:"))
     }
 
+    // The Fire (Android 9), 2026-11-20: a folder picked under Downloads read "SD card · storage/emulated/0/Download/…".
+    @Test
+    fun `a folder picked under Downloads on older Android reads as its path`() {
+        assertEquals("Download/Katana-formats-test", folderLabelOf("raw:/storage/emulated/0/Download/Katana-formats-test"))
+        assertEquals("SD card · Books", folderLabelOf("raw:/storage/1A2B-3C4D/Books"))
+        assertEquals("The phone's storage", folderLabelOf("raw:/storage/emulated/0"))
+        assertEquals("Download", folderLabelOf("downloads"))
+        assertEquals("1234", folderLabelOf("msd:1234"))
+    }
+
     @Test
     fun `only book files are looked at`() {
         listOf("Frankenstein.mobi", "a.EPUB", "scan.djvu", "x.djv", "c.cbz", "c.CBR", "p.pdf", "k.azw3", "k.azw", "w.fb2")

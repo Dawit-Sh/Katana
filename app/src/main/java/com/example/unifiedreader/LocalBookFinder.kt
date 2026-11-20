@@ -173,10 +173,33 @@ internal fun folderLabelOf(treeDocumentId: String): String {
     val path = treeDocumentId.substringAfter(':', "").trim('/')
     return when {
         volume == "primary" -> path.ifEmpty { "The phone's storage" }
+        // Picked under Downloads on older Android (the Fire): a file path, "raw:/storage/emulated/0/Download/…".
+        volume == "raw" -> storagePathLabel(path)
+        treeDocumentId == "downloads" -> "Download"
+        !SdCardVolume.matches(volume) -> path.ifEmpty { treeDocumentId }
         path.isEmpty() -> "SD card"
         else -> "SD card · $path"
     }
 }
+
+// "storage/emulated/0/Download/Books" → "Download/Books"; "storage/1A2B-3C4D/Books" → "SD card · Books".
+private fun storagePathLabel(path: String): String {
+    val parts = path.split('/').filter(String::isNotEmpty)
+    val onPhone = parts.take(PHONE_STORAGE_PARTS).let { it.size == PHONE_STORAGE_PARTS && it[0] == "storage" && it[1] == "emulated" }
+    val onCard = parts.size >= CARD_STORAGE_PARTS && parts[0] == "storage" && SdCardVolume.matches(parts[1])
+    return when {
+        onPhone -> parts.drop(PHONE_STORAGE_PARTS).joinToString("/").ifEmpty { "The phone's storage" }
+        onCard -> parts.drop(CARD_STORAGE_PARTS).joinToString("/").let { rest -> if (rest.isEmpty()) "SD card" else "SD card · $rest" }
+        else -> path
+    }
+}
+
+// "storage/emulated/0" before a path on the phone, "storage/1A2B-3C4D" before one on a card.
+private const val PHONE_STORAGE_PARTS = 3
+private const val CARD_STORAGE_PARTS = 2
+
+// An SD card's volume id, "1A2B-3C4D".
+private val SdCardVolume = Regex("^[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}$")
 
 fun folderLabel(tree: Uri): String =
     runCatching { folderLabelOf(DocumentsContract.getTreeDocumentId(tree)) }.getOrNull() ?: tree.lastPathSegment.orEmpty()
