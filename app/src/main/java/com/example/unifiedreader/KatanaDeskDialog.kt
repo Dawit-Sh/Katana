@@ -172,7 +172,7 @@ private fun PairDialog(state: PairState, onPair: (String, String) -> Unit, onDis
                     onValueChange = { typed -> code = typed.filter(Char::isDigit).take(CODE_DIGITS) },
                     label = { Text("Code on the PC") },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 state.problem?.let { problem ->

@@ -156,3 +156,13 @@ internal val EpubSecondColumnBlankScript = """
       return document.getElementById('readium-virtual-page') !== null;
     })();
 """.trimIndent()
+
+/** A page as the reader shows it: its file and the page inside it (-1 when the navigator doesn't say). */
+internal data class EpubShownPage(val href: String?, val pageIndex: Int)
+
+/**
+ * Whether the page shown after a touch is another page than the one the book opened on ([opened]). A page the
+ * navigator can't number (scrolling) counts as moved, as before, so scrolling still saves.
+ */
+internal fun epubPageMovedSinceOpen(opened: EpubShownPage?, shown: EpubShownPage): Boolean =
+    opened == null || shown.pageIndex < 0 || opened.pageIndex < 0 || opened != shown

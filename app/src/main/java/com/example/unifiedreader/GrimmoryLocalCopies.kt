@@ -33,6 +33,9 @@ enum class LocalMarksHome {
     /** A copy of a Grimmory book: its marks sync with it. */
     SyncsWithGrimmory,
 
+    /** The same file is in Katana Desk on the PC: its place and marks sync there. */
+    SyncsWithKatanaDesk,
+
     /** Checked: no Grimmory book is this file (or it was, and the file changed). */
     NotOnGrimmory,
 
@@ -102,6 +105,7 @@ class GrimmoryLocalCopies @Inject constructor(
 
     /** What [item]'s page says about its marks. */
     fun marksHome(item: ReadableItem, link: LocalServerLinkEntity?): LocalMarksHome = when {
+        desk.isLinked(item.id) -> LocalMarksHome.SyncsWithKatanaDesk
         !item.format.sharesBookmarksWithGrimmory() || credentialStore.sessionFlow.value == null -> LocalMarksHome.OnThisDevice
         link?.state == LOCAL_LINK_LINKED -> LocalMarksHome.SyncsWithGrimmory
         link != null -> LocalMarksHome.NotOnGrimmory

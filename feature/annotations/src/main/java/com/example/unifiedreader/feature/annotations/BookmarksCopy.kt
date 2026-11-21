@@ -37,6 +37,8 @@ object BookmarksCopy {
     const val MarksSyncWithGrimmory = "Highlights and bookmarks sync with Grimmory."
     const val BookmarksSyncWithGrimmory = "Bookmarks sync with Grimmory."
     const val MarksNotOnGrimmory = "Not on Grimmory: highlights and bookmarks stay on this device."
+    const val MarksSyncWithKatanaDesk = "Your place, highlights and bookmarks sync with Katana Desk."
+    const val BookmarksSyncWithKatanaDesk = "Your place and bookmarks sync with Katana Desk."
     const val MarksOnThisDevice = "Highlights and bookmarks stay on this device."
     const val NothingInBook = "None of this book's marks match."
     const val EmptyBody = "Bookmark a page, highlight words or add a word to your dictionary while you read. They all gather here."

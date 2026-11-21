@@ -22,6 +22,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -31,6 +32,7 @@ class AppBookPageBookmarksViewModel @Inject constructor(
     private val store: ReaderAnnotationStore,
     private val jumps: AnnotationJumps,
     private val localCopies: GrimmoryLocalCopies,
+    private val desk: KatanaDeskConnection,
 ) : ViewModel() {
     fun bookmarks(itemId: String): Flow<List<ReaderBookmark>> = store.bookmarks(itemId)
 
@@ -39,7 +41,9 @@ class AppBookPageBookmarksViewModel @Inject constructor(
         if (item.sourceType != SourceType.LOCAL) {
             flowOf(null)
         } else {
-            localCopies.linkStates.map { links -> localCopies.marksHome(item, links[item.id]).copy(item.format) }.distinctUntilChanged()
+            // A link to Katana Desk can form while the page shows (a sync), so its links are followed too.
+            combine(localCopies.linkStates, desk.links) { links, _ -> localCopies.marksHome(item, links[item.id]).copy(item.format) }
+                .distinctUntilChanged()
         }
 
     /** Checks a file here against Grimmory now, so its page says where its marks live. */
@@ -83,6 +87,8 @@ internal fun rememberBookPageBookmarks(
 private fun LocalMarksHome.copy(format: FormatType): String = when (this) {
     LocalMarksHome.SyncsWithGrimmory ->
         if (format == FormatType.EPUB) BookmarksCopy.MarksSyncWithGrimmory else BookmarksCopy.BookmarksSyncWithGrimmory
+    LocalMarksHome.SyncsWithKatanaDesk ->
+        if (format == FormatType.EPUB) BookmarksCopy.MarksSyncWithKatanaDesk else BookmarksCopy.BookmarksSyncWithKatanaDesk
     LocalMarksHome.NotOnGrimmory -> BookmarksCopy.MarksNotOnGrimmory
     LocalMarksHome.OnThisDevice -> BookmarksCopy.MarksOnThisDevice
 }

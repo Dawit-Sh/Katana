@@ -128,6 +128,10 @@ fun EpubReaderScreen(
     // where it was. Saving them would stamp it as read now, over newer progress from another device.
     var readerTouched by remember(item.id) { mutableStateOf(false) }
     var positionMovedSinceOpen by rememberSaveable(item.id) { mutableStateOf(false) }
+    // The page shown before the first touch. A touch alone (showing the bars, a long press) doesn't move the
+    // place: a page that only lays out again after it reports the page's start, one page behind a place that
+    // came from another device, which that device would then be asked to go back to.
+    var untouchedPage by remember(item.id) { mutableStateOf<EpubShownPage?>(null) }
     var restoreProgressSnapshot by remember(item.id) {
         mutableStateOf(progressSnapshot)
     }
@@ -642,7 +646,12 @@ fun EpubReaderScreen(
                                 currentPage = reportedPage
                             }
                             framePage = resourcePage
-                            if (readerTouched) positionMovedSinceOpen = true
+                            val shownPage = EpubShownPage(currentHref, resourcePage.pageIndex)
+                            if (!readerTouched) {
+                                untouchedPage = shownPage
+                            } else if (epubPageMovedSinceOpen(untouchedPage, shownPage)) {
+                                positionMovedSinceOpen = true
+                            }
                             if (resourcePage.totalPages != null) {
                                 secondSpreadPage = state.publication
                                     .epubSecondSpreadPage(locator, resourcePage, bookProgress.resourcePositions)
