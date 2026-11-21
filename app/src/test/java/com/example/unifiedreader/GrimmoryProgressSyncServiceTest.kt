@@ -234,7 +234,12 @@ class GrimmoryProgressSyncServiceTest {
             bookEntriesById = mapOf(
                 "book-1" to GrimmoryBookCatalogEntry(
                     item = item,
-                    progress = ReadingProgress(itemId = item.id, locatorType = LocatorType.PERCENT, percent = 0.4, updatedAtEpochMillis = 10L),
+                    progress = ReadingProgress(
+                        itemId = item.id,
+                        locatorType = LocatorType.PERCENT,
+                        percent = 0.4,
+                        updatedAtEpochMillis = 10L,
+                    ),
                     readStatus = "PAUSED",
                 ),
             ),

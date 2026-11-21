@@ -48,6 +48,8 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
@@ -293,6 +295,14 @@ class KatanaDeskSync @Inject constructor(
 
     val syncing: StateFlow<Boolean> = syncingState.asStateFlow()
 
+    private val placesChangedFlow = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    /** A sync changed the place of a book here: the library's shelves and cards follow. */
+    val placesChanged: SharedFlow<Unit> = placesChangedFlow.asSharedFlow()
+
+    private fun linkedPlaces(books: List<ReadableItem>) =
+        readerSessionStore.progressByItemIdFlow.value.let { places -> books.associate { it.id to places[it.id] } }
+
     /** Why the last sync didn't finish, in words to show; null when it did. */
     val problem: StateFlow<String?> = problemState.asStateFlow()
 
@@ -383,6 +393,7 @@ class KatanaDeskSync @Inject constructor(
         val links = known + client.match(desk, asks)
         if (links != known) connection.saveLinks(links)
         val linked = books.filter { it.id in links }
+        val placesBefore = linkedPlaces(linked)
         var firstFailure: Throwable? = null
         linked.forEach { item ->
             runSuspendCatching { bookSync.sync(api, desk.token, item, links.getValue(item.id)) }.onFailure { failure ->
@@ -391,6 +402,8 @@ class KatanaDeskSync @Inject constructor(
                 if (firstFailure == null) firstFailure = failure
             }
         }
+        // A place the desk changed here (another device read on, or marked it finished or unread) shows at once.
+        if (linkedPlaces(linked) != placesBefore) placesChangedFlow.tryEmit(Unit)
         firstFailure?.let { throw it }
         return linked.size
     }

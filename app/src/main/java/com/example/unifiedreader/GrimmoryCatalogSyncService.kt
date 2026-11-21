@@ -44,6 +44,8 @@ interface GrimmoryCatalogSyncer {
     ): GrimmoryCatalogSyncResult = sync(request, onProgress)
 }
 
+// Its collaborators, each but the first two optional so tests can leave them out.
+@Suppress("LongParameterList")
 class GrimmoryCatalogSyncService(
     private val grimmoryApiFactory: GrimmoryApiFactory,
     private val remoteCatalogWriter: RemoteCatalogWriter,

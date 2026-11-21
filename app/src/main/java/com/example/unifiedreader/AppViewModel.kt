@@ -94,6 +94,7 @@ class AppViewModel @Inject constructor(
 
     init {
         AppStartupLog.mark("appViewModel.init")
+        viewModelScope.launch { highlightSync.deskPlacesChanged.collect { refreshProgress() } }
         viewModelScope.launch { remoteSourceConnectivityStartupCoordinator.checkConfiguredSources() }
         remoteSourcesCoordinator.initialize(::updateUiState)
         settingsController.restoreState(updateState = ::updateUiState)

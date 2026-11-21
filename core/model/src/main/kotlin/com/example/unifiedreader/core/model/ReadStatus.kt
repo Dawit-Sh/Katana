@@ -116,7 +116,10 @@ sealed interface ServerReadStatusStep {
     data class Settled(val record: ReadStatusRecord) : ServerReadStatusStep
 }
 
-/** A book's status on its server, as a sync reads it: [status] (null when the server doesn't say), set at [setAtEpochMillis] when it tells. */
+/**
+ * A book's status on its server, as a sync reads it: [status] (null when the server doesn't say), set at
+ * [setAtEpochMillis] when it tells.
+ */
 data class ServerReadStatus(
     val status: ReadStatus?,
     val setAtEpochMillis: Long? = null,

@@ -41,6 +41,9 @@ interface HighlightSyncTriggers {
     /** The app came back to the front: Katana Desk is asked again. */
     fun onAppResumed() = Unit
 
+    /** Katana Desk changed a book's place here, so the library refreshes. */
+    val deskPlacesChanged: kotlinx.coroutines.flow.Flow<Unit> get() = kotlinx.coroutines.flow.emptyFlow()
+
     data object None : HighlightSyncTriggers
 }
 
@@ -131,6 +134,8 @@ class AppHighlightSyncCoordinator @Inject constructor(
     }
 
     override fun onAppResumed() = desk.syncSoon()
+
+    override val deskPlacesChanged: kotlinx.coroutines.flow.Flow<Unit> get() = desk.placesChanged
 
     override fun afterLibrarySync() {
         desk.syncSoon()

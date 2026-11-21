@@ -125,7 +125,10 @@ class ReadStatusTest {
         assertEquals(ServerReadStatusStep.Send, decide(ReadStatus.READING, serverAt = null))
         assertEquals(ServerReadStatusStep.Send, decide(ReadStatus.READING, serverAt = now - 9 * minute))
         // Within the margin: the server stamps with its own clock, so it's no later.
-        assertEquals(ServerReadStatusStep.Send, decide(ReadStatus.READING, serverAt = now - 10 * minute + READ_STATUS_CLOCK_TOLERANCE_MILLIS))
+        assertEquals(
+            ServerReadStatusStep.Send,
+            decide(ReadStatus.READING, serverAt = now - 10 * minute + READ_STATUS_CLOCK_TOLERANCE_MILLIS),
+        )
         assertEquals(
             ServerReadStatusStep.Take(ReadStatusRecord(ReadStatus.ABANDONED, now - 5 * minute)),
             decide(ReadStatus.ABANDONED, serverAt = now - 5 * minute),
@@ -171,7 +174,10 @@ class ReadStatusTest {
         assertEquals(ServerReadStatusStep.Keep, decide(ReadStatus.UNREAD, ReadStatus.UNREAD))
         assertEquals(ServerReadStatusStep.Keep, decide(ReadStatus.READ, ReadStatus.READ))
         assertEquals(ServerReadStatusStep.Keep, decide(server = null, fromPlace = ReadStatus.READING))
-        assertEquals(ServerReadStatusStep.Take(ReadStatusRecord(ReadStatus.WONT_READ, now)), decide(ReadStatus.WONT_READ, ReadStatus.UNREAD))
+        assertEquals(
+            ServerReadStatusStep.Take(ReadStatusRecord(ReadStatus.WONT_READ, now)),
+            decide(ReadStatus.WONT_READ, ReadStatus.UNREAD),
+        )
         assertEquals(ServerReadStatusStep.Keep, decide(ReadStatus.UNREAD, ReadStatus.READING, placeUnsent = true))
         // Never sends a status it was never given.
         ReadStatus.entries.forEach { server ->

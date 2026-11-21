@@ -413,7 +413,11 @@ private fun LibraryBookPageTop(
                         choices = status.choices,
                         tint = tint,
                         onSelect = { picked ->
-                            if (picked.movesPlace) actionContext.onSetReadStatus(item, picked == ReadStatus.READ) else status.onSelect(picked)
+                            if (picked.movesPlace) {
+                                actionContext.onSetReadStatus(item, picked == ReadStatus.READ)
+                            } else {
+                                status.onSelect(picked)
+                            }
                         },
                     )
                 }

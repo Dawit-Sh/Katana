@@ -179,7 +179,14 @@ class ApplyReadStatusChangeUseCaseTest {
         )
         val place = store.progressByItemIdFlow.value.getValue(book.id)
 
-        listOf(ReadStatus.RE_READING, ReadStatus.PAUSED, ReadStatus.PARTIALLY_READ, ReadStatus.WONT_READ, ReadStatus.ABANDONED, ReadStatus.READING)
+        listOf(
+            ReadStatus.RE_READING,
+            ReadStatus.PAUSED,
+            ReadStatus.PARTIALLY_READ,
+            ReadStatus.WONT_READ,
+            ReadStatus.ABANDONED,
+            ReadStatus.READING,
+        )
             .forEach { status ->
                 assertTrue(setStatus(book, status))
                 assertEquals(status, statuses.get(book.id)?.status)

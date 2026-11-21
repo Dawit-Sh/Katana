@@ -66,7 +66,11 @@ internal fun LibraryBookStatusPill(
             onClick = { choosing = true },
             label = { Text(text = shown.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             trailingIcon = {
-                Icon(imageVector = AppIcons.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(AppChipDefaults.iconSize))
+                Icon(
+                    imageVector = AppIcons.KeyboardArrowDown,
+                    contentDescription = null,
+                    modifier = Modifier.size(AppChipDefaults.iconSize),
+                )
             },
             colors = AppChipDefaults.colors(contentColor = tint.content),
             border = AppChipDefaults.border(enabled = true, selected = false, color = tint.track),

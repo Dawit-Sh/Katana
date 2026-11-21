@@ -52,13 +52,17 @@ internal suspend fun HttpClient.postGrimmoryReadStatus(
 
 // The answer's entry for the book (or its only one): its readStatus and when it was set.
 private fun String.toReadStatusAnswer(bookId: Long): GrimmoryReadStatusAnswer? {
-    val rows = runCatching { LenientJson.decodeFromString<JsonElement>(this) }.getOrNull() as? JsonArray ?: return null
-    val books = rows.filterIsInstance<JsonObject>()
-    val row = books.firstOrNull { it.long("bookId") == bookId } ?: books.singleOrNull() ?: return null
-    val status = row.text("readStatus") ?: return null
-    return GrimmoryReadStatusAnswer(status = status, setAtEpochMillis = row.text("readStatusModifiedTime")?.toServerEpochMillisOrNull())
+    val rows = runCatching { LenientJson.decodeFromString<JsonElement>(this) }.getOrNull() as? JsonArray
+    val books = rows.orEmpty().filterIsInstance<JsonObject>()
+    val row = books.firstOrNull { it.long("bookId") == bookId } ?: books.singleOrNull()
+    return row?.let { book ->
+        book.text("readStatus")?.let { status ->
+            GrimmoryReadStatusAnswer(status = status, setAtEpochMillis = book.text("readStatusModifiedTime")?.toServerEpochMillisOrNull())
+        }
+    }
 }
 
-private fun JsonObject.text(key: String): String? = (get(key) as? JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf(String::isNotBlank)
+private fun JsonObject.text(key: String): String? =
+    (get(key) as? JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf(String::isNotBlank)
 
 private fun JsonObject.long(key: String): Long? = (get(key) as? JsonPrimitive)?.content?.toLongOrNull()

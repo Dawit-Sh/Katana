@@ -58,7 +58,10 @@ class ReadStatusSyncTest {
             place(percent = null, type = LocatorType.PAGE, page = 0).toReadStatusPlace(),
         )
         // Marked unread: no place, whatever it held.
-        assertEquals(ReadStatusPlace(hasPlace = false, isFinished = false), place(percent = 1.0, finished = true, reset = true).toReadStatusPlace())
+        assertEquals(
+            ReadStatusPlace(hasPlace = false, isFinished = false),
+            place(percent = 1.0, finished = true, reset = true).toReadStatusPlace(),
+        )
     }
 
     @Test
@@ -90,13 +93,31 @@ class ReadStatusSyncTest {
     fun `a server's place, an older place and a push going up are no reading here`() {
         val records = mapOf(grimmoryBook.id to ReadStatusRecord(ReadStatus.UNREAD, now - 10 * minute))
         // Grimmory's place came down (saved in step).
-        assertTrue(readStatusChangesFromReading(emptyMap(), mapOf(grimmoryBook.id to place(0.3, item = grimmoryBook, at = now, state = SyncState.CLEAN)), records).isEmpty())
+        assertTrue(
+            readStatusChangesFromReading(
+                emptyMap(),
+                mapOf(grimmoryBook.id to place(0.3, item = grimmoryBook, at = now, state = SyncState.CLEAN)),
+                records,
+            ).isEmpty(),
+        )
         // A place from before the status was set (a server's, applied after its status).
-        assertTrue(readStatusChangesFromReading(emptyMap(), mapOf(grimmoryBook.id to place(0.3, item = grimmoryBook, at = now - 11 * minute)), records).isEmpty())
+        assertTrue(
+            readStatusChangesFromReading(
+                emptyMap(),
+                mapOf(grimmoryBook.id to place(0.3, item = grimmoryBook, at = now - 11 * minute)),
+                records,
+            ).isEmpty(),
+        )
         // The same place, only its state moving as it goes up.
         val waiting = place(0.3, item = grimmoryBook, at = now)
         val unread = mapOf(grimmoryBook.id to ReadStatusRecord(ReadStatus.UNREAD, now))
-        assertTrue(readStatusChangesFromReading(mapOf(grimmoryBook.id to waiting), mapOf(grimmoryBook.id to waiting.copy(syncState = SyncState.SYNCING)), unread).isEmpty())
+        assertTrue(
+            readStatusChangesFromReading(
+                mapOf(grimmoryBook.id to waiting),
+                mapOf(grimmoryBook.id to waiting.copy(syncState = SyncState.SYNCING)),
+                unread,
+            ).isEmpty(),
+        )
         // Nothing changed for the book.
         assertTrue(readStatusChangesFromReading(mapOf(grimmoryBook.id to waiting), mapOf(grimmoryBook.id to waiting), unread).isEmpty())
     }
@@ -106,7 +127,13 @@ class ReadStatusSyncTest {
         val rereading = mapOf(localBook.id to ReadStatusRecord(ReadStatus.RE_READING, now - 5 * minute, unsent = true))
         val end = place(1.0, finished = true, item = localBook, at = now - 10 * minute)
         // Opened: the reader saves its end again.
-        assertTrue(readStatusChangesFromReading(mapOf(localBook.id to end), mapOf(localBook.id to end.copy(updatedAtEpochMillis = now)), rereading).isEmpty())
+        assertTrue(
+            readStatusChangesFromReading(
+                mapOf(localBook.id to end),
+                mapOf(localBook.id to end.copy(updatedAtEpochMillis = now)),
+                rereading,
+            ).isEmpty(),
+        )
         // Back to the start and read: still Re-reading.
         val back = place(0.05, item = localBook, at = now + minute)
         assertTrue(readStatusChangesFromReading(mapOf(localBook.id to end), mapOf(localBook.id to back), rereading).isEmpty())
@@ -165,10 +192,17 @@ class ReadStatusSyncTest {
     fun `Grimmory's book answers bring their status, and one waiting to go up beats them`() {
         val places = TestReaderSessionStore()
         places.save(grimmoryBook, place(0.3, item = grimmoryBook, at = now - 20 * minute, state = SyncState.CLEAN))
-        val store = MemoryReadStatusStore(mapOf(otherGrimmoryBook.id to ReadStatusRecord(ReadStatus.RE_READING, now - minute, unsent = true)))
+        val store = MemoryReadStatusStore(
+            mapOf(otherGrimmoryBook.id to ReadStatusRecord(ReadStatus.RE_READING, now - minute, unsent = true)),
+        )
         store.takeGrimmoryStatuses(
             entries = listOf(
-                GrimmoryBookCatalogEntry(item = grimmoryBook, progress = null, readStatus = "PAUSED", readStatusModifiedTime = "2026-11-21T10:10:30Z"),
+                GrimmoryBookCatalogEntry(
+                    item = grimmoryBook,
+                    progress = null,
+                    readStatus = "PAUSED",
+                    readStatusModifiedTime = "2026-11-21T10:10:30Z",
+                ),
                 GrimmoryBookCatalogEntry(item = otherGrimmoryBook, progress = null, readStatus = "READ"),
             ),
             readerSessionStore = places,
@@ -295,6 +329,8 @@ class ReadStatusSyncTest {
         )
     }
 
+    @Suppress("LongParameterList") // A test's place, every part with a default.
+
     private fun place(
         percent: Double?,
         finished: Boolean = false,
@@ -387,7 +423,11 @@ private class TestReaderSessionStore : ReaderSessionStore {
 
     override suspend fun replaceProgressIfCurrent(expected: ReaderProgressSnapshot, replacement: ReaderProgressSnapshot?): Boolean {
         if (progressState.value[expected.itemId] != expected) return false
-        progressState.value = if (replacement == null) progressState.value - expected.itemId else progressState.value + (expected.itemId to replacement)
+        progressState.value = if (replacement == null) {
+            progressState.value - expected.itemId
+        } else {
+            progressState.value + (expected.itemId to replacement)
+        }
         return true
     }
 

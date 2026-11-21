@@ -253,7 +253,10 @@ class LibraryBookPageModelTest {
         assertEquals(ReadStatus.READ, libraryBookShownStatus(own = null, progress = ItemProgressSummary(label = "", fraction = 1f)))
         assertEquals(
             ReadStatus.RE_READING,
-            libraryBookShownStatus(own = ReadStatus.RE_READING, progress = ItemProgressSummary(label = "", fraction = 1f, isFinished = true)),
+            libraryBookShownStatus(
+                own = ReadStatus.RE_READING,
+                progress = ItemProgressSummary(label = "", fraction = 1f, isFinished = true),
+            ),
         )
         assertEquals(ReadStatus.PAUSED, libraryBookShownStatus(own = ReadStatus.PAUSED, progress = null))
     }
