@@ -19,6 +19,12 @@ class DrawerPanelWidthTest {
     }
 
     @Test
+    fun `a phone on its side keeps the full width for its rows side by side`() {
+        assertEquals(360.dp, drawerPanelMaxWidth(hasReadingCard = false, windowWidth = 853.dp, sideBySide = true))
+        assertEquals(324.dp, drawerPanelMaxWidth(hasReadingCard = false, windowWidth = 360.dp, sideBySide = true))
+    }
+
+    @Test
     fun `the reading card leaves the side menu only at very large text, where it would be cut off`() {
         assertEquals(true, drawerShowsReadingCard(fontScale = 1f))
         assertEquals(true, drawerShowsReadingCard(fontScale = 1.3f))

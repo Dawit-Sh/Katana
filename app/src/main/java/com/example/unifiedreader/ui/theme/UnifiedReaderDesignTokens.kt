@@ -141,6 +141,9 @@ internal object UnifiedReaderPalette {
     val SoftOutline = Color(0xFFD2C8BC)
     val CoverBlue = Color(0xFF405F6B)
     val ReadGreen = Color(0xFF476A53)
+
+    /** [ReadGreen] for a dark ground: reading days at their fullest in Graphite (Katana Desk's Graphite green). */
+    val DarkReadGreen = Color(0xFF9CC18A)
     val BookmarkRed = Color(0xFF86504E)
 
     val DarkInk = Color(0xFFE8E1D7)

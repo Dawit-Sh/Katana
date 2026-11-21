@@ -1,6 +1,9 @@
 package com.example.unifiedreader.feature.navigation
 
+import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
+import com.example.unifiedreader.core.model.deriveKavitaSeriesGrouping
+import com.example.unifiedreader.core.model.deriveStumpSeriesGrouping
 
 /** The servers a source can be: everything but the files on this device. */
 val NavigationServerSources: List<SourceType> = SourceType.entries.filter { it != SourceType.LOCAL }
@@ -37,3 +40,22 @@ fun knownConnectedServers(sessions: Map<SourceType, Boolean?>): Set<SourceType>?
     } else {
         null
     }
+
+/**
+ * How many books each loaded source holds, for the end of its row in the menu, as its library counts
+ * them ("All books 6,218"): every book for Grimmory and Local, the series and loose issues for Kavita
+ * and Stump. From the catalog the app already holds ([items]); a source still loading
+ * ([loadedSources] lacks it) is left out, so a row never shows a count that is too low.
+ */
+fun navigationSourceCounts(items: List<ReadableItem>, loadedSources: Set<SourceType>): Map<SourceType, Int> {
+    if (loadedSources.isEmpty()) return emptyMap()
+    val bySource = items.groupBy(ReadableItem::sourceType)
+    return loadedSources.associateWith { source ->
+        val sourceItems = bySource[source].orEmpty()
+        when (source) {
+            SourceType.KAVITA -> deriveKavitaSeriesGrouping(sourceItems).rootItems.size
+            SourceType.STUMP -> deriveStumpSeriesGrouping(sourceItems).rootItems.size
+            SourceType.GRIMMORY, SourceType.LOCAL -> sourceItems.size
+        }
+    }
+}

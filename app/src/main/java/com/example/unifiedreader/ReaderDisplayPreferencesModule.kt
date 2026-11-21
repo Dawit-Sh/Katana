@@ -9,6 +9,7 @@ import com.example.unifiedreader.feature.reader.preferences.DataStoreReaderComfo
 import com.example.unifiedreader.feature.reader.preferences.DataStoreReaderPageColorPreferencesStore
 import com.example.unifiedreader.feature.reader.preferences.DataStoreReaderPageNumberPreferencesStore
 import com.example.unifiedreader.feature.reader.preferences.DataStoreReaderPagesPreferencesStore
+import com.example.unifiedreader.feature.reader.preferences.DataStoreReadingGoalStore
 import com.example.unifiedreader.feature.reader.preferences.ReaderDisplayPreferences
 import dagger.Module
 import dagger.Provides
@@ -22,7 +23,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.plus
 
 /**
- * The readers' shared page settings (page number, page colour, light and keys, PDF pages); kept out of
+ * The readers' shared page settings (page number, page colour, light and keys, PDF pages, the daily
+ * reading goal); kept out of
  * [AppModule], which should not grow.
  */
 @Module
@@ -40,6 +42,7 @@ object ReaderDisplayPreferencesModule {
         bookLook = DataStoreReaderBookLookPreferencesStore(context, scope = applicationScope + appDispatchers.io),
         comfort = DataStoreReaderComfortPreferencesStore(context, scope = applicationScope + appDispatchers.io),
         pages = DataStoreReaderPagesPreferencesStore(context, scope = applicationScope + appDispatchers.io),
+        readingGoal = DataStoreReadingGoalStore(context, scope = applicationScope + appDispatchers.io),
     )
 }
 

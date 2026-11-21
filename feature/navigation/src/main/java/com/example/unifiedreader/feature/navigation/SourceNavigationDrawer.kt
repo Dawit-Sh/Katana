@@ -3,12 +3,12 @@ package com.example.unifiedreader.feature.navigation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
@@ -18,7 +18,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DrawerState
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -29,16 +28,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.core.model.displayName
-import com.example.unifiedreader.ui.components.AppDivider
-import com.example.unifiedreader.ui.components.AppDrawerBadge
-import com.example.unifiedreader.ui.components.AppDrawerItem
-import com.example.unifiedreader.ui.components.AppGroupLabel
+import com.example.unifiedreader.ui.components.AppDrawerRow
 import com.example.unifiedreader.ui.components.AppIcons
+import com.example.unifiedreader.ui.components.AppWindowHeight
+import com.example.unifiedreader.ui.components.appCount
 import com.example.unifiedreader.ui.components.appGlass
+import com.example.unifiedreader.ui.components.currentAppWindowHeight
 import com.example.unifiedreader.ui.theme.UnifiedReaderThemeTokens
 
 sealed interface SourceNavigationDestination {
@@ -62,28 +65,43 @@ sealed interface SourceNavigationDestination {
     data object AddSource : SourceNavigationDestination
 }
 
+/**
+ * The side menu, top to bottom: Katana's name with the Settings gear, the [readingCard], the sources with
+ * their book counts ([sourceCounts]) and "Add a server", Your reading (Lists, Bookmarks, My words with its
+ * count, Journal), and the [wordCard] at the bottom. It never scrolls: on a short window the reading card's
+ * heat map gets smaller first, then the word card loses its meaning, then the word card goes (see
+ * [fitDrawer]); a phone on its side puts Sources and Your reading side by side, in slightly tighter rows.
+ */
 @Composable
 fun SourceNavigationDrawer(
     drawerState: DrawerState,
     sourceOrder: List<SourceType>,
     selectedDestination: SourceNavigationDestination,
     onDestinationSelected: (SourceNavigationDestination) -> Unit,
-    /** Shown at the end of the Settings row, such as the version of a waiting update. */
+    /** A dot on the Settings gear, such as the version of a waiting update. */
     settingsBadge: String? = null,
     /** "Add a server" under the sources, while a server is not connected. */
     showAddSource: Boolean = false,
     /** False while the rail shows: then nothing opens the drawer, not even a swipe. */
     gesturesEnabled: Boolean = true,
-    /** The reading card, in the room between the sources and the destinations below. */
+    /** The reading card, under the name. */
     readingCard: (@Composable () -> Unit)? = null,
+    /** The word of the day, at the bottom; null while there is none. */
+    wordCard: (@Composable () -> Unit)? = null,
     /** How many words are saved, at the end of the My words row; null leaves the row out. */
     myWordsCount: Int? = null,
+    /** How many books each source holds, at the end of its row; a source left out shows none. */
+    sourceCounts: Map<SourceType, Int> = emptyMap(),
+    /** Katana's mark before its name. */
+    logo: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val presentation = UnifiedReaderThemeTokens.presentation
     val drawerShape = RoundedCornerShape(presentation.cardCornerRadius)
     // With very large text the card can't fit the side menu whole; the Journal row below opens it instead.
     val shownReadingCard = readingCard.takeIf { drawerShowsReadingCard(LocalDensity.current.fontScale) }
+    // A phone on its side has no height for the rows one under another: Sources and Your reading go side by side.
+    val sideBySide = currentAppWindowHeight() == AppWindowHeight.Compact
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = gesturesEnabled,
@@ -96,13 +114,12 @@ fun SourceNavigationDrawer(
                     .windowInsetsPadding(
                         WindowInsets.systemBars.only(WindowInsetsSides.Vertical + WindowInsetsSides.Start),
                     )
-                    .padding(start = DrawerStartMargin, top = 12.dp, bottom = 12.dp)
-                    // A little wider with the reading card, so its fifteen weeks keep a usable size; on a narrow
-                    // phone it leaves 24 dp of the page showing, where a tap closes it.
+                    .padding(start = DrawerStartMargin, top = DrawerEdgeMargin, bottom = DrawerEdgeMargin)
                     .widthIn(
                         max = drawerPanelMaxWidth(
                             hasReadingCard = shownReadingCard != null,
                             windowWidth = LocalConfiguration.current.screenWidthDp.dp,
+                            sideBySide = sideBySide,
                         ),
                     )
                     .appGlass(shape = drawerShape),
@@ -110,115 +127,29 @@ fun SourceNavigationDrawer(
                 drawerContainerColor = Color.Transparent,
                 windowInsets = WindowInsets(0, 0, 0, 0),
             ) {
-                Column(
+                DrawerMenu(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .padding(horizontal = 12.dp, vertical = 16.dp),
+                        .padding(start = DrawerInset, end = DrawerInset, top = DrawerTopInset, bottom = DrawerInset),
+                    header = {
+                        KatanaDrawerHeader(
+                            settingsSelected = selectedDestination == SourceNavigationDestination.Settings,
+                            onOpenSettings = { onDestinationSelected(SourceNavigationDestination.Settings) },
+                            settingsBadge = settingsBadge,
+                            logo = logo,
+                        )
+                    },
+                    readingCard = shownReadingCard,
+                    wordCard = wordCard,
                 ) {
-                    DrawerTopSection(readingCard = shownReadingCard, modifier = Modifier.weight(1f)) {
-                        KatanaDrawerHeader()
-                        AppGroupLabel(
-                            text = "Sources",
-                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
-                        )
-                        sourceOrder.forEach { sourceType ->
-                            SourceNavigationItem(
-                                sourceType = sourceType,
-                                selected = selectedDestination == SourceNavigationDestination.Source(sourceType),
-                                onDestinationSelected = onDestinationSelected,
-                            )
-                        }
-                        if (showAddSource) {
-                            AppDrawerItem(
-                                label = { Text(text = "Add a server") },
-                                selected = false,
-                                onClick = { onDestinationSelected(SourceNavigationDestination.AddSource) },
-                                icon = {
-                                    Icon(
-                                        imageVector = AppIcons.Add,
-                                        contentDescription = null,
-                                    )
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                    }
-                    AppDivider(modifier = Modifier.padding(vertical = 12.dp))
-                    AppDrawerItem(
-                        label = { Text(text = "Lists") },
-                        selected = selectedDestination == SourceNavigationDestination.Lists,
-                        onClick = { onDestinationSelected(SourceNavigationDestination.Lists) },
-                        icon = {
-                            Icon(
-                                imageVector = AppIcons.Checklist,
-                                contentDescription = null,
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    AppDrawerItem(
-                        label = { Text(text = "Bookmarks") },
-                        selected = selectedDestination == SourceNavigationDestination.Bookmarks,
-                        onClick = { onDestinationSelected(SourceNavigationDestination.Bookmarks) },
-                        icon = {
-                            Icon(
-                                imageVector = AppIcons.Bookmark,
-                                contentDescription = null,
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    if (myWordsCount != null) {
-                        AppDrawerItem(
-                            label = { Text(text = MyWordsLabel) },
-                            selected = selectedDestination == SourceNavigationDestination.MyWords,
-                            onClick = { onDestinationSelected(SourceNavigationDestination.MyWords) },
-                            icon = {
-                                Icon(
-                                    imageVector = AppIcons.Style,
-                                    contentDescription = null,
-                                )
-                            },
-                            badge = {
-                                Text(
-                                    text = myWordsCount.toString(),
-                                    style = MaterialTheme.typography.labelLarge,
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                    AppDrawerItem(
-                        label = { Text(text = "Journal") },
-                        selected = selectedDestination == SourceNavigationDestination.Journal,
-                        onClick = { onDestinationSelected(SourceNavigationDestination.Journal) },
-                        icon = {
-                            Icon(
-                                imageVector = AppIcons.History,
-                                contentDescription = null,
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    AppDrawerItem(
-                        label = { Text(text = "Settings") },
-                        selected = selectedDestination == SourceNavigationDestination.Settings,
-                        onClick = { onDestinationSelected(SourceNavigationDestination.Settings) },
-                        icon = {
-                            Icon(
-                                imageVector = AppIcons.Settings,
-                                contentDescription = null,
-                            )
-                        },
-                        badge = settingsBadge?.let { badge ->
-                            {
-                                AppDrawerBadge(
-                                    text = badge,
-                                    selected = selectedDestination == SourceNavigationDestination.Settings,
-                                )
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
+                    DrawerDestinations(
+                        sideBySide = sideBySide,
+                        sourceOrder = sourceOrder,
+                        showAddSource = showAddSource,
+                        myWordsCount = myWordsCount,
+                        sourceCounts = sourceCounts,
+                        selectedDestination = selectedDestination,
+                        onDestinationSelected = onDestinationSelected,
                     )
                 }
             }
@@ -228,31 +159,137 @@ fun SourceNavigationDrawer(
 }
 
 /**
- * The drawer's top part, scrolling when the window is short: the name and the sources and, with a
- * [readingCard], the card midway in the room left under them.
+ * The menu inside the panel, laid out to its height by [DrawerFitLayout]. Only where even its least
+ * (no cards, the rows side by side on a phone held sideways) is taller than the window, at the largest
+ * text sizes, can it scroll; at every other size there is nothing to scroll.
  */
 @Composable
-private fun DrawerTopSection(
+private fun DrawerMenu(
+    header: @Composable () -> Unit,
     readingCard: (@Composable () -> Unit)?,
+    wordCard: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
-    sources: @Composable () -> Unit,
+    rows: @Composable () -> Unit,
 ) {
     BoxWithConstraints(modifier = modifier) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .heightIn(min = maxHeight),
-            verticalArrangement = if (readingCard != null) Arrangement.SpaceBetween else Arrangement.Top,
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) { sources() }
-            if (readingCard != null) {
-                readingCard()
-                // The foot of SpaceBetween, so the card sits midway rather than at the bottom.
-                Spacer(Modifier)
-            }
+        val room = constraints.maxHeight
+        Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+            DrawerFitLayout(
+                room = room,
+                header = header,
+                rows = rows,
+                readingCard = readingCard,
+                wordCard = wordCard,
+            )
         }
     }
+}
+
+/** The menu's rows: Sources (each with its book count) and Add a server, then Your reading. */
+@Composable
+private fun DrawerDestinations(
+    sideBySide: Boolean,
+    sourceOrder: List<SourceType>,
+    showAddSource: Boolean,
+    myWordsCount: Int?,
+    sourceCounts: Map<SourceType, Int>,
+    selectedDestination: SourceNavigationDestination,
+    onDestinationSelected: (SourceNavigationDestination) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    @Composable
+    fun Destination(destination: SourceNavigationDestination, label: String, icon: ImageVector, count: Int? = null) {
+        DrawerDestination(
+            destination = destination,
+            label = label,
+            icon = icon,
+            selectedDestination = selectedDestination,
+            onDestinationSelected = onDestinationSelected,
+            count = count,
+            dense = sideBySide,
+        )
+    }
+    DrawerRows(
+        sideBySide = sideBySide,
+        modifier = modifier,
+        sources = {
+            DrawerSectionLabel(text = "Sources")
+            sourceOrder.forEach { sourceType ->
+                Destination(
+                    destination = SourceNavigationDestination.Source(sourceType),
+                    label = sourceType.displayName(),
+                    icon = sourceType.navigationIcon(),
+                    count = sourceCounts[sourceType],
+                )
+            }
+            if (showAddSource) Destination(SourceNavigationDestination.AddSource, "Add a server", AppIcons.Add)
+        },
+        reading = {
+            DrawerSectionLabel(text = "Your reading")
+            Destination(SourceNavigationDestination.Lists, "Lists", AppIcons.Checklist)
+            Destination(SourceNavigationDestination.Bookmarks, "Bookmarks", AppIcons.Bookmark)
+            if (myWordsCount != null) Destination(SourceNavigationDestination.MyWords, MyWordsLabel, AppIcons.Style, myWordsCount)
+            Destination(SourceNavigationDestination.Journal, "Journal", AppIcons.History)
+        },
+    )
+}
+
+/** Sources, then Your reading: one under the other, or side by side ([sideBySide]). */
+@Composable
+private fun DrawerRows(
+    sideBySide: Boolean,
+    sources: @Composable ColumnScope.() -> Unit,
+    reading: @Composable ColumnScope.() -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (sideBySide) {
+        Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(SideBySideGap)) {
+            Column(modifier = Modifier.weight(1f), content = sources)
+            Column(modifier = Modifier.weight(1f), content = reading)
+        }
+    } else {
+        Column(modifier = modifier.fillMaxWidth()) {
+            sources()
+            reading()
+        }
+    }
+}
+
+/** "Sources", "Your reading": a small muted label over the rows. */
+@Composable
+private fun DrawerSectionLabel(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp, lineHeight = 16.sp),
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        modifier = modifier
+            .padding(start = SectionLabelStart, end = SectionLabelStart, top = SectionLabelTop, bottom = SectionLabelBottom)
+            .semantics { heading() },
+    )
+}
+
+@Composable
+private fun DrawerDestination(
+    destination: SourceNavigationDestination,
+    label: String,
+    icon: ImageVector,
+    selectedDestination: SourceNavigationDestination,
+    onDestinationSelected: (SourceNavigationDestination) -> Unit,
+    modifier: Modifier = Modifier,
+    count: Int? = null,
+    dense: Boolean = false,
+) {
+    AppDrawerRow(
+        label = label,
+        icon = icon,
+        selected = selectedDestination == destination,
+        onClick = { onDestinationSelected(destination) },
+        count = count?.let(::appCount),
+        dense = dense,
+        modifier = modifier,
+    )
 }
 
 /** The My words row's name, in the drawer and on the rail. */
@@ -265,43 +302,40 @@ private const val DrawerLargeTextScale = 1.5f
 
 private val DrawerMaxWidth = 320.dp
 private val DrawerWithCardMaxWidth = 360.dp
+private val DrawerSideBySideMaxWidth = 360.dp
 
 /** The page left showing beside the drawer on a narrow phone, enough to see it is a panel and to tap beside it. */
 private val DrawerPagePeek = 24.dp
 
-/** The panel's start margin from the window. */
+/** The panel's margins from the window. */
 private val DrawerStartMargin = 12.dp
+private val DrawerEdgeMargin = 12.dp
 
-/** The drawer panel's widest: 360 dp with the reading card, 320 without, and never closer than 24 dp to the far edge. */
-internal fun drawerPanelMaxWidth(hasReadingCard: Boolean, windowWidth: Dp): Dp =
+/** Inside the panel: 12 at the sides and the foot, 10 over the name. */
+private val DrawerInset = 12.dp
+private val DrawerTopInset = 10.dp
+
+/** Between Sources and Your reading side by side: the panel is no wider than 360 (Material's drawer). */
+private val SideBySideGap = 4.dp
+
+/** The section labels' room: 14 above, 4 under, in line with the rows' text. */
+private val SectionLabelStart = 12.dp
+private val SectionLabelTop = 14.dp
+private val SectionLabelBottom = 4.dp
+
+/**
+ * The drawer panel's widest: 360 dp with the reading card or with the rows side by side (Material's
+ * drawer is never wider), 320 otherwise, and never closer than 24 dp to the far edge.
+ */
+internal fun drawerPanelMaxWidth(hasReadingCard: Boolean, windowWidth: Dp, sideBySide: Boolean = false): Dp =
     minOf(
-        if (hasReadingCard) DrawerWithCardMaxWidth else DrawerMaxWidth,
+        when {
+            sideBySide -> DrawerSideBySideMaxWidth
+            hasReadingCard -> DrawerWithCardMaxWidth
+            else -> DrawerMaxWidth
+        },
         windowWidth - DrawerStartMargin - DrawerPagePeek,
     )
-
-@Composable
-private fun SourceNavigationItem(
-    sourceType: SourceType,
-    selected: Boolean,
-    onDestinationSelected: (SourceNavigationDestination) -> Unit,
-) {
-    AppDrawerItem(
-        label = { Text(text = sourceType.displayName()) },
-        selected = selected,
-        onClick = {
-            onDestinationSelected(
-                SourceNavigationDestination.Source(sourceType),
-            )
-        },
-        icon = {
-            Icon(
-                imageVector = sourceType.navigationIcon(),
-                contentDescription = null,
-            )
-        },
-        modifier = Modifier.fillMaxWidth(),
-    )
-}
 
 @Composable
 fun SourceType.navigationIcon(): ImageVector = when (this) {

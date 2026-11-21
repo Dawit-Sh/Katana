@@ -1,48 +1,34 @@
 package com.example.unifiedreader.feature.journal
 
-import com.example.unifiedreader.journal.JournalReadingEventType
 import com.example.unifiedreader.journal.JournalSnapshot
+import com.example.unifiedreader.journal.ReadingGoal
 import java.time.DayOfWeek
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 
-/** One day of the reading card: how long was read, and how dark its tile is (0 none, 4 the most). */
+/** One day of the side menu's heat map: how long was read, and its step against the daily goal (0 none to 4). */
 data class ReadingCardDay(
     val date: LocalDate,
     val minutes: Int,
-    val read: Boolean,
-    val level: Int,
+    val step: Int,
     val isToday: Boolean,
     val isFuture: Boolean,
 )
 
 /**
- * The side menu's reading card: the last [weeks] weeks as a heat map (columns of Monday to
- * Sunday, the last one this week), the streak, the days read and the books finished in them, the
- * best day, and the last seven days.
+ * The side menu's Reading card: today's minutes, and the last [WEEKS] weeks as a heat map, a column a
+ * week from Monday at the top to Sunday, this week last, each day stepped against the daily goal.
  */
 data class ReadingCardModel(
     val weeks: List<List<ReadingCardDay>>,
-    /** The column a month's name stands over, and the name ("Aug"). */
-    val monthLabels: List<Pair<Int, String>>,
-    val firstDay: LocalDate,
     val today: LocalDate,
-    val streak: Int,
-    val daysRead: Int,
-    val finished: Int,
-    val bestDay: ReadingCardDay?,
-    val lastSeven: List<ReadingCardDay>,
-    val weekMinutes: Int,
+    val todayMinutes: Int,
 ) {
-    val averageMinutes: Int get() = (weekMinutes + LAST_DAYS / 2) / LAST_DAYS
-
     companion object {
-        const val WEEKS = 15
-        const val LAST_DAYS = 7
+        const val WEEKS = 16
     }
 }
 
@@ -50,13 +36,13 @@ data class ReadingCardModel(
 data class ReadingCardInput(val minutes: Int, val read: Boolean)
 
 /**
- * Builds the card from the journal's days ([days], by date) and the dates books were finished on
- * ([finishedOn]). A day with reading but under a minute still counts as read, at the lightest tile.
+ * Builds the card from the journal's days ([days], by date) against [goalMinutes]. A day with reading
+ * but under a minute counted is still a reading day, at the first step.
  */
 fun readingCardModel(
     days: Map<LocalDate, ReadingCardInput>,
-    finishedOn: List<LocalDate>,
     today: LocalDate,
+    goalMinutes: Int,
     weeks: Int = ReadingCardModel.WEEKS,
 ): ReadingCardModel {
     val lastMonday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
@@ -64,13 +50,11 @@ fun readingCardModel(
     fun day(date: LocalDate): ReadingCardDay {
         val input = days[date]
         val future = date.isAfter(today)
-        val read = !future && input?.read == true
         val minutes = if (future) 0 else input?.minutes ?: 0
         return ReadingCardDay(
             date = date,
             minutes = minutes,
-            read = read,
-            level = if (read) readingLevel(minutes) else 0,
+            step = if (future) 0 else ReadingGoal.step(minutes, goalMinutes, read = input?.read == true),
             isToday = date == today,
             isFuture = future,
         )
@@ -78,38 +62,17 @@ fun readingCardModel(
     val columns = (0 until weeks).map { week ->
         (0 until DAYS_IN_WEEK).map { weekday -> day(firstDay.plusDays((week * DAYS_IN_WEEK + weekday).toLong())) }
     }
-    val shown = columns.flatten().filterNot(ReadingCardDay::isFuture)
-    val readDates = shown.filter(ReadingCardDay::read).map(ReadingCardDay::date).toSet()
-    // A streak still counts while today has no reading yet: it is broken only by a whole day missed.
-    var cursor = if (today in readDates) today else today.minusDays(1)
-    var streak = 0
-    while (cursor in readDates || (cursor.isBefore(firstDay) && days[cursor]?.read == true)) {
-        streak++
-        cursor = cursor.minusDays(1)
-    }
-    val lastSeven = (ReadingCardModel.LAST_DAYS - 1 downTo 0).map { back -> day(today.minusDays(back.toLong())) }
-    return ReadingCardModel(
-        weeks = columns,
-        monthLabels = monthLabels(columns),
-        firstDay = firstDay,
-        today = today,
-        streak = streak,
-        daysRead = readDates.size,
-        finished = finishedOn.count { date -> !date.isBefore(firstDay) && !date.isAfter(today) },
-        bestDay = shown.filter { it.minutes > 0 }.maxWithOrNull(compareBy<ReadingCardDay> { it.minutes }.thenBy { it.date }),
-        lastSeven = lastSeven,
-        weekMinutes = lastSeven.sumOf(ReadingCardDay::minutes),
-    )
+    return ReadingCardModel(weeks = columns, today = today, todayMinutes = days[today]?.minutes ?: 0)
 }
 
-/** How dark a read day's tile is, by minutes: up to 20, 40, 70, then more. */
-fun readingLevel(minutes: Int): Int = 1 + LevelCeilings.count { ceiling -> minutes > ceiling }
-
-/** A month's name over the column holding its first day (the first column takes its own month), never two too close. */
-private fun monthLabels(columns: List<List<ReadingCardDay>>): List<Pair<Int, String>> {
+/**
+ * The months' names over [columns] (weeks, Monday first): over the column holding a month's first day,
+ * the first column taking its own month, never two closer than three columns.
+ */
+fun readingCardMonthLabels(columns: List<List<ReadingCardDay>>): List<Pair<Int, String>> {
     val labels = mutableListOf<Pair<Int, String>>()
     columns.forEachIndexed { index, week ->
-        val first = week.firstOrNull { it.date.dayOfMonth == 1 }?.date ?: week.first().date.takeIf { index == 0 }
+        val first = week.firstOrNull { it.date.dayOfMonth == 1 }?.date ?: week.firstOrNull()?.date?.takeIf { index == 0 }
         val label = first?.let { index to it.month.getDisplayName(TextStyle.SHORT, MonthNames) } ?: return@forEachIndexed
         val previous = labels.lastOrNull()?.first
         when {
@@ -121,10 +84,11 @@ private fun monthLabels(columns: List<List<ReadingCardDay>>): List<Pair<Int, Str
     return labels
 }
 
-/** The journal's reading per day and its finishing dates, by the device's calendar. */
+/** The journal's reading per day, by the device's calendar, against [goalMinutes]. */
 fun readingCardModel(
     snapshot: JournalSnapshot,
     today: LocalDate,
+    goalMinutes: Int,
     zone: ZoneId = ZoneId.systemDefault(),
 ): ReadingCardModel {
     val start = today.minusWeeks(ReadingCardModel.WEEKS.toLong() + 1).atStartOfDay(zone).toInstant().toEpochMilli()
@@ -137,17 +101,20 @@ fun readingCardModel(
             read = day.eventCount > 0,
         )
     }
-    val finishedOn = events
-        .filter { event -> event.eventType == JournalReadingEventType.FINISHED }
-        .distinctBy { event -> event.itemId }
-        .map { event -> Instant.ofEpochMilli(event.occurredAtEpochMillis).atZone(zone).toLocalDate() }
-    return readingCardModel(days = days, finishedOn = finishedOn, today = today)
+    return readingCardModel(days = days, today = today, goalMinutes = goalMinutes)
+}
+
+/** What the card's first line says before "read today": "1 h 12", "2 h", "22 min", "0 min". */
+fun readingTodayTime(minutes: Int): String {
+    val shown = minutes.coerceAtLeast(0)
+    if (shown < MINUTES_PER_HOUR) return "$shown min"
+    val rest = shown % MINUTES_PER_HOUR
+    return if (rest == 0) "${shown / MINUTES_PER_HOUR} h" else "${shown / MINUTES_PER_HOUR} h ${rest.toString().padStart(2, '0')}"
 }
 
 /** Three-letter months ("Sep"): the JDK's UK names now say "Sept", Android 9's don't. */
 private val MonthNames: Locale = Locale.US
 private const val DAYS_IN_WEEK = 7
 private const val MIN_LABEL_COLUMNS = 3
-/** The most minutes of each lighter tile: up to 20, 40 and 70; more is the darkest. */
-private val LevelCeilings = listOf(20, 40, 70)
+private const val MINUTES_PER_HOUR = 60
 private const val MINUTE_MILLIS = 60_000L

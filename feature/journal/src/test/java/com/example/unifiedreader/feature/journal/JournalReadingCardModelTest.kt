@@ -1,5 +1,9 @@
 package com.example.unifiedreader.feature.journal
 
+import com.example.unifiedreader.core.model.FormatType
+import com.example.unifiedreader.core.model.ReadableItem
+import com.example.unifiedreader.core.model.SourceType
+import com.example.unifiedreader.feature.library.ItemProgressSummary
 import java.time.DayOfWeek
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
@@ -8,87 +12,111 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class JournalReadingCardModelTest {
-    // Wednesday 18 November 2026.
-    private val today = LocalDate.of(2026, 11, 18)
+    // Saturday 21 November 2026.
+    private val today = LocalDate.of(2026, 11, 21)
+    private val goal = 30
 
     private fun read(minutes: Int) = ReadingCardInput(minutes = minutes, read = true)
 
     @Test
-    fun `fifteen weeks of Monday to Sunday end with this week, the days after today left blank`() {
-        val model = readingCardModel(days = emptyMap(), finishedOn = emptyList(), today = today)
+    fun `sixteen weeks of Monday to Sunday end with this week, the days after today to come`() {
+        val model = readingCardModel(days = emptyMap(), today = today, goalMinutes = goal)
 
-        assertEquals(15, model.weeks.size)
+        assertEquals(16, model.weeks.size)
         assertTrue(model.weeks.all { it.size == 7 })
-        assertEquals(LocalDate.of(2026, 8, 10), model.firstDay)
-        assertEquals(DayOfWeek.MONDAY, model.firstDay.dayOfWeek)
+        val first = model.weeks.first().first().date
+        assertEquals(LocalDate.of(2026, 8, 3), first)
+        assertEquals(DayOfWeek.MONDAY, first.dayOfWeek)
         val lastWeek = model.weeks.last()
         assertEquals(LocalDate.of(2026, 11, 16), lastWeek.first().date)
-        assertTrue(lastWeek[2].isToday)
-        assertTrue(lastWeek.drop(3).all { it.isFuture && !it.read })
-        assertEquals(listOf("Aug", "Sep", "Oct", "Nov"), model.monthLabels.map { it.second })
-        assertEquals(0, model.streak)
-        assertNull(model.bestDay)
+        assertTrue(lastWeek[5].isToday)
+        assertTrue(lastWeek[6].isFuture)
+        assertEquals(listOf("Aug", "Sep", "Oct", "Nov"), readingCardMonthLabels(model.weeks).map { it.second })
+        assertEquals(0, model.todayMinutes)
     }
 
     @Test
-    fun `the streak runs back from today, or from yesterday while today has no reading yet`() {
+    fun `days step by the daily goal, and a day read under a minute still shows`() {
         val days = mapOf(
-            today to read(18),
-            today.minusDays(1) to read(52),
-            today.minusDays(2) to read(34),
-            today.minusDays(4) to read(10),
-        )
-        assertEquals(3, readingCardModel(days, emptyList(), today).streak)
-        assertEquals(2, readingCardModel(days - today, emptyList(), today).streak)
-        assertEquals(4, readingCardModel(days, emptyList(), today).daysRead)
-    }
-
-    @Test
-    fun `tiles darken with the minutes, and a day read under a minute still shows`() {
-        val days = mapOf(
+            today to read(72),
             today.minusDays(1) to ReadingCardInput(minutes = 0, read = true),
-            today.minusDays(2) to read(20),
-            today.minusDays(3) to read(40),
-            today.minusDays(4) to read(70),
-            today.minusDays(5) to read(102),
+            today.minusDays(2) to read(10),
+            today.minusDays(3) to read(20),
+            today.minusDays(4) to read(30),
+            today.minusDays(5) to read(59),
         )
-        val levels = readingCardModel(days, emptyList(), today).lastSeven.map { it.level }
+        val week = readingCardModel(days, today, goal).weeks.last()
 
-        assertEquals(listOf(0, 4, 3, 2, 1, 1, 0), levels)
+        // Monday 16 to Sunday 22: 59, 30, 20, 10, read without minutes, 72 today, Sunday to come.
+        assertEquals(listOf(3, 3, 2, 1, 1, 4, 0), week.map { it.step })
+        assertEquals(72, readingCardModel(days, today, goal).todayMinutes)
+        // A longer goal moves the same days down.
+        assertEquals(listOf(2, 2, 1, 1, 1, 3, 0), readingCardModel(days, today, goalMinutes = 60).weeks.last().map { it.step })
     }
 
     @Test
-    fun `the last seven days end today with their total, average and the best day`() {
-        val days = mapOf(
-            LocalDate.of(2026, 11, 12) to read(22),
-            LocalDate.of(2026, 11, 14) to read(41),
-            LocalDate.of(2026, 11, 15) to read(102),
-            LocalDate.of(2026, 11, 16) to read(34),
-            LocalDate.of(2026, 11, 17) to read(52),
-            LocalDate.of(2026, 11, 18) to read(18),
-            // Outside the fifteen weeks: not counted.
-            LocalDate.of(2026, 8, 1) to read(300),
+    fun `today's time reads in minutes under an hour, in hours and minutes after`() {
+        assertEquals("0 min", readingTodayTime(0))
+        assertEquals("22 min", readingTodayTime(22))
+        assertEquals("59 min", readingTodayTime(59))
+        assertEquals("1 h", readingTodayTime(60))
+        assertEquals("1 h 05", readingTodayTime(65))
+        assertEquals("1 h 12", readingTodayTime(72))
+        assertEquals("3 h 40", readingTodayTime(220))
+    }
+
+    @Test
+    fun `the book's line is its chapter and how far, or only how far`() {
+        assertEquals("Stave Three · 34%", readingCardBookDetail(progress(0.34f, chapterTitle = "Stave Three", chapter = 3)))
+        assertEquals("Chapter 9 · 70%", readingCardBookDetail(progress(0.7f, chapter = 9)))
+        assertEquals("34%", readingCardBookDetail(progress(0.34f)))
+        assertEquals("34%", readingCardBookDetail(progress(0.34f, chapterTitle = "  ")))
+        assertNull(readingCardBookDetail(null))
+    }
+
+    @Test
+    fun `the heat map fills its width with up to sixteen weeks of squares`() {
+        val wide = heatMapFit(width = 300f, height = Float.MAX_VALUE, weeks = 16, gap = 3f, cells = 8f..18f)
+        assertEquals(16, wide.weeks)
+        assertEquals(15.9375f, wide.cell, 0.001f)
+        // A wider menu stops at the biggest squares.
+        assertEquals(18f, heatMapFit(400f, Float.MAX_VALUE, 16, 3f, 8f..18f).cell, 0.001f)
+    }
+
+    @Test
+    fun `a shorter height makes the squares smaller, all sixteen weeks kept, down to the smallest`() {
+        val tenHigh = heatMapFit(width = 300f, height = heatMapGridHeight(10f, 3f), weeks = 16, gap = 3f, cells = 8f..18f)
+        assertEquals(HeatMapFit(weeks = 16, cell = 10f), tenHigh)
+        assertEquals(HeatMapFit(weeks = 16, cell = 8f), heatMapFit(300f, 30f, 16, 3f, 8f..18f))
+        assertEquals(88f, heatMapGridHeight(10f, 3f), 0.001f)
+    }
+
+    @Test
+    fun `only a width too narrow for the smallest squares drops the oldest weeks`() {
+        val narrow = heatMapFit(width = 150f, height = Float.MAX_VALUE, weeks = 16, gap = 3f, cells = 8f..18f)
+        assertEquals(13, narrow.weeks)
+        assertEquals(8.77f, narrow.cell, 0.01f)
+    }
+
+    @Test
+    fun `the book being read is the one read last that isn't finished, from any source`() {
+        fun book(id: String, source: SourceType) =
+            ReadableItem(id = id, sourceType = source, libraryId = "1", title = id, format = FormatType.EPUB)
+        val carol = book("carol", SourceType.GRIMMORY)
+        val hole = book("hole", SourceType.LOCAL)
+        val done = book("done", SourceType.GRIMMORY)
+        val items = listOf(carol, hole, done)
+        val progress = mapOf(
+            "carol" to progress(0.34f).copy(lastReadAtEpochMillis = 100L),
+            "hole" to progress(0.7f).copy(lastReadAtEpochMillis = 200L),
+            "done" to progress(1f).copy(lastReadAtEpochMillis = 300L, isFinished = true),
         )
-        val model = readingCardModel(days, emptyList(), today)
-
-        assertEquals(LocalDate.of(2026, 11, 12), model.lastSeven.first().date)
-        assertTrue(model.lastSeven.last().isToday)
-        assertEquals(269, model.weekMinutes)
-        assertEquals(38, model.averageMinutes)
-        assertEquals(LocalDate.of(2026, 11, 15), model.bestDay?.date)
-        assertEquals("Best day: Sun 15 Nov, 1h 42m", ReadingCardCopy.bestDay(model.bestDay!!))
-        assertEquals("4h 29m", ReadingCardCopy.minutes(model.weekMinutes))
+        assertEquals(hole, readingCardBook(items, progress)?.item)
+        assertEquals(carol, readingCardBook(items - hole, progress)?.item)
+        assertNull(readingCardBook(items, progress - "carol" - "hole"))
+        assertNull(readingCardBook(emptyList(), progress))
     }
 
-    @Test
-    fun `finished books count only inside the fifteen weeks`() {
-        val finished = listOf(LocalDate.of(2026, 11, 16), LocalDate.of(2026, 9, 1), LocalDate.of(2026, 7, 1))
-
-        assertEquals(2, readingCardModel(emptyMap(), finished, today).finished)
-    }
-
-    @Test
-    fun `the range line names the first Monday`() {
-        assertEquals("Last 15 weeks, 10 Aug to today", ReadingCardCopy.range(LocalDate.of(2026, 8, 10)))
-    }
+    private fun progress(fraction: Float, chapterTitle: String? = null, chapter: Int? = null) =
+        ItemProgressSummary(label = "", fraction = fraction, chapter = chapter, chapterTitle = chapterTitle)
 }

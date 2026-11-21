@@ -1,5 +1,7 @@
 package com.example.unifiedreader.feature.navigation
 
+import com.example.unifiedreader.core.model.FormatType
+import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -50,5 +52,24 @@ class SourceNavigationSourcesTest {
             setOf(SourceType.KAVITA),
             knownConnectedServers(mapOf(SourceType.KAVITA to true, SourceType.STUMP to false, SourceType.GRIMMORY to false)),
         )
+    }
+
+    @Test
+    fun `each loaded source counts its books, a source still loading shows none`() {
+        fun book(id: String, source: SourceType) =
+            ReadableItem(id = id, sourceType = source, libraryId = "1", title = id, format = FormatType.EPUB)
+        val items = listOf(
+            book("g1", SourceType.GRIMMORY),
+            book("g2", SourceType.GRIMMORY),
+            book("g3", SourceType.GRIMMORY),
+            book("l1", SourceType.LOCAL),
+        )
+        assertEquals(
+            mapOf(SourceType.GRIMMORY to 3, SourceType.LOCAL to 1),
+            navigationSourceCounts(items, loadedSources = setOf(SourceType.GRIMMORY, SourceType.LOCAL)),
+        )
+        assertEquals(mapOf(SourceType.LOCAL to 1), navigationSourceCounts(items, loadedSources = setOf(SourceType.LOCAL)))
+        assertEquals(mapOf(SourceType.LOCAL to 0), navigationSourceCounts(emptyList(), loadedSources = setOf(SourceType.LOCAL)))
+        assertEquals(emptyMap<SourceType, Int>(), navigationSourceCounts(items, loadedSources = emptySet()))
     }
 }

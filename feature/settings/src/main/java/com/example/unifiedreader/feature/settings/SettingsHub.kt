@@ -145,8 +145,8 @@ internal fun SettingsHub(
 
 /**
  * Settings › Reading: the look new books open with, Translation when the app has it, the English
- * dictionary (download, remove), then the readers' Keep the screen on and Volume keys switches. Left
- * out when it has none of them.
+ * dictionary (download, remove), the readers' Keep the screen on and Volume keys switches, then the
+ * daily reading goal. Left out when it has none of them.
  */
 @Composable
 private fun ReadingSettingsGroup(
@@ -157,7 +157,8 @@ private fun ReadingSettingsGroup(
     val translation = LocalTranslationService.current
     val comfort = LocalReaderComfortPreferences.current
     val dictionary = LocalDictionary.current
-    if (listOf(newBookLook, translation, dictionary, comfort).all { it == null }) return
+    val readingGoal = LocalReadingGoalStore.current
+    if (listOf(newBookLook, translation, dictionary, comfort, readingGoal).all { it == null }) return
     AppSettingsGroup(label = "Reading") {
         if (newBookLook != null) {
             AppSettingsRow(
@@ -187,6 +188,7 @@ private fun ReadingSettingsGroup(
             DictionarySettingsRow(dictionary = dictionaryRow)
         }
         ReaderComfortSettingsRows(leadingDivider = newBookLook != null || translation != null || dictionaryRow != null)
+        ReadingGoalSettingsRow(leadingDivider = listOf(newBookLook, translation, dictionaryRow, comfort).any { it != null })
     }
 }
 

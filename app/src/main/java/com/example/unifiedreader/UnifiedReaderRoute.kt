@@ -60,6 +60,7 @@ import com.example.unifiedreader.feature.translation.LocalTranslationService
 import com.example.unifiedreader.feature.dictionary.LocalDictionary
 import com.example.unifiedreader.feature.dictionary.LocalOpenDictionarySettings
 import com.example.unifiedreader.feature.settings.LocalReaderComfortPreferences
+import com.example.unifiedreader.feature.settings.LocalReadingGoalStore
 import kotlinx.coroutines.flow.MutableStateFlow
 
 @Composable
@@ -70,7 +71,7 @@ fun UnifiedReaderRoute(
     bookmarks: AppBookmarksViewModel = hiltViewModel(),
     // The saved words, for My words.
     myWords: AppMyWordsViewModel = hiltViewModel(),
-    // The readers' shared settings, for Settings › Reading.
+    // The readers' shared settings, for Settings › Reading; the daily goal for the side menu and the Journal too.
     readerDisplay: AppReaderDisplayViewModel = hiltViewModel(),
     // The offline dictionary, for the readers' Dictionary card and Settings › Reading.
     dictionary: AppDictionaryViewModel = hiltViewModel(),
@@ -107,6 +108,7 @@ fun UnifiedReaderRoute(
         LocalAppSettingsTools provides settingsTools,
         LocalLocalBookActions provides localBookActions,
         LocalReaderComfortPreferences provides readerDisplay.preferences.comfort,
+        LocalReadingGoalStore provides readerDisplay.preferences.readingGoal,
     ) {
         UnifiedReaderAppContent(
             viewModel = viewModel,

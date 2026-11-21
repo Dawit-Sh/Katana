@@ -56,6 +56,13 @@ class MyWordsState {
         page = MyWordsPage.Review
     }
 
+    /** The review on [word] alone, as the side menu's word of the day opens it. */
+    fun openReview(word: SavedWord) {
+        round = WordReviewRound.of(listOf(word))
+        scrolled = false
+        page = MyWordsPage.Review
+    }
+
     /** One page back; false on the list, which has nothing behind it. */
     fun back(): Boolean {
         if (page == MyWordsPage.Words) return false

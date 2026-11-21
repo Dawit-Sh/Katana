@@ -10,6 +10,8 @@ import androidx.compose.ui.unit.dp
  * Colors the app uses by role, derived from the active theme's Material color scheme.
  * [readerCanvas] is what a comic or a page spread sits on: dark in every theme.
  * [surfaceCard] is the reading card's box: [cardStepColor] of the ground, one fixed step from it in every theme.
+ * [readingDay] is a reading day at its fullest (twice the daily goal) in the side menu and the Journal:
+ * Katana's green in Paper and Graphite, the theme's accent in the others.
  */
 @Immutable
 data class UnifiedReaderSemanticColors(
@@ -36,6 +38,7 @@ data class UnifiedReaderSemanticColors(
     val onSourceAccent: Color,
     val sourceAccentContainer: Color,
     val onSourceAccentContainer: Color,
+    val readingDay: Color,
 )
 
 /**
@@ -97,6 +100,7 @@ val LocalUnifiedReaderSemanticColors = staticCompositionLocalOf {
         onSourceAccent = Color(0xFFFFFFFF),
         sourceAccentContainer = Color(0xFFFFDAD7),
         onSourceAccentContainer = Color(0xFF34100F),
+        readingDay = Color(0xFF476A53),
     )
 }
 

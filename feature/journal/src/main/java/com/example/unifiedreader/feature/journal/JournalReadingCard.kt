@@ -1,18 +1,15 @@
 package com.example.unifiedreader.feature.journal
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -20,331 +17,255 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.compositeOver
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.min
+import androidx.compose.ui.unit.sp
+import com.example.unifiedreader.core.model.ReadableItem
+import com.example.unifiedreader.core.model.ReadableItemKind
+import com.example.unifiedreader.feature.library.ItemProgressSummary
+import com.example.unifiedreader.feature.library.LibraryCoverImageVariant
+import com.example.unifiedreader.feature.library.VisibleResolvedLibraryCover
 import com.example.unifiedreader.journal.JournalSnapshot
-import com.example.unifiedreader.ui.components.AppDivider
+import com.example.unifiedreader.ui.components.AppBookType
+import com.example.unifiedreader.ui.components.AppCoverShape
 import com.example.unifiedreader.ui.components.AppIcons
-import com.example.unifiedreader.ui.components.AppLayout
 import com.example.unifiedreader.ui.components.AppPanel
+import com.example.unifiedreader.ui.components.AppPanelDefaults
+import com.example.unifiedreader.ui.components.AppProgressBar
 import com.example.unifiedreader.ui.theme.UnifiedReaderThemeTokens
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle
-import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** The book being read, for the side menu's Reading card: the library's item and how far it is. */
+data class ReadingCardBook(
+    val item: ReadableItem,
+    val progress: ItemProgressSummary?,
+)
+
 /**
- * The side menu's reading card, from the journal's own reading sessions: a heat map of the last
- * 15 weeks, the streak, the days read and the books finished, the best day, and bars for the last
- * seven days. A tap opens the Journal.
+ * The book being read across every source, for the card: the one read last that isn't finished, with
+ * how far it is ([progressByItemId]); null when nothing is under way.
+ */
+fun readingCardBook(items: List<ReadableItem>, progressByItemId: Map<String, ItemProgressSummary>): ReadingCardBook? {
+    val underWay = progressByItemId.entries
+        .filter { (_, progress) -> progress.lastReadAtEpochMillis > 0L && !progress.isFinished && progress.fraction < FINISHED_FRACTION }
+        .sortedByDescending { (_, progress) -> progress.lastReadAtEpochMillis }
+    if (underWay.isEmpty()) return null
+    val itemsById = items.associateBy(ReadableItem::id)
+    // A place kept for a book no longer in the library (removed, or its server not loaded yet) is passed over.
+    return underWay.firstNotNullOfOrNull { (itemId, progress) ->
+        itemsById[itemId]?.let { item -> ReadingCardBook(item = item, progress = progress) }
+    }
+}
+
+/** The card's model for [snapshot] against [goalMinutes], worked out off the main thread; today moves on at midnight. */
+@Composable
+fun rememberReadingCardModel(snapshot: JournalSnapshot, goalMinutes: Int): ReadingCardModel? {
+    val today = rememberLocalToday()
+    val model by produceState<ReadingCardModel?>(null, snapshot.events, snapshot.sessions, today, goalMinutes) {
+        value = withContext(Dispatchers.Default) { readingCardModel(snapshot, today, goalMinutes) }
+    }
+    return model
+}
+
+/**
+ * The side menu's Reading card: today's reading ("1 h 12 read today", Journal ›), the book being read
+ * (cover, title in the book face, chapter and how far, a thin bar; a tap opens it) and the last 16 weeks
+ * as a heat map coloured by the daily goal (a tap opens the Journal). Nothing else: no streak, totals or
+ * key. Given less height than it would like, the heat map's squares get smaller (see [ReadingHeatMap]).
  */
 @Composable
 fun JournalReadingCard(
-    snapshot: JournalSnapshot,
-    onClick: () -> Unit,
+    model: ReadingCardModel,
+    book: ReadingCardBook?,
+    onOpenJournal: () -> Unit,
+    onOpenBook: (ReadableItem) -> Unit,
     modifier: Modifier = Modifier,
-    today: LocalDate = LocalDate.now(),
+    coverImageUrlProvider: (ReadableItem, LibraryCoverImageVariant) -> String? = { item, _ -> item.coverUrl },
+    onCoverVisible: (ReadableItem, LibraryCoverImageVariant) -> Unit = { _, _ -> },
 ) {
-    val model by produceState<ReadingCardModel?>(null, snapshot.events, snapshot.sessions, today) {
-        value = withContext(Dispatchers.Default) { readingCardModel(snapshot, today) }
-    }
-    val shown = model ?: return
-    AppPanel(
-        onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .semantics(mergeDescendants = true) { contentDescription = ReadingCardCopy.description(shown) },
-    ) {
+    val ground = AppPanelDefaults.containerColor
+    val shades = readingDayShades(ground)
+    AppPanel(modifier = modifier.fillMaxWidth(), color = ground) {
         Column(
-            // Tight enough for the Fire's side menu, under its sources, without scrolling.
-            modifier = Modifier.padding(horizontal = AppLayout.menuInset, vertical = AppLayout.headingGap),
-            verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
+            modifier = Modifier.padding(ReadingCardDefaults.Inset),
+            verticalArrangement = Arrangement.spacedBy(ReadingCardDefaults.Gap),
         ) {
-            CardHeader(shown)
-            StatTiles(shown)
-            HeatMap(shown)
-            Legend(shown)
-            AppDivider()
-            LastSevenDays(shown)
+            TodayLine(minutes = model.todayMinutes, onOpenJournal = onOpenJournal)
+            if (book != null) {
+                BookRow(
+                    book = book,
+                    onOpenBook = onOpenBook,
+                    coverImageUrlProvider = coverImageUrlProvider,
+                    onCoverVisible = onCoverVisible,
+                )
+            }
+            ReadingHeatMap(
+                columns = model.weeks,
+                shades = shades,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClickLabel = ReadingCardCopy.OpenJournal, onClick = onOpenJournal)
+                    .clearAndSetSemantics {
+                        contentDescription = ReadingCardCopy.heatMapDescription(model)
+                        role = Role.Button
+                        onClick(label = ReadingCardCopy.OpenJournal) {
+                            onOpenJournal()
+                            true
+                        }
+                    },
+            )
         }
     }
 }
 
+/** "1 h 12 read today" and, at the end, "Journal ›"; the whole line opens the Journal. */
 @Composable
-private fun CardHeader(model: ReadingCardModel) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = ReadingCardCopy.Title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(
-                text = ReadingCardCopy.range(model.firstDay),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+private fun TodayLine(minutes: Int, onOpenJournal: () -> Unit) {
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(UnifiedReaderThemeTokens.presentation.innerCornerRadius))
+            .clickable(onClickLabel = ReadingCardCopy.OpenJournal, role = Role.Button, onClick = onOpenJournal)
+            .semantics(mergeDescendants = true) {},
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = readingTodayTime(minutes),
+            style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp, fontFeatureSettings = "tnum"),
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            modifier = Modifier.alignByBaseline(),
+        )
+        Text(
+            text = ReadingCardCopy.ReadToday,
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp),
+            color = muted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).alignByBaseline(),
+        )
         Text(
             text = ReadingCardCopy.Journal,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp),
+            fontWeight = FontWeight.Medium,
+            color = muted,
+            maxLines = 1,
+            modifier = Modifier.alignByBaseline(),
         )
         Icon(
             imageVector = AppIcons.KeyboardArrowRight,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(SmallIcon),
+            tint = muted,
+            modifier = Modifier.size(ReadingCardDefaults.ArrowSize),
         )
     }
 }
 
+/** The book being read: its cover, the title in the book face, "chapter · 34%" and a thin bar; a tap opens it. */
 @Composable
-private fun StatTiles(model: ReadingCardModel) {
-    Row(horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap)) {
-        StatTile(
-            value = model.streak.toString(),
-            unit = ReadingCardCopy.days(model.streak),
-            label = ReadingCardCopy.Streak,
-            icon = AppIcons.LocalFireDepartment,
-            tint = StreakTint,
-            modifier = Modifier.weight(1f),
-        )
-        StatTile(
-            value = model.daysRead.toString(),
-            unit = null,
-            label = ReadingCardCopy.DaysRead,
-            icon = AppIcons.EventAvailable,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.weight(1f),
-        )
-        StatTile(
-            value = model.finished.toString(),
-            unit = null,
-            label = ReadingCardCopy.Finished,
-            icon = AppIcons.TaskAlt,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-@Composable
-private fun StatTile(
-    value: String,
-    unit: String?,
-    label: String,
-    icon: ImageVector,
-    tint: Color,
-    modifier: Modifier = Modifier,
+private fun BookRow(
+    book: ReadingCardBook,
+    onOpenBook: (ReadableItem) -> Unit,
+    coverImageUrlProvider: (ReadableItem, LibraryCoverImageVariant) -> String?,
+    onCoverVisible: (ReadableItem, LibraryCoverImageVariant) -> Unit,
 ) {
-    Column(
-        modifier = modifier
-            .background(tileColor(), RoundedCornerShape(UnifiedReaderThemeTokens.presentation.innerCornerRadius))
-            .padding(horizontal = AppLayout.headingGap + TileExtraInset, vertical = TileVerticalInset),
-        verticalArrangement = Arrangement.spacedBy(TileLineGap),
+    val item = book.item
+    val detail = readingCardBookDetail(book.progress)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(UnifiedReaderThemeTokens.presentation.innerCornerRadius))
+            .clickable(onClickLabel = ReadingCardCopy.OpenBook, role = Role.Button) { onOpenBook(item) }
+            .semantics(mergeDescendants = true) {},
+        horizontalArrangement = Arrangement.spacedBy(ReadingCardDefaults.Gap),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(text = value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            unit?.let {
-                Text(
-                    text = " $it",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = TileUnitNudge),
-                )
-            }
+        Box(modifier = Modifier.size(ReadingCardDefaults.CoverWidth, ReadingCardDefaults.CoverHeight).clip(AppCoverShape.shape)) {
+            VisibleResolvedLibraryCover(
+                item = item,
+                coverImageUrlProvider = coverImageUrlProvider,
+                onCoverVisible = onCoverVisible,
+                imageVariant = LibraryCoverImageVariant.ShelfRow,
+                modifier = Modifier.size(ReadingCardDefaults.CoverWidth, ReadingCardDefaults.CoverHeight),
+            )
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(TileLineGap)) {
-            Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(TinyIcon))
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = item.title,
+                style = AppBookType.title(
+                    MaterialTheme.typography.titleSmall.copy(fontSize = 15.sp, lineHeight = 19.sp),
+                    comic = item.kind == ReadableItemKind.COMIC,
+                ),
                 maxLines = 1,
-                // A narrow phone or a large font cuts a label short; the dots say so.
                 overflow = TextOverflow.Ellipsis,
             )
-        }
-    }
-}
-
-/** The weeks as columns of Monday to Sunday, the months over them and every other weekday beside them. */
-@Composable
-private fun HeatMap(model: ReadingCardModel) {
-    val shades = heatShades()
-    val todayRing = MaterialTheme.colorScheme.onSurface
-    val futureEdge = MaterialTheme.colorScheme.outlineVariant
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth().clearAndSetSemantics { }) {
-        val columns = model.weeks.size
-        val cell = min(MaxCell, (maxWidth - DayLabelWidth - AppLayout.headingGap - CellGap * (columns - 1)) / columns)
-        val step = cell + CellGap
-        Column(verticalArrangement = Arrangement.spacedBy(MonthGap)) {
-            MonthLabels(labels = model.monthLabels, step = step)
-            Row(horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap)) {
-                Column(modifier = Modifier.width(DayLabelWidth), verticalArrangement = Arrangement.spacedBy(CellGap)) {
-                    WeekdayLabels.forEachIndexed { index, label ->
-                        Box(modifier = Modifier.height(cell), contentAlignment = Alignment.CenterStart) {
-                            if (index % 2 == 0) {
-                                Text(
-                                    text = label,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                }
-                Canvas(modifier = Modifier.width(step * columns - CellGap).height(step * DaysInWeek - CellGap)) {
-                    val size = cell.toPx()
-                    val gap = step.toPx()
-                    val radius = CornerRadius(size * CellRounding)
-                    model.weeks.forEachIndexed { x, week ->
-                        week.forEachIndexed { y, day ->
-                            val topLeft = Offset(x * gap, y * gap)
-                            val tile = Size(size, size)
-                            when {
-                                day.isFuture -> drawRoundRect(futureEdge, topLeft, tile, radius, style = Stroke(1.dp.toPx()))
-                                else -> drawRoundRect(shades[day.level], topLeft, tile, radius)
-                            }
-                            if (day.isToday) {
-                                val ring = 2.dp.toPx()
-                                drawRoundRect(
-                                    todayRing,
-                                    Offset(topLeft.x - ring / 2, topLeft.y - ring / 2),
-                                    Size(size + ring, size + ring),
-                                    radius,
-                                    style = Stroke(ring),
-                                )
-                            }
-                        }
-                    }
-                }
+            if (detail != null) {
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 16.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = ReadingCardDefaults.LineGap),
+                )
             }
-        }
-    }
-}
-
-/** The months' names over the columns that hold their first day, [step] apart a column. */
-@Composable
-private fun MonthLabels(labels: List<Pair<Int, String>>, step: Dp) {
-    Box(modifier = Modifier.padding(start = DayLabelWidth + AppLayout.headingGap).height(MonthRowHeight).fillMaxWidth()) {
-        labels.forEach { (column, name) ->
-            Text(
-                text = name,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.offset(x = step * column),
+            Spacer(modifier = Modifier.height(ReadingCardDefaults.BarGap))
+            AppProgressBar(
+                fraction = book.progress?.fraction ?: 0f,
+                height = ReadingCardDefaults.BarHeight,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
 }
 
-@Composable
-private fun Legend(model: ReadingCardModel) {
-    val shades = heatShades()
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(TileLineGap)) {
-        Text(
-            text = model.bestDay?.let(ReadingCardCopy::bestDay).orEmpty(),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
-            maxLines = 1,
-        )
-        Text(text = ReadingCardCopy.Less, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        shades.forEach { shade ->
-            Box(
-                modifier = Modifier
-                    .size(LegendSwatch)
-                    .background(shade, RoundedCornerShape(UnifiedReaderThemeTokens.presentation.chipCornerRadius)),
-            )
-        }
-        Text(text = ReadingCardCopy.More, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+/** "Stave Three · 34%", "Chapter 9 · 70%", or only "34%" when the reader kept no chapter. */
+fun readingCardBookDetail(progress: ItemProgressSummary?): String? {
+    progress ?: return null
+    val chapter = progress.chapterTitle?.trim()?.takeIf(String::isNotEmpty)
+        ?: progress.chapter?.let { number -> "Chapter $number" }
+    return listOfNotNull(chapter, progress.percentLabel).joinToString(" · ")
 }
 
-/** The five tiles from no reading to the most: the empty tile, then the accent ever stronger. */
-@Composable
-private fun heatShades(): List<Color> {
-    val ground = tileColor()
-    val accent = MaterialTheme.colorScheme.primary
-    return remember(ground, accent) { listOf(ground) + HeatAlphas.map { alpha -> accent.copy(alpha = alpha).compositeOver(ground) } }
-}
-
-@Composable
-internal fun tileColor(): Color = MaterialTheme.colorScheme.surfaceContainerHighest
+/** A book this far through counts as finished (the library's shelves agree). */
+private const val FINISHED_FRACTION = 0.999f
 
 /** What the reading card says. */
 internal object ReadingCardCopy {
-    const val Title = "Reading"
+    const val ReadToday = " read today"
     const val Journal = "Journal"
-    const val Streak = "Streak"
-    const val DaysRead = "Days read"
-    const val Finished = "Finished"
-    const val Less = "Less"
-    const val More = "More"
-    const val Today = "Today"
+    const val OpenJournal = "Open the Journal"
+    const val OpenBook = "Open the book"
 
-    // Day first, as in Britain, with three-letter months ("Sep"; the JDK's UK months say "Sept").
-    private val DayMonth: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM", Locale.US)
-    private val WeekdayDayMonth: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale.US)
-
-    fun days(n: Int): String = if (n == 1) "day" else "days"
-
-    fun range(firstDay: LocalDate): String = "Last 15 weeks, ${firstDay.format(DayMonth)} to today"
-
-    fun minutes(minutes: Int): String = when {
-        minutes < MINUTES_PER_HOUR -> "${minutes}m"
-        else -> "${minutes / MINUTES_PER_HOUR}h ${minutes % MINUTES_PER_HOUR}m"
+    fun heatMapDescription(model: ReadingCardModel): String {
+        val read = model.weeks.flatten().count { day -> !day.isFuture && day.step > 0 }
+        return "Reading days, the last ${model.weeks.size} weeks: $read days read"
     }
-
-    private const val MINUTES_PER_HOUR = 60
-
-    fun bestDay(day: ReadingCardDay): String = "Best day: ${day.date.format(WeekdayDayMonth)}, ${minutes(day.minutes)}"
-
-    fun lastSeven(minutes: Int): String = "Last 7 days · ${minutes(minutes)}"
-
-    fun average(minutes: Int): String = "$minutes min a day"
-
-    fun weekday(date: LocalDate): String = date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.US)
-
-    fun description(model: ReadingCardModel): String =
-        "Reading: ${model.streak}-day streak, ${model.daysRead} days read in the last 15 weeks, " +
-            "${minutes(model.weekMinutes)} in the last 7 days; opens the Journal"
 }
 
-private val WeekdayLabels = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-private val HeatAlphas = listOf(0.3f, 0.5f, 0.75f, 1f)
-private const val DaysInWeek = 7
-private const val CellRounding = 0.28f
-private const val STREAK_ARGB = 0xFFE8A33D
-
-/** The streak's flame: the bookmark ribbon's amber. */
-private val StreakTint = Color(STREAK_ARGB)
-private val SmallIcon = 16.dp
-private val TinyIcon = 13.dp
-private val MaxCell: Dp = 13.dp
-private val CellGap: Dp = 3.dp
-private val DayLabelWidth: Dp = 26.dp
-private val MonthRowHeight: Dp = 16.dp
-private val MonthGap: Dp = 2.dp
-private val TileVerticalInset: Dp = 6.dp
-internal val TileLineGap: Dp = 4.dp
-private val TileExtraInset: Dp = 4.dp
-private val TileUnitNudge: Dp = 2.dp
-private val LegendSwatch: Dp = 11.dp
+/** The reading card's sizes. */
+object ReadingCardDefaults {
+    /** Inside the card, and between its parts. */
+    val Inset: Dp = 12.dp
+    val Gap: Dp = 12.dp
+    val CoverWidth: Dp = 36.dp
+    val CoverHeight: Dp = 54.dp
+    val BarHeight: Dp = 3.dp
+    val BarGap: Dp = 7.dp
+    val LineGap: Dp = 2.dp
+    val ArrowSize: Dp = 16.dp
+}

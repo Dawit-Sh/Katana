@@ -7,6 +7,9 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Calendar
 import java.util.Locale
 
@@ -22,6 +25,13 @@ internal fun rememberJournalNowEpochMillis(): Long {
         }
     }
     return now
+}
+
+/** Today on the device's calendar, moving on at each local midnight. */
+@Composable
+fun rememberLocalToday(): LocalDate {
+    val now = rememberJournalNowEpochMillis()
+    return remember(now) { Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).toLocalDate() }
 }
 
 internal fun millisUntilNextLocalDay(

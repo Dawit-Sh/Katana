@@ -42,6 +42,7 @@ import com.example.unifiedreader.data.repository.RemoteSyncArtifact
 import com.example.unifiedreader.feature.lists.ListLibraryMode
 import com.example.unifiedreader.feature.downloads.DownloadsSheet
 import com.example.unifiedreader.feature.journal.JournalReadingCard
+import com.example.unifiedreader.feature.journal.rememberReadingCardModel
 import com.example.unifiedreader.feature.journal.JournalScreen
 import com.example.unifiedreader.feature.library.LocalLibraryCoverAsPrinted
 import com.example.unifiedreader.feature.library.LibraryPullToRefresh
@@ -418,18 +419,42 @@ fun UnifiedReaderScaffold(
         knownConnectedServers?.let(viewModel::recordConnectedSources)
     }
     val warmJournalSnapshot = rememberWarmJournalSnapshot(viewModel, uiState)
+    val (readingGoal, onReadingGoalChange) = rememberReadingGoal()
+    val readingCardModel = rememberReadingCardModel(uiState.journalSnapshot, readingGoal)
+    val readingCardBook = rememberReadingCardBook(uiState)
+    val closeDrawer: () -> Unit = { drawerScope.launch { drawerState.close() } }
+    val wordCard = rememberWordOfTheDayCard(myWords) { word ->
+        closeDrawer()
+        myWords?.state?.openReview(word)
+        viewModel.onTopLevelSelected(TopLevelDestination.MyWords)
+    }
     SourceNavigationFrame(
         drawerState = drawerState,
         sourceOrder = navigationSources(uiState.sourceOrder, connectedServers),
         showAddSource = canAddNavigationSource(connectedServers),
         settingsBadge = waitingUpdateVersion,
         myWordsCount = myWords?.let { it.count.collectAsStateWithLifecycle().value },
-        readingCard = {
-            JournalReadingCard(snapshot = uiState.journalSnapshot, onClick = {
-                drawerScope.launch { drawerState.close() }
-                viewModel.onTopLevelSelected(TopLevelDestination.Journal)
-            })
+        sourceCounts = rememberSourceCounts(uiState),
+        logo = { KatanaMenuLogo() },
+        readingCard = readingCardModel?.let { model ->
+            {
+                JournalReadingCard(
+                    model = model,
+                    book = readingCardBook,
+                    onOpenJournal = {
+                        closeDrawer()
+                        viewModel.onTopLevelSelected(TopLevelDestination.Journal)
+                    },
+                    onOpenBook = { item ->
+                        closeDrawer()
+                        viewModel.onItemSelected(item)
+                    },
+                    coverImageUrlProvider = viewModel::coverImageUrlFor,
+                    onCoverVisible = viewModel::ensureCoverCached,
+                )
+            }
         },
+        wordCard = wordCard,
         selectedDestination = when (uiState.topLevel) {
             TopLevelDestination.Library -> SourceNavigationDestination.Source(uiState.selectedSource)
             TopLevelDestination.Lists -> SourceNavigationDestination.Lists
@@ -669,6 +694,8 @@ fun UnifiedReaderScaffold(
                                             viewModel.onTopLevelSelected(TopLevelDestination.Bookmarks)
                                         }
                                     },
+                                    readingGoalMinutes = readingGoal,
+                                    onReadingGoalChange = onReadingGoalChange,
                                 )
                             }
 

@@ -28,13 +28,15 @@ class JournalOverviewModelTest {
 
 
     @Test
-    fun `heat levels step by quarters of the busiest day`() {
-        assertEquals(0, journalHeatLevel(0, 25))
-        assertEquals(1, journalHeatLevel(2, 25))
-        assertEquals(2, journalHeatLevel(12, 25))
-        assertEquals(3, journalHeatLevel(18, 25))
-        assertEquals(4, journalHeatLevel(25, 25))
-        assertEquals(1, journalHeatLevel(3, 0))
+    fun `calendar days step by the daily goal, a day read without minutes as the first step`() {
+        val goal = 30
+        assertEquals(0, journalReadingDayStep(day(5, pages = 0, events = 0), goal))
+        assertEquals(1, journalReadingDayStep(day(5, pages = 0, events = 1), goal))
+        assertEquals(1, journalReadingDayStep(day(5, pages = 0, events = 1).copy(readingMillis = 14 * MINUTE), goal))
+        assertEquals(2, journalReadingDayStep(day(5, pages = 0, events = 1).copy(readingMillis = 20 * MINUTE), goal))
+        assertEquals(3, journalReadingDayStep(day(5, pages = 0, events = 1).copy(readingMillis = 45 * MINUTE), goal))
+        assertEquals(4, journalReadingDayStep(day(5, pages = 0, events = 1).copy(readingMillis = 61 * MINUTE), goal))
+        assertEquals(3, journalReadingDayStep(day(5, pages = 0, events = 1).copy(readingMillis = 61 * MINUTE), 45))
     }
 
     @Test
@@ -240,3 +242,5 @@ class JournalOverviewModelTest {
             set(year, month, day, hour, 0)
         }.timeInMillis
 }
+
+private const val MINUTE = 60_000L

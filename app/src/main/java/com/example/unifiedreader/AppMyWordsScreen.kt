@@ -1,5 +1,6 @@
 package com.example.unifiedreader
 
+import android.content.Context
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -16,6 +17,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.feature.annotations.AnnotationExports
 import com.example.unifiedreader.feature.annotations.AnnotationJumps
+import com.example.unifiedreader.feature.annotations.KeptWord
 import com.example.unifiedreader.feature.annotations.MarkdownExport
 import com.example.unifiedreader.feature.annotations.MyWordsActions
 import com.example.unifiedreader.feature.annotations.MyWordsBar
@@ -25,6 +27,8 @@ import com.example.unifiedreader.feature.annotations.MyWordsState
 import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
 import com.example.unifiedreader.feature.annotations.SavedWord
 import com.example.unifiedreader.feature.annotations.WordMeanings
+import com.example.unifiedreader.feature.annotations.WordOfTheDay
+import com.example.unifiedreader.feature.annotations.meaningLine
 import com.example.unifiedreader.feature.annotations.meaningsOf
 import com.example.unifiedreader.feature.annotations.removeWordWithUndo
 import com.example.unifiedreader.feature.dictionary.DictionaryRequest
@@ -34,11 +38,16 @@ import com.example.unifiedreader.ui.components.AppToastMessage
 import com.example.unifiedreader.ui.components.AppToastState
 import com.example.unifiedreader.ui.components.LocalAppToastState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.time.LocalDate
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
@@ -52,8 +61,15 @@ class AppMyWordsViewModel @Inject constructor(
     store: ReaderAnnotationStore,
     jumps: AnnotationJumps,
     meanings: WordMeanings,
+    @ApplicationContext context: Context,
 ) : ViewModel() {
-    val screen = AppMyWordsScreen(store = store, jumps = jumps, meanings = meanings, scope = viewModelScope)
+    val screen = AppMyWordsScreen(
+        store = store,
+        jumps = jumps,
+        wordMeanings = meanings,
+        scope = viewModelScope,
+        wordOfTheDayStore = WordOfTheDayStore(context),
+    )
 }
 
 /**
@@ -64,8 +80,10 @@ class AppMyWordsViewModel @Inject constructor(
 class AppMyWordsScreen(
     private val store: ReaderAnnotationStore,
     private val jumps: AnnotationJumps,
-    meanings: WordMeanings,
+    private val wordMeanings: WordMeanings,
     private val scope: CoroutineScope,
+    /** Keeps the side menu's word of the day for its day; null keeps it in memory only. */
+    private val wordOfTheDayStore: WordOfTheDayStore? = null,
 ) {
     /** Where the page is; kept here so it is still there after a book opened from it closes. */
     val state = MyWordsState()
@@ -84,10 +102,45 @@ class AppMyWordsScreen(
      */
     val meanings: StateFlow<Map<String, String>> =
         words.filterNotNull()
-            .mapLatest { list -> meanings.meaningsOf(list, language = MEANING_LANGUAGE) }
+            .mapLatest { list -> wordMeanings.meaningsOf(list, language = MEANING_LANGUAGE) }
             .stateIn(scope, SharingStarted.WhileSubscribed(KEEP_MILLIS), emptyMap())
 
     private val exports = AnnotationExports(store)
+
+    private val keptWordState = MutableStateFlow<KeptWord?>(null)
+    private val keptWordReadState = MutableStateFlow(wordOfTheDayStore == null)
+
+    /** The word kept as a day's word of the day. */
+    val keptWord: StateFlow<KeptWord?> = keptWordState.asStateFlow()
+
+    /** Whether [keptWord] has been read from its file; until then nothing is kept over it. */
+    val keptWordRead: StateFlow<Boolean> = keptWordReadState.asStateFlow()
+
+    init {
+        wordOfTheDayStore?.let { kept ->
+            scope.launch(Dispatchers.IO) {
+                keptWordState.value = kept.read()
+                keptWordReadState.value = true
+            }
+        }
+    }
+
+    /** Keeps [kept] as its day's word of the day, so it stays all day even as words come and go. */
+    fun keepWordOfTheDay(kept: KeptWord) {
+        if (!keptWordReadState.value || keptWordState.value == kept) return
+        keptWordState.value = kept
+        wordOfTheDayStore?.let { store -> scope.launch(Dispatchers.IO) { store.write(kept) } }
+    }
+
+    /** "Another word": the next in [date]'s order after [current], kept for the rest of the day. */
+    fun nextWordOfTheDay(date: LocalDate, current: SavedWord) {
+        val next = words.value?.let { list -> WordOfTheDay.next(list, date, current) } ?: return
+        keepWordOfTheDay(KeptWord(date, next.id))
+    }
+
+    /** [word]'s meaning on one line: its own, else the dictionary's. */
+    suspend fun meaningOf(word: SavedWord): String? =
+        meaningLine(word, wordMeanings.meaningsOf(listOf(word), language = MEANING_LANGUAGE))
 
     /** The reader opens [itemId] at this place next, instead of where it was left. */
     fun openAt(itemId: String, locatorJson: String) = jumps.request(itemId, locatorJson)

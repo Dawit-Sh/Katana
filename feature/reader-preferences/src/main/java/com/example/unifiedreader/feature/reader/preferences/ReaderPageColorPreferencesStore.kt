@@ -82,8 +82,8 @@ class InMemoryReaderPageColorPreferencesStore(
 
 /**
  * What the readers' settings change about the reading page beyond one book: the page number, the
- * page colour new books open on, the font and spacing they open with, the light and keys, and whether
- * a PDF or DjVu book you haven't set turns its pages or scrolls.
+ * page colour new books open on, the font and spacing they open with, the light and keys, whether
+ * a PDF or DjVu book you haven't set turns its pages or scrolls, and the daily reading goal.
  */
 class ReaderDisplayPreferences(
     val pageNumbers: ReaderPageNumberPreferencesStore = InMemoryReaderPageNumberPreferencesStore(),
@@ -91,6 +91,7 @@ class ReaderDisplayPreferences(
     val bookLook: ReaderBookLookPreferencesStore = InMemoryReaderBookLookPreferencesStore(),
     val comfort: ReaderComfortPreferencesStore = InMemoryReaderComfortPreferencesStore(),
     val pages: ReaderPagesPreferencesStore = InMemoryReaderPagesPreferencesStore(),
+    val readingGoal: ReadingGoalStore = InMemoryReadingGoalStore(),
 )
 
 private val Context.readerPageColorPreferencesDataStore: DataStore<Preferences> by preferencesDataStore(

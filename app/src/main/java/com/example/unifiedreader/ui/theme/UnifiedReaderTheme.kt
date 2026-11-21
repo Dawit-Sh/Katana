@@ -547,9 +547,19 @@ private fun resolveUnifiedReaderTheme(
     val isDark = if (themeMode == ThemeMode.SystemDynamic) systemDarkTheme else themeMode.isDark
     return UnifiedReaderResolvedTheme(
         colorScheme = colorScheme,
-        semanticColors = colorScheme.toSemanticColors(isDark = isDark),
+        semanticColors = colorScheme.toSemanticColors(isDark = isDark, readingDay = readingDayColor(themeMode, isDark, colorScheme)),
         isDark = isDark,
     )
+}
+
+/**
+ * A reading day at its fullest: Katana's green in the quiet themes (Paper's read green, a lighter one on
+ * Graphite's dark), and a character theme's own accent, so its days stay in its palette.
+ */
+internal fun readingDayColor(themeMode: ThemeMode, isDark: Boolean, colorScheme: ColorScheme): Color = when (themeMode) {
+    ThemeMode.SystemDynamic, ThemeMode.Paper, ThemeMode.Light, ThemeMode.Graphite, ThemeMode.Dark ->
+        if (isDark) UnifiedReaderPalette.DarkReadGreen else UnifiedReaderPalette.ReadGreen
+    else -> colorScheme.primary
 }
 
 /** [themeMode]'s own colours, or System Dynamic's without dynamic colour (before Android 12). */
@@ -615,7 +625,7 @@ internal fun unifiedReaderThemeCharacter(themeMode: ThemeMode): UnifiedReaderThe
     else -> UnifiedReaderQuietCharacter
 }
 
-private fun ColorScheme.toSemanticColors(isDark: Boolean): UnifiedReaderSemanticColors {
+private fun ColorScheme.toSemanticColors(isDark: Boolean, readingDay: Color): UnifiedReaderSemanticColors {
     val readerChromeAlpha = if (isDark) 0.94f else 0.88f
     val readerChromeElevatedAlpha = if (isDark) 0.98f else 0.94f
     return UnifiedReaderSemanticColors(
@@ -643,6 +653,7 @@ private fun ColorScheme.toSemanticColors(isDark: Boolean): UnifiedReaderSemantic
         onSourceAccent = onTertiary,
         sourceAccentContainer = tertiaryContainer,
         onSourceAccentContainer = onTertiaryContainer,
+        readingDay = readingDay,
     )
 }
 

@@ -33,7 +33,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -46,8 +45,8 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.unifiedreader.journal.ReadingGoal
 import com.example.unifiedreader.ui.components.AppLayout
-import com.example.unifiedreader.ui.components.AppPanelDefaults
 import com.example.unifiedreader.ui.components.AppWindowWidth
 import com.example.unifiedreader.ui.components.currentAppWindowWidth
 import java.util.Calendar
@@ -55,9 +54,10 @@ import java.util.Locale
 import kotlin.math.min
 
 /**
- * Reading days in Month: the month as small squares, each shaded in the accent by its minutes of
- * reading (four steps, scaled to the month's longest day), today ringed, a dot on a day something
- * was finished; a day without reading is a faint square and a day still to come only an outline.
+ * Reading days in Month: the month as small squares, each shaded by its minutes of reading against
+ * the daily goal ([ReadingGoal]: under half, under the goal, the goal met, twice the goal), today
+ * ringed, a dot on a day something was finished; a day without reading is a faint square and a day
+ * still to come only an outline.
  * From Medium the squares sit beside the heading, the best day and the key, so the month takes
  * the height of its squares; on phones they fill the width under the heading.
  */
@@ -69,7 +69,6 @@ internal fun JournalMonthReadingDaysPanel(
     modifier: Modifier = Modifier,
 ) {
     val daysByKey = remember(overview) { overview.activityDays.associateBy(JournalActivityDay::localDayKey) }
-    val maxValue = overview.activityDays.maxOfOrNull { day -> day.heatValue } ?: 0
     val best = remember(overview) { journalBestDay(overview.activityDays) }
     val showFinished = overview.activityDays.any { day -> day.finishedCount > 0 }
     val compact = currentAppWindowWidth() == AppWindowWidth.Compact
@@ -77,7 +76,6 @@ internal fun JournalMonthReadingDaysPanel(
         MonthGrid(
             monthStartEpochMillis = overview.periodStartEpochMillis,
             daysByKey = daysByKey,
-            maxValue = maxValue,
             todayKey = localDateKey(nowEpochMillis),
             cellMaxHeight = MonthSquareMaxSize,
             gap = MonthSquareGap,
@@ -147,7 +145,6 @@ internal fun JournalYearReadingDaysPanel(
     columns: Int = journalYearMonthColumns(compact = currentAppWindowWidth() == AppWindowWidth.Compact),
 ) {
     val daysByKey = remember(overview) { overview.activityDays.associateBy(JournalActivityDay::localDayKey) }
-    val maxValue = overview.activityDays.maxOfOrNull { day -> day.heatValue } ?: 0
     JournalPanel(modifier = modifier) {
         JournalSectionHeader(title = "Reading days", summary = "Tap a day for what you read")
         Column(modifier = Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -164,7 +161,6 @@ internal fun JournalYearReadingDaysPanel(
                             MonthGrid(
                                 monthStartEpochMillis = monthStartInYear(overview.periodStartEpochMillis, month),
                                 daysByKey = daysByKey,
-                                maxValue = maxValue,
                                 todayKey = localDateKey(nowEpochMillis),
                                 cellMaxHeight = YearCellMaxHeight,
                                 gap = YearCellGap,
@@ -194,7 +190,6 @@ internal fun journalYearMonthColumns(compact: Boolean): Int = if (compact) 3 els
 private fun MonthGrid(
     monthStartEpochMillis: Long,
     daysByKey: Map<Int, JournalActivityDay>,
-    maxValue: Int,
     todayKey: Int,
     cellMaxHeight: Dp,
     gap: Dp,
@@ -206,6 +201,8 @@ private fun MonthGrid(
 ) {
     val cells = remember(monthStartEpochMillis) { monthCells(monthStartEpochMillis) }
     val cellSize = Modifier.cellSize(cellMaxHeight)
+    val goal = LocalJournalReadingGoal.current.minutes
+    val shades = readingDayShades()
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(gap)) {
         if (showNumbers) {
             JournalEqualRow(count = 7, gap = gap) {
@@ -229,7 +226,8 @@ private fun MonthGrid(
                         val activity = daysByKey[day.localDayKey]?.takeIf { it.heatValue > 0 }
                         HeatCell(
                             dayOfMonth = day.dayOfMonth.takeIf { showNumbers },
-                            level = activity?.let { journalHeatLevel(it.heatValue, maxValue) } ?: 0,
+                            level = activity?.let { journalReadingDayStep(it, goal) } ?: 0,
+                            shades = shades,
                             future = day.localDayKey > todayKey,
                             finished = showFinished && (activity?.finishedCount ?: 0) > 0,
                             today = day.localDayKey == todayKey,
@@ -262,6 +260,7 @@ private fun Modifier.cellSize(maxHeight: Dp): Modifier = layout { measurable, co
 private fun HeatCell(
     dayOfMonth: Int?,
     level: Int,
+    shades: List<Color>,
     future: Boolean,
     finished: Boolean,
     today: Boolean,
@@ -275,9 +274,9 @@ private fun HeatCell(
     val dot = scheme.tertiary
     val shape = RoundedCornerShape(corner)
     val fill = when {
-        level > 0 -> Modifier.background(heatColor(level))
+        level > 0 -> Modifier.background(shades[level])
         future -> Modifier.border(1.dp, scheme.onSurface.copy(alpha = FutureOutlineAlpha), shape)
-        else -> Modifier.background(noReadingColor())
+        else -> Modifier.background(shades[0])
     }
     Box(
         modifier = modifier
@@ -308,17 +307,22 @@ private fun HeatCell(
         if (dayOfMonth != null) {
             // The number in the top corner, as on a wall calendar.
             Box(modifier = Modifier.fillMaxSize().padding(start = CellTextInset, top = CellTextTop)) {
-                CellText(text = dayOfMonth.toString(), color = cellTextColor(level, future), size = 11f, weight = FontWeight.SemiBold)
+                CellText(
+                    text = dayOfMonth.toString(),
+                    color = cellTextColor(level, shades, future),
+                    size = 11f,
+                    weight = FontWeight.SemiBold,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun cellTextColor(level: Int, future: Boolean): Color {
+private fun cellTextColor(level: Int, shades: List<Color>, future: Boolean): Color {
     val scheme = MaterialTheme.colorScheme
     return when {
-        level >= 3 -> scheme.onPrimary
+        level >= 3 -> textOnReadingDay(shades[level])
         level > 0 -> scheme.onSurface
         future -> scheme.onSurfaceVariant.copy(alpha = 0.5f)
         else -> scheme.onSurfaceVariant
@@ -342,24 +346,10 @@ private fun CellText(
     )
 }
 
-/** A day gone by without reading: a faint square on the panel. */
-@Composable
-private fun noReadingColor(): Color = MaterialTheme.colorScheme.onSurface.copy(alpha = NoReadingAlpha)
-
-@Composable
-private fun heatColor(level: Int): Color {
-    val base = AppPanelDefaults.containerColor
-    val accent = MaterialTheme.colorScheme.primary
-    return when (level) {
-        0 -> base
-        1 -> lerp(base, accent, 0.2f)
-        2 -> lerp(base, accent, 0.4f)
-        3 -> lerp(base, accent, 0.66f)
-        else -> accent
-    }
-}
-
-/** "None, the none square, four shades, More"; under it the finished dot where the month has one. */
+/**
+ * The key, "Less", the five shades, "More", each named for the goal; under it the finished dot where the
+ * month has one, then the goal itself ("Goal 30 min a day"), which opens the goals to pick from.
+ */
 @Composable
 private fun HeatLegend(
     showFinished: Boolean,
@@ -368,12 +358,20 @@ private fun HeatLegend(
     val textStyle = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp)
     val color = MaterialTheme.colorScheme.onSurfaceVariant
     val swatch = RoundedCornerShape(LegendSwatchCorner)
+    val goal = LocalJournalReadingGoal.current
+    val shades = readingDayShades()
+    val names = ReadingGoal.stepNames(goal.minutes)
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(LegendSwatchGap)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(LegendSwatchGap), verticalAlignment = Alignment.CenterVertically) {
-            Text(text = "None", style = textStyle, color = color)
-            Box(modifier = Modifier.size(LegendSwatchSize).clip(swatch).background(noReadingColor()))
-            (1..4).forEach { level ->
-                Box(modifier = Modifier.size(LegendSwatchSize).clip(swatch).background(heatColor(level)))
+        Row(
+            modifier = Modifier.semantics(mergeDescendants = true) {
+                contentDescription = "Reading days, from less to more: " + names.joinToString(", ")
+            },
+            horizontalArrangement = Arrangement.spacedBy(LegendSwatchGap),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(text = "Less", style = textStyle, color = color)
+            shades.forEach { shade ->
+                Box(modifier = Modifier.size(LegendSwatchSize).clip(swatch).background(shade))
             }
             Text(text = "More", style = textStyle, color = color)
         }
@@ -383,6 +381,7 @@ private fun HeatLegend(
                 Text(text = "Finished something", style = textStyle, color = color)
             }
         }
+        JournalGoalPicker(goal = goal, textStyle = textStyle, color = color)
     }
 }
 
@@ -445,7 +444,6 @@ private val CellTextTop = 3.dp
 private val TodayRingOffset = 3.dp
 private val TodayRingWidth = 2.dp
 private val FinishedDotRadius = 3.5.dp
-private const val NoReadingAlpha = 0.07f
 private const val FutureOutlineAlpha = 0.08f
 private val LegendSwatchSize = 11.dp
 private val LegendSwatchCorner = 3.dp

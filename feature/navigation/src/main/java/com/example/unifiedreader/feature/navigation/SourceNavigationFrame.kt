@@ -35,8 +35,14 @@ fun SourceNavigationFrame(
     showAddSource: Boolean = false,
     /** The drawer's reading card (the rail has no room for one). */
     readingCard: (@Composable () -> Unit)? = null,
+    /** The drawer's word of the day, at its bottom; null while there is none. */
+    wordCard: (@Composable () -> Unit)? = null,
     /** How many words are saved, for My words in the drawer; null leaves My words out. */
     myWordsCount: Int? = null,
+    /** How many books each source holds, at the end of its row in the drawer. */
+    sourceCounts: Map<SourceType, Int> = emptyMap(),
+    /** Katana's mark before its name in the drawer. */
+    logo: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val railShown = sourceNavigationUsesRail()
@@ -53,7 +59,10 @@ fun SourceNavigationFrame(
         showAddSource = showAddSource,
         gesturesEnabled = !railShown,
         readingCard = readingCard,
+        wordCard = wordCard,
         myWordsCount = myWordsCount,
+        sourceCounts = sourceCounts,
+        logo = logo,
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
             if (railShown) {

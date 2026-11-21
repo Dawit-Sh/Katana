@@ -2,6 +2,7 @@ package com.example.unifiedreader.feature.journal
 
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -11,6 +12,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.feature.library.LibraryCoverImageVariant
+import com.example.unifiedreader.journal.ReadingGoal
 import com.example.unifiedreader.ui.components.AppDialog
 import com.example.unifiedreader.ui.components.AppDialogConfirmButton
 import com.example.unifiedreader.ui.components.AppDialogDismissButton
@@ -38,23 +40,28 @@ fun JournalScreen(
     marks: JournalMarks = JournalMarks(),
     // Opens the Bookmarks page from Highlights this month; null hides the link.
     onOpenBookmarks: (() -> Unit)? = null,
+    // The daily goal the calendars colour their days by, and how to change it under their key.
+    readingGoalMinutes: Int = ReadingGoal.DEFAULT_MINUTES,
+    onReadingGoalChange: ((Int) -> Unit)? = null,
 ) {
     var deleteTarget by remember { mutableStateOf<JournalDeleteTarget?>(null) }
-    JournalStatsContent(
-        snapshot = snapshot,
-        coverImageUrlProvider = coverImageUrlProvider,
-        onCoverVisible = onCoverVisible,
-        onDeleteItemJournal = { itemId -> deleteTarget = JournalDeleteTarget.Item(itemId) },
-        onSaveJournalEntry = onSaveJournalEntry,
-        onOpenInLibrary = onOpenInLibrary,
-        contentTopInset = contentTopInset,
-        onScrolledChanged = onScrolledChanged,
-        modifier = modifier,
-        finishedLists = finishedLists,
-        listCover = listCover,
-        marks = marks,
-        onOpenBookmarks = onOpenBookmarks,
-    )
+    CompositionLocalProvider(LocalJournalReadingGoal provides JournalReadingGoal(readingGoalMinutes, onReadingGoalChange)) {
+        JournalStatsContent(
+            snapshot = snapshot,
+            coverImageUrlProvider = coverImageUrlProvider,
+            onCoverVisible = onCoverVisible,
+            onDeleteItemJournal = { itemId -> deleteTarget = JournalDeleteTarget.Item(itemId) },
+            onSaveJournalEntry = onSaveJournalEntry,
+            onOpenInLibrary = onOpenInLibrary,
+            contentTopInset = contentTopInset,
+            onScrolledChanged = onScrolledChanged,
+            modifier = modifier,
+            finishedLists = finishedLists,
+            listCover = listCover,
+            marks = marks,
+            onOpenBookmarks = onOpenBookmarks,
+        )
+    }
     val toasts = LocalAppToastState.current
     deleteTarget?.let { target ->
         JournalDeleteConfirmationDialog(

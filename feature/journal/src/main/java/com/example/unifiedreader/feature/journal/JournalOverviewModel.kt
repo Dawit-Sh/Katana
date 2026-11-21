@@ -12,19 +12,6 @@ import java.util.Locale
  * they can be tested without Compose.
  */
 
-/** How strongly a calendar day is shaded: 0 for no reading, then four steps up to [maxValue]. */
-internal fun journalHeatLevel(value: Int, maxValue: Int): Int {
-    if (value <= 0) return 0
-    if (maxValue <= 0) return 1
-    val share = value.toFloat() / maxValue.toFloat()
-    return when {
-        share <= 0.25f -> 1
-        share <= 0.5f -> 2
-        share <= 0.75f -> 3
-        else -> 4
-    }
-}
-
 /**
  * A day's weight on the calendar: its minutes of reading, and at least 1 for a day with any
  * (reading on another device leaves progress but no time). Pages would let a jump outweigh a
