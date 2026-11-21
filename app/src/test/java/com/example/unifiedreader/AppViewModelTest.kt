@@ -3413,6 +3413,51 @@ class AppViewModelTest {
     }
 
     @Test
+    fun `grimmory refreshes in the background while the local library is on screen, which stays`() {
+        val syncer = FakeGrimmoryCatalogSyncer()
+        val viewModel = createViewModel(
+            grimmoryCatalogSyncer = syncer,
+            grimmoryCredentialStore = FakeGrimmoryCredentialStore(savedGrimmorySession()),
+        )
+        shadowOf(Looper.getMainLooper()).idle()
+        viewModel.openLibrarySource(SourceType.LOCAL)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        viewModel.onLibraryShown()
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertEquals(1, syncer.refreshCount)
+        assertNull(syncer.lastSyncRequest)
+        assertEquals(SourceType.LOCAL, viewModel.uiState.selectedSource)
+        clearViewModel(viewModel)
+    }
+
+    @Test
+    fun `grimmory back after being offline catches up at once`() {
+        val policy = RemoteSourceConnectivityPolicy().apply { markUnavailable(SourceType.GRIMMORY) }
+        val syncer = FakeGrimmoryCatalogSyncer()
+        val viewModel = createViewModel(
+            grimmoryCatalogSyncer = syncer,
+            grimmoryCredentialStore = FakeGrimmoryCredentialStore(savedGrimmorySession()),
+            remoteSourceConnectivityPolicy = policy,
+        )
+        shadowOf(Looper.getMainLooper()).idle()
+        viewModel.openLibrarySource(SourceType.LOCAL)
+        viewModel.onLibraryShown()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(0, syncer.refreshCount)
+
+        policy.markChecking(SourceType.GRIMMORY)
+        shadowOf(Looper.getMainLooper()).idle()
+        policy.markReachable(SourceType.GRIMMORY)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertEquals(1, syncer.refreshCount)
+        assertEquals(SourceType.LOCAL, viewModel.uiState.selectedSource)
+        clearViewModel(viewModel)
+    }
+
+    @Test
     fun `a grimmory sync asked for while one runs is not started a second time`() {
         val gate = CompletableDeferred<Unit>()
         val syncer = FakeGrimmoryCatalogSyncer(syncGate = gate)

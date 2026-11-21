@@ -972,9 +972,19 @@ class AppViewModel @Inject constructor(
         scope = viewModelScope,
     )
 
-    /** The library is on screen: it refreshes by itself when its server last synced a while ago. */
+    /**
+     * The library is on screen: every signed-in server whose last sync was a while ago refreshes by itself, the
+     * one on screen or not, so a device left on its own files still gets the places read elsewhere.
+     */
     fun onLibraryShown() {
-        libraryAutoRefreshCoordinator.refreshIfDue(uiState, ::refreshSelectedRemoteLibrary)
+        libraryAutoRefreshCoordinator.refreshIfDue(uiState) { source ->
+            remoteSourcesCoordinator.refreshRemoteLibraryInPlace(
+                source = source,
+                stateProvider = { uiState },
+                updateState = ::updateUiState,
+                scope = viewModelScope,
+            )
+        }
     }
 
     fun refreshKavitaLibrary() {
@@ -1085,6 +1095,7 @@ class AppViewModel @Inject constructor(
             updateState = ::updateUiState,
         )
         viewModelScope.launch {
+            val backOnline = ServersBackOnline()
             remoteSourceConnectivityPolicy.reachabilityFlow.collect { connectivityBySource ->
                 updateUiState { state ->
                     state.copy(sourceConnectivityBySource = connectivityBySource)
@@ -1093,6 +1104,8 @@ class AppViewModel @Inject constructor(
                     scope = viewModelScope,
                     canScheduleSource = remoteSourceConnectivityPolicy::canScheduleDownload,
                 )
+                // A server answering again after being offline catches up now, not at the next library visit.
+                if (backOnline.next(connectivityBySource).isNotEmpty()) onLibraryShown()
             }
         }
         viewModelScope.launch {

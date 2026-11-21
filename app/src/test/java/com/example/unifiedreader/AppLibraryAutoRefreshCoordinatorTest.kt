@@ -15,8 +15,44 @@ class AppLibraryAutoRefreshCoordinatorTest {
         nowEpochMillis = { now },
     )
     private var refreshes = 0
+    private val refreshed = mutableListOf<SourceType>()
 
-    private fun show(state: AppUiState) = coordinator.refreshIfDue(state) { refreshes += 1 }
+    private fun show(state: AppUiState) = coordinator.refreshIfDue(state) { source ->
+        refreshes += 1
+        refreshed += source
+    }
+
+    @Test
+    fun `grimmory refreshes while the local library is on screen`() {
+        show(grimmory().copy(selectedSource = SourceType.LOCAL))
+        assertEquals(listOf(SourceType.GRIMMORY), refreshed)
+
+        now += 5 * MINUTE
+        show(grimmory().copy(selectedSource = SourceType.LOCAL))
+        assertEquals(1, refreshes)
+    }
+
+    @Test
+    fun `every signed-in server refreshes, the one on screen or not`() {
+        show(
+            grimmory().copy(
+                selectedSource = SourceType.LOCAL,
+                kavitaConnection = RemoteSourceConnectionUiState(source = SourceType.KAVITA, hasStoredSession = true),
+            ),
+        )
+        assertEquals(setOf(SourceType.KAVITA, SourceType.GRIMMORY), refreshed.toSet())
+    }
+
+    @Test
+    fun `a server is back once it answers after being offline, checks between included`() {
+        val back = ServersBackOnline()
+        assertEquals(emptySet<SourceType>(), back.next(mapOf(SourceType.GRIMMORY to SourceConnectivityState.Online)))
+        assertEquals(emptySet<SourceType>(), back.next(mapOf(SourceType.GRIMMORY to SourceConnectivityState.Offline)))
+        assertEquals(emptySet<SourceType>(), back.next(mapOf(SourceType.GRIMMORY to SourceConnectivityState.Checking)))
+        assertEquals(setOf(SourceType.GRIMMORY), back.next(mapOf(SourceType.GRIMMORY to SourceConnectivityState.Online)))
+        // Once only: staying online is not coming back again.
+        assertEquals(emptySet<SourceType>(), back.next(mapOf(SourceType.GRIMMORY to SourceConnectivityState.Online)))
+    }
 
     @Test
     fun `refreshes once the server last synced 15 minutes ago or more`() {

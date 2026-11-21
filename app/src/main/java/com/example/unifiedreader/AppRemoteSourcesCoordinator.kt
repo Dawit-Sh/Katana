@@ -151,8 +151,16 @@ class AppRemoteSourcesCoordinator @Inject constructor(
         stateProvider: AppUiStateProvider,
         updateState: AppUiStateUpdater,
         scope: CoroutineScope,
+    ) = refreshRemoteLibraryInPlace(stateProvider().selectedSource, stateProvider, updateState, scope)
+
+    /** [source]'s light refresh, in place: the library on screen stays, whichever it is. */
+    fun refreshRemoteLibraryInPlace(
+        source: SourceType,
+        stateProvider: AppUiStateProvider,
+        updateState: AppUiStateUpdater,
+        scope: CoroutineScope,
     ) {
-        when (stateProvider().selectedSource) {
+        when (source) {
             SourceType.KAVITA -> kavitaController.fastRefresh(stateProvider, updateState, scope, preserveLibraryContext = true)
             SourceType.STUMP -> stumpController.refresh(stateProvider, updateState, scope, inPlace = true)
             SourceType.GRIMMORY -> grimmoryController.refresh(stateProvider, updateState, scope, inPlace = true)
