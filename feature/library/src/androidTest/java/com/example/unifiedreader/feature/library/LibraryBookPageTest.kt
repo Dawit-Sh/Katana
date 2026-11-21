@@ -1,6 +1,7 @@
 package com.example.unifiedreader.feature.library
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -9,6 +10,7 @@ import com.example.unifiedreader.core.model.BookMetadata
 import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.LibraryBrowseChip
 import com.example.unifiedreader.core.model.LibraryBrowseRow
+import com.example.unifiedreader.core.model.ReadStatus
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
 import org.junit.Assert.assertEquals
@@ -36,26 +38,30 @@ class LibraryBookPageTest {
     fun pageShowsTheBookAndRunsItsActions() {
         var downloaded: ReadableItem? = null
         var markedRead: Boolean? = null
+        var picked: ReadStatus? = null
         var filtered: LibraryBrowseChip? = null
         var opened: ReadableItem? = null
+        val status = LibraryBookStatus(own = null, choices = ReadStatus.entries, onSelect = { picked = it })
 
         composeRule.setContent {
             MaterialTheme {
-                LibraryBookPage(
-                    item = book,
-                    relatedPool = listOf(book),
-                    actionContext = LibraryItemActionContext(
-                        downloadableItemIds = setOf(book.id),
-                        onDownloadItem = { downloaded = it },
-                        onSetReadStatus = { _, read -> markedRead = read },
-                    ),
-                    coverImageUrlProvider = { _, _ -> null },
-                    onOpen = { opened = it },
-                    onShowBook = {},
-                    onDeleteImported = {},
-                    onDismiss = {},
-                    onFilterByTag = { filtered = it },
-                )
+                CompositionLocalProvider(LocalLibraryBookPageStatus provides status) {
+                    LibraryBookPage(
+                        item = book,
+                        relatedPool = listOf(book),
+                        actionContext = LibraryItemActionContext(
+                            downloadableItemIds = setOf(book.id),
+                            onDownloadItem = { downloaded = it },
+                            onSetReadStatus = { _, read -> markedRead = read },
+                        ),
+                        coverImageUrlProvider = { _, _ -> null },
+                        onOpen = { opened = it },
+                        onShowBook = {},
+                        onDeleteImported = {},
+                        onDismiss = {},
+                        onFilterByTag = { filtered = it },
+                    )
+                }
             }
         }
 
@@ -65,12 +71,17 @@ class LibraryBookPageTest {
         composeRule.onNodeWithText("English").assertExists()
 
         composeRule.onNodeWithText("Download").performClick()
-        composeRule.onNodeWithText("Mark finished").performClick()
+        // The reading status pill: a book never started is Unread; Read is Mark finished, the others only the status.
+        composeRule.onNodeWithText("Unread").performClick()
+        composeRule.onNodeWithText("Read").performClick()
+        composeRule.onNodeWithText("Unread").performClick()
+        composeRule.onNodeWithText("Paused").performClick()
         // A genre filters the library by it and closes the page.
         composeRule.onNodeWithText("Fantasy").performClick()
         composeRule.runOnIdle {
             assertEquals(book, downloaded)
             assertEquals(true, markedRead)
+            assertEquals(ReadStatus.PAUSED, picked)
             assertEquals(LibraryBrowseChip(LibraryBrowseRow.GENRE, "Fantasy"), filtered)
             assertEquals(null, opened)
         }

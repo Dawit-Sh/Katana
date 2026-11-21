@@ -1,5 +1,6 @@
 package com.example.unifiedreader
 
+import com.example.unifiedreader.core.model.ReadStatusStore
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.core.model.progress.ProgressSyncStore
@@ -11,6 +12,8 @@ class GrimmoryProgressSyncService @Inject constructor(
     private val grimmoryCredentialStore: GrimmoryCredentialStore,
     private val readerSessionStore: ReaderSessionStore,
     private val nowEpochMillis: () -> Long = System::currentTimeMillis,
+    // The book's reading status comes down with its place (GrimmoryReadStatusSync sends this device's up).
+    private val readStatusStore: ReadStatusStore? = null,
 ) : SourceProgressSync {
     override val sourceType: SourceType = SourceType.GRIMMORY
 
@@ -38,6 +41,8 @@ class GrimmoryProgressSyncService @Inject constructor(
                 )
             }
         } ?: return
+        // The status before the place, as a library sync does.
+        readStatusStore?.takeGrimmoryStatuses(listOf(entry), readerSessionStore, nowEpochMillis())
         applyOrOfferRemoteProgress(
             store = progressSyncStore,
             item = entry.item,

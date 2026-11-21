@@ -3,6 +3,9 @@ package com.example.unifiedreader
 import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.Library
 import com.example.unifiedreader.core.model.LocatorType
+import com.example.unifiedreader.core.model.MemoryReadStatusStore
+import com.example.unifiedreader.core.model.ReadStatus
+import com.example.unifiedreader.core.model.ReadStatusRecord
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.ReadingProgress
 import com.example.unifiedreader.core.model.SourceType
@@ -220,6 +223,42 @@ class GrimmoryProgressSyncServiceTest {
         val snapshot = checkNotNull(readerSessionStore.getProgress(item))
         assertEquals(SyncState.DIRTY, snapshot.syncState)
         assertEquals(0.5, snapshot.percent)
+    }
+
+    @Test
+    fun `sync item brings the book's reading status down with its place`() = runBlocking {
+        val item = grimmoryItem(remoteId = "book-1")
+        val readerSessionStore = ProgressSyncTestReaderSessionStore()
+        val statuses = MemoryReadStatusStore()
+        val api = RecordingGrimmoryApi(
+            bookEntriesById = mapOf(
+                "book-1" to GrimmoryBookCatalogEntry(
+                    item = item,
+                    progress = ReadingProgress(itemId = item.id, locatorType = LocatorType.PERCENT, percent = 0.4, updatedAtEpochMillis = 10L),
+                    readStatus = "PAUSED",
+                ),
+            ),
+        )
+        val service = GrimmoryProgressSyncService(
+            grimmoryApiFactory = GrimmoryApiFactory { _ -> api },
+            grimmoryCredentialStore = ProgressSyncTestGrimmoryCredentialStore(
+                GrimmoryStoredSession(
+                    displayName = "Home Grimmory",
+                    baseUrl = "https://grimmory.example",
+                    username = "reader",
+                    accessToken = "access-token",
+                    refreshToken = "refresh-token",
+                ),
+            ),
+            readerSessionStore = readerSessionStore,
+            nowEpochMillis = { 1_000L },
+            readStatusStore = statuses,
+        )
+
+        service.syncItem(item)
+
+        assertEquals(ReadStatusRecord(ReadStatus.PAUSED, 1_000L), statuses.get(item.id))
+        assertEquals(0.4, readerSessionStore.getProgress(item)?.percent)
     }
 
     @Test

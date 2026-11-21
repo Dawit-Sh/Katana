@@ -18,6 +18,7 @@ import com.example.unifiedreader.feature.library.LibraryBookPage
 import com.example.unifiedreader.feature.library.LibraryCoverImageVariant
 import com.example.unifiedreader.feature.library.LibraryItemActionContext
 import com.example.unifiedreader.feature.library.LocalLibraryBookPageBookmarks
+import com.example.unifiedreader.feature.library.LocalLibraryBookPageStatus
 
 /**
  * The book page over the library for [itemId], opened by the "•••" under a cover or the reading
@@ -61,8 +62,12 @@ internal fun LibraryBookPageHost(
             ?: item.stumpSeriesGroupKey()?.let(::stumpSeriesContainerId)
         containerId?.let { id -> uiState.sourceItems.firstOrNull { it.id == id } }
     }
-    // The book's bookmarks after its progress (feature:annotations' rows, a tap opens the book there).
-    CompositionLocalProvider(LocalLibraryBookPageBookmarks provides rememberBookPageBookmarks(item, onItemSelected)) {
+    // The book's bookmarks after its progress (feature:annotations' rows, a tap opens the book there), and its
+    // reading status under the progress.
+    CompositionLocalProvider(
+        LocalLibraryBookPageBookmarks provides rememberBookPageBookmarks(item, onItemSelected),
+        LocalLibraryBookPageStatus provides rememberBookPageStatus(item),
+    ) {
         LibraryBookPage(
             item = item,
             relatedPool = pool,

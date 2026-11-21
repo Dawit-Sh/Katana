@@ -65,6 +65,7 @@ internal data class GrimmoryBookDto(
     @SerialName("date_finished")
     val dateFinishedSnake: String? = null,
     val readStatus: String? = null,
+    val readStatusModifiedTime: String? = null,
     val personalRating: Int? = null,
     val addedOn: String? = null,
     val metadata: GrimmoryBookMetadataDto? = null,
@@ -365,6 +366,7 @@ internal fun GrimmoryBookDto.toCatalogEntry(
         readStatus = readStatus,
         dateFinished = dateFinished ?: dateFinishedSnake,
         lastReadTime = lastReadTime,
+        readStatusModifiedTime = readStatusModifiedTime,
     )
 }
 

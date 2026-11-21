@@ -18,6 +18,7 @@ import com.example.unifiedreader.core.network.buildHttpClient
 import com.example.unifiedreader.data.grimmory.GrimmoryRemoteJournalPusher
 import com.example.unifiedreader.data.kavita.KavitaRemoteJournalPusher
 import com.example.unifiedreader.data.kavita.KtorKavitaApi
+import com.example.unifiedreader.core.model.ReadStatusStore
 import com.example.unifiedreader.core.model.progress.ProgressSyncStore
 import com.example.unifiedreader.data.repository.RemoteJournalPusher
 import com.example.unifiedreader.data.repository.RemoteJournalPusherRegistry
@@ -465,11 +466,13 @@ object AppModule {
         remoteCatalogWriter: RemoteCatalogWriter,
         readerSessionStore: ReaderSessionStore,
         journalRepository: JournalRepository,
+        readStatusStore: ReadStatusStore,
     ): GrimmoryCatalogSyncer = GrimmoryCatalogSyncService(
         grimmoryApiFactory = grimmoryApiFactory,
         remoteCatalogWriter = remoteCatalogWriter,
         readerSessionStore = readerSessionStore,
         journalRepository = journalRepository,
+        readStatusStore = readStatusStore,
     )
 
     @Provides
@@ -579,10 +582,12 @@ object AppModule {
         grimmoryApiFactory: GrimmoryApiFactory,
         grimmoryCredentialStore: GrimmoryCredentialStore,
         readerSessionStore: ReaderSessionStore,
+        readStatusStore: ReadStatusStore,
     ): GrimmoryProgressSyncService = GrimmoryProgressSyncService(
         grimmoryApiFactory = grimmoryApiFactory,
         grimmoryCredentialStore = grimmoryCredentialStore,
         readerSessionStore = readerSessionStore,
+        readStatusStore = readStatusStore,
     )
 
     @Provides

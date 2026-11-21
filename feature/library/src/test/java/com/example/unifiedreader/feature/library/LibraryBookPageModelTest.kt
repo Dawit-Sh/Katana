@@ -4,6 +4,7 @@ import com.example.unifiedreader.core.model.BookMetadata
 import com.example.unifiedreader.core.model.ComicMetadata
 import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.ReadableItem
+import com.example.unifiedreader.core.model.ReadStatus
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.core.model.buildKavitaSeriesContainer
 import java.time.LocalDateTime
@@ -240,31 +241,27 @@ class LibraryBookPageModelTest {
     }
 
     @Test
-    fun `a book started and not finished can go back to unread`() {
-        val grimmory = book(id = "g", title = "Book").copy(sourceType = SourceType.GRIMMORY, isLocalImport = false)
-        assertTrue(libraryBookCanMarkUnread(grimmory, ItemProgressSummary(label = "", fraction = 0.4f)))
-        assertFalse(libraryBookCanMarkUnread(grimmory, null))
-        assertFalse(libraryBookCanMarkUnread(grimmory, ItemProgressSummary(label = "", fraction = 0f)))
-        // Finished: the tile itself says Mark unread.
-        assertFalse(libraryBookCanMarkUnread(grimmory, ItemProgressSummary(label = "", fraction = 1f, isFinished = true)))
+    fun `the status pill shows the book's own status, or what its progress says`() {
+        assertEquals(ReadStatus.UNREAD, libraryBookShownStatus(own = null, progress = null))
+        assertEquals(ReadStatus.UNREAD, libraryBookShownStatus(own = null, progress = ItemProgressSummary(label = "", fraction = 0f)))
+        assertEquals(ReadStatus.READING, libraryBookShownStatus(own = null, progress = ItemProgressSummary(label = "", fraction = 0.4f)))
+        assertEquals(
+            ReadStatus.READ,
+            libraryBookShownStatus(own = null, progress = ItemProgressSummary(label = "", fraction = 1f, isFinished = true)),
+        )
+        // A share read to the very end is finished, as the Finished shelf has it.
+        assertEquals(ReadStatus.READ, libraryBookShownStatus(own = null, progress = ItemProgressSummary(label = "", fraction = 1f)))
+        assertEquals(
+            ReadStatus.RE_READING,
+            libraryBookShownStatus(own = ReadStatus.RE_READING, progress = ItemProgressSummary(label = "", fraction = 1f, isFinished = true)),
+        )
+        assertEquals(ReadStatus.PAUSED, libraryBookShownStatus(own = ReadStatus.PAUSED, progress = null))
     }
 
     @Test
-    fun `read and file actions follow the source and the file`() {
+    fun `file actions follow the source and the file`() {
         val grimmory = book(id = "g", title = "Book").copy(sourceType = SourceType.GRIMMORY, isLocalImport = false)
-        assertEquals(LibraryBookReadAction.MarkFinished, libraryBookReadAction(grimmory, null))
-        assertEquals(
-            LibraryBookReadAction.MarkFinished,
-            libraryBookReadAction(grimmory, ItemProgressSummary(label = "", fraction = 0.4f)),
-        )
-        assertEquals(
-            LibraryBookReadAction.MarkUnread,
-            libraryBookReadAction(grimmory, ItemProgressSummary(label = "", fraction = 1f, isFinished = true)),
-        )
         val local = book(id = "l", title = "Local")
-        assertEquals(LibraryBookReadAction.MarkFinished, libraryBookReadAction(local, null))
-        val stump = book(id = "s", title = "Stump").copy(sourceType = SourceType.STUMP, isLocalImport = false)
-        assertNull(libraryBookReadAction(stump, null))
         assertEquals(listOf(LibraryBookFileAction.RemoveImported), libraryBookFileActions(local, LibraryItemActionContext()))
         assertEquals(
             listOf(LibraryBookFileAction.Downloading),

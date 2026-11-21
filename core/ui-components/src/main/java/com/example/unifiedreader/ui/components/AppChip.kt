@@ -102,6 +102,24 @@ object AppChipDefaults {
     val iconSize: Dp = 18.dp
     const val countAlpha: Float = 0.75f
 
+    /**
+     * A clear pill in [contentColor], for a chip on a ground of its own (the book page's reading status, on
+     * the cover's tint); selected, the selected container as always.
+     */
+    @Composable
+    fun colors(contentColor: Color): SelectableChipColors {
+        val semanticColors = UnifiedReaderThemeTokens.colors
+        return FilterChipDefaults.filterChipColors(
+            containerColor = Color.Transparent,
+            labelColor = contentColor,
+            iconColor = contentColor,
+            selectedContainerColor = semanticColors.surfaceSelected,
+            selectedLabelColor = semanticColors.onSurfaceSelected,
+            selectedLeadingIconColor = semanticColors.onSurfaceSelected,
+            selectedTrailingIconColor = semanticColors.onSurfaceSelected,
+        )
+    }
+
     /** Quiet text on a clear pill; the selected chip is the selected container. */
     @Composable
     fun colors(): SelectableChipColors {
@@ -117,15 +135,19 @@ object AppChipDefaults {
         )
     }
 
-    /** A 1 dp `outlineVariant` edge, none while selected. */
+    /** A 1 dp `outlineVariant` edge ([color] on a ground of its own), none while selected. */
     @Composable
-    fun border(enabled: Boolean, selected: Boolean): BorderStroke? = if (selected) {
+    fun border(
+        enabled: Boolean,
+        selected: Boolean,
+        color: Color = MaterialTheme.colorScheme.outlineVariant,
+    ): BorderStroke? = if (selected) {
         null
     } else {
         FilterChipDefaults.filterChipBorder(
             enabled = enabled,
             selected = false,
-            borderColor = MaterialTheme.colorScheme.outlineVariant,
+            borderColor = color,
             borderWidth = 1.dp,
         )
     }

@@ -109,6 +109,10 @@ interface GrimmoryApi {
         bookId: String,
     ): Unit = error("Resetting Grimmory progress is not implemented.")
 
+    /** Sets the book's reading status (UNREAD, READING, RE_READING, READ, ...): [postGrimmoryReadStatus] says how. */
+    suspend fun setReadStatus(accessToken: String, bookId: String, status: String): GrimmoryReadStatusAnswer =
+        error("Setting a Grimmory reading status is not implemented.")
+
     suspend fun updatePersonalRating(
         accessToken: String,
         bookId: String,
@@ -266,6 +270,8 @@ data class GrimmoryBookCatalogEntry(
     val readStatus: String? = null,
     val dateFinished: String? = null,
     val lastReadTime: String? = null,
+    // When [readStatus] was set, where the server says.
+    val readStatusModifiedTime: String? = null,
 )
 
 class GrimmoryUnauthorizedException : RuntimeException("Grimmory access token expired.")
@@ -460,6 +466,9 @@ class KtorGrimmoryApi(
             }
         }
     }
+
+    override suspend fun setReadStatus(accessToken: String, bookId: String, status: String): GrimmoryReadStatusAnswer =
+        httpClient.postGrimmoryReadStatus(normalizedBaseUrl, accessToken, bookId, status)
 
     override suspend fun updatePersonalRating(
         accessToken: String,

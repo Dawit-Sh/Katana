@@ -69,6 +69,9 @@ class AppHighlightSyncCoordinator @Inject constructor(
     private val localCopies: GrimmoryLocalCopies,
     private val reconnect: RemoteSourceConnectivityStartupCoordinator,
     private val desk: KatanaDeskSync,
+    // Reading statuses start with the marks: reading here moving them on, and Grimmory's going up.
+    private val readStatusUpdates: ReadStatusAutoUpdates,
+    private val grimmoryReadStatuses: GrimmoryReadStatusSync,
 ) : HighlightSyncTriggers {
     private val waiting = MutableStateFlow<List<WaitingHighlightKey>>(emptyList())
     private val waitingBookmarks = MutableStateFlow<List<WaitingBookmarkKey>>(emptyList())
@@ -79,6 +82,8 @@ class AppHighlightSyncCoordinator @Inject constructor(
         if (!started.compareAndSet(false, true)) return
         localCopies.start()
         desk.start()
+        readStatusUpdates.start()
+        grimmoryReadStatuses.start()
         scope.launch { store.observeWaiting().collect { keys -> waiting.value = keys } }
         scope.launch { bookmarkStore.observeWaiting().collect { keys -> waitingBookmarks.value = keys } }
         scope.launch {
@@ -121,6 +126,7 @@ class AppHighlightSyncCoordinator @Inject constructor(
 
     override fun retry() {
         scope.launch { syncWaitingBooks() }
+        scope.launch { grimmoryReadStatuses.sendWaiting() }
         desk.syncSoon()
     }
 

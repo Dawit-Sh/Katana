@@ -11,7 +11,6 @@ import com.example.unifiedreader.core.model.libraryPrimaryText
 import com.example.unifiedreader.core.model.normalizedAuthors
 import com.example.unifiedreader.core.model.ownIssueTitle
 import com.example.unifiedreader.core.model.shortDayLabel
-import com.example.unifiedreader.core.model.supportsManualReadStatusAction
 import com.example.unifiedreader.core.model.volumeNumber
 import com.example.unifiedreader.core.model.opensInEpubReader
 import java.time.Instant
@@ -150,30 +149,6 @@ internal fun libraryBookPageText(
         facts = facts,
     )
 }
-
-/** The book page's read-state button, where the source takes one. */
-internal enum class LibraryBookReadAction { MarkFinished, MarkUnread }
-
-internal fun libraryBookReadAction(
-    item: ReadableItem,
-    progress: ItemProgressSummary?,
-): LibraryBookReadAction? = when {
-    !item.supportsManualReadStatusAction() -> null
-    progress?.isComplete == true -> LibraryBookReadAction.MarkUnread
-    else -> LibraryBookReadAction.MarkFinished
-}
-
-/**
- * A book started and not finished can go back to unread in one tap, beside Mark finished: under
- * its progress bar on the book page.
- */
-internal fun libraryBookCanMarkUnread(
-    item: ReadableItem,
-    progress: ItemProgressSummary?,
-): Boolean = item.supportsManualReadStatusAction() &&
-    progress != null &&
-    !progress.isComplete &&
-    progress.fraction > 0f
 
 /** The book page's file actions: Download at the top, the removals in a row at the end. */
 internal enum class LibraryBookFileAction {

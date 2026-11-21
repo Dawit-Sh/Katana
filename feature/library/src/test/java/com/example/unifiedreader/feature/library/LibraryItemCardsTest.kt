@@ -4,10 +4,10 @@ import com.example.unifiedreader.core.model.ComicMetadata
 import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
+import com.example.unifiedreader.core.model.readStatusChoices
 import com.example.unifiedreader.core.model.buildKavitaSeriesContainer
 import com.example.unifiedreader.core.model.buildStumpSeriesContainer
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -272,7 +272,7 @@ class LibraryItemCardsTest {
             issues = listOf(kavitaIssue(id = "chapter-1", title = "Akira 001", seriesKey = "series-7")),
         )
 
-        assertNull(libraryBookReadAction(item = seriesItem, progress = null))
+        assertTrue(seriesItem.readStatusChoices().isEmpty())
     }
 }
 

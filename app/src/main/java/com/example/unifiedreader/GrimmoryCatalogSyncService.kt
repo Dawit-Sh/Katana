@@ -1,6 +1,7 @@
 package com.example.unifiedreader
 
 import com.example.unifiedreader.core.model.FormatType
+import com.example.unifiedreader.core.model.ReadStatusStore
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.data.grimmory.GrimmoryApi
 import com.example.unifiedreader.data.grimmory.GrimmoryBookCatalogEntry
@@ -49,6 +50,8 @@ class GrimmoryCatalogSyncService(
     private val readerSessionStore: ReaderSessionStore? = null,
     private val journalRepository: JournalRepository? = null,
     private val nowEpochMillis: () -> Long = System::currentTimeMillis,
+    // Each book's reading status comes down with the catalog (GrimmoryReadStatusSync sends this device's up).
+    private val readStatusStore: ReadStatusStore? = null,
     // Decoding the book list (2,000 books, megabytes of JSON), comparing it with the saved library and the
     // uploads run here, not on the caller's (main) thread, which froze the app and its bar for seconds.
     private val workDispatcher: CoroutineDispatcher = Dispatchers.Default,
@@ -165,6 +168,11 @@ class GrimmoryCatalogSyncService(
                     session = fetchResult.refreshedSession ?: session,
                 ),
             )
+        }
+        // The statuses before the places: a place that waits to go up here leaves its book's status for the
+        // next sync, and a place that comes down isn't taken for reading here.
+        readerSessionStore?.let { places ->
+            readStatusStore?.takeGrimmoryStatuses(fetched.value.fetch.entries, places, nowEpochMillis())
         }
         // A sync and a refresh both write only the books that changed, so covers stay put when none did.
         val syncOutcome = finalizeRemoteCatalogSync<GrimmoryBookCatalogEntry, GrimmorySession>(

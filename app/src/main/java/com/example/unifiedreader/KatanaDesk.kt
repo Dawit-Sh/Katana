@@ -5,10 +5,13 @@ import android.os.Build
 import android.util.Log
 import com.example.unifiedreader.core.common.ApplicationScope
 import com.example.unifiedreader.core.model.FormatType
+import com.example.unifiedreader.core.model.ReadStatus
+import com.example.unifiedreader.core.model.ReadStatusStore
 import com.example.unifiedreader.core.model.SyncState
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.primaryAuthor
 import com.example.unifiedreader.core.model.runSuspendCatching
+import com.example.unifiedreader.core.model.toServerEpochMillisOrNull
 import com.example.unifiedreader.data.grimmory.GrimmoryAnnotation
 import com.example.unifiedreader.data.grimmory.GrimmoryApi
 import com.example.unifiedreader.data.grimmory.GrimmoryBookCatalogEntry
@@ -21,6 +24,7 @@ import com.example.unifiedreader.feature.annotations.BookmarkSyncStore
 import com.example.unifiedreader.feature.annotations.HighlightBookSync
 import com.example.unifiedreader.feature.annotations.HighlightSyncEngine
 import com.example.unifiedreader.feature.annotations.HighlightSyncStore
+import com.example.unifiedreader.feature.reader.core.ReaderProgressSnapshot
 import com.example.unifiedreader.feature.reader.core.ReaderSessionStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.ktor.client.HttpClient
@@ -46,6 +50,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -253,8 +258,9 @@ const val KATANA_DESK_SERVICE = "_katana-desk._tcp"
 
 /**
  * Syncs the books here that are on Katana Desk too, with Grimmory's own rules (the desk answers Grimmory's
- * API for its books): the most recent place wins, asking before going back; highlights and bookmarks through
- * the same engines as Grimmory's, holds and Undo included. A book linked to Grimmory syncs there, not here.
+ * API for its books): the most recent place wins, asking before going back; the reading status the same way
+ * ([decideServerReadStatus]); highlights and bookmarks through the same engines as Grimmory's, holds and Undo
+ * included. A book linked to Grimmory syncs there, not here.
  */
 @Singleton
 class KatanaDeskSync @Inject constructor(
@@ -267,6 +273,7 @@ class KatanaDeskSync @Inject constructor(
     highlightStore: HighlightSyncStore,
     bookmarkStore: BookmarkSyncStore,
     private val readerSessionStore: ReaderSessionStore,
+    private val readStatuses: ReadStatusStore,
 ) {
     private val client = KatanaDeskClient(httpClient)
     private val fingerprints = LocalFileFingerprints(context)
@@ -274,6 +281,7 @@ class KatanaDeskSync @Inject constructor(
         highlights = HighlightSyncEngine(highlightStore),
         bookmarks = BookmarkSyncEngine(bookmarkStore),
         readerSessionStore = readerSessionStore,
+        statuses = readStatuses,
     )
     private val highlightWaiting = highlightStore.observeWaiting()
     private val bookmarkWaiting = bookmarkStore.observeWaiting()
@@ -312,6 +320,15 @@ class KatanaDeskSync @Inject constructor(
         scope.launch { requests.debounce(SOON_MILLIS).collect { syncNow() } }
         scope.launch { highlightWaiting.drop(1).collect { syncSoon() } }
         scope.launch { bookmarkWaiting.drop(1).collect { syncSoon() } }
+        // A status set here for a book on the desk goes a moment later, as a place does.
+        scope.launch {
+            combine(readStatuses.records, connection.links) { records, links ->
+                records.filter { (itemId, record) -> record.unsent && itemId in links }.keys
+            }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect { waiting -> if (waiting.isNotEmpty()) syncSoon() }
+        }
         scope.launch {
             readerSessionStore.progressByItemIdFlow
                 .map { places -> places.filterKeys(connection::isLinked).mapValues { (_, place) -> place.updatedAtEpochMillis } }
@@ -387,62 +404,103 @@ class KatanaDeskSync @Inject constructor(
     }
 }
 
-/** One book's place, highlights and bookmarks with the desk, by Grimmory's rules and engines. */
+/** One book's place, reading status, highlights and bookmarks with the desk, by Grimmory's rules and engines. */
 private class KatanaDeskBookSync(
     private val highlights: HighlightSyncEngine,
     private val bookmarks: BookmarkSyncEngine,
     private val readerSessionStore: ReaderSessionStore,
+    private val statuses: ReadStatusStore,
 ) {
     private val progressStore = ReaderSessionProgressStoreAdapter(readerSessionStore)
 
     suspend fun sync(api: GrimmoryApi, token: String, item: ReadableItem, bookId: String) {
         // A book the desk couldn't answer for (gone there, or an answer this version can't read) is left alone.
-        val deskPlace = api.getBookEntry(accessToken = token, bookId = bookId)
-        if (deskPlace != null && pullPlace(item, deskPlace)) {
-            pushPlace(api, token, item, bookId, deskPlace.progress?.updatedAtEpochMillis)
+        val deskBook = api.getBookEntry(accessToken = token, bookId = bookId)
+        if (deskBook != null) {
+            // The most recent place wins as with Grimmory (asking before going back).
+            val decision = decideRemoteProgressSync(
+                local = progressStore.getProgress(item),
+                remote = deskBook.progress,
+                nowEpochMillis = System.currentTimeMillis(),
+                missingRemoteClearsLocal = deskBook.isExplicitUnreadReset,
+                remoteClearOverridesLocal = false,
+            )
+            val placeHere = if (decision == RemoteProgressSyncDecision.KeepLocal) {
+                placeToSend(item, deskBook.progress?.updatedAtEpochMillis)
+            } else {
+                null
+            }
+            // The status before the place: while this device's place goes up, the desk's status is from before it
+            // (the desk makes Reading or Read of a place), and the desk's place coming down isn't reading here.
+            pullStatus(item, deskBook, placeGoesUp = placeHere != null)
+            applyOrOfferRemoteProgress(
+                store = progressStore,
+                item = item,
+                pageCount = item.pageCount,
+                decision = decision,
+                offeredBy = KATANA_DESK_NAME,
+            )
+            placeHere?.let { place -> pushPlace(api, token, item, place, deskBook) }
         }
+        pushStatus(api, token, item, bookId)
         val book = AnnotatedBook(itemId = item.id, title = item.title, author = item.bookMetadata?.primaryAuthor())
         if (item.format == FormatType.EPUB) syncHighlights(api, token, book, bookId)
         syncBookmarks(api, token, item, book, bookId)
     }
 
-    // The most recent place wins as with Grimmory (asking before going back). True when this device's stays.
-    private fun pullPlace(item: ReadableItem, deskPlace: GrimmoryBookCatalogEntry): Boolean {
-        val decision = decideRemoteProgressSync(
-            local = progressStore.getProgress(item),
-            remote = deskPlace.progress,
-            nowEpochMillis = System.currentTimeMillis(),
-            missingRemoteClearsLocal = deskPlace.isExplicitUnreadReset,
-            remoteClearOverridesLocal = false,
-        )
-        applyOrOfferRemoteProgress(
-            store = progressStore,
-            item = item,
-            pageCount = item.pageCount,
-            decision = decision,
-            offeredBy = KATANA_DESK_NAME,
-        )
-        return decision == RemoteProgressSyncDecision.KeepLocal
-    }
+    // This device's place, when it stayed and goes up: not sent yet (as Grimmory's queued saves) or newer.
+    private fun placeToSend(item: ReadableItem, deskTime: Long?): ReaderProgressSnapshot? =
+        readerSessionStore.progressByItemIdFlow.value[item.id]?.takeIf { place ->
+            val unsent = place.syncState != SyncState.CLEAN
+            unsent || !place.isExplicitUnreadReset && (deskTime == null || place.updatedAtEpochMillis > deskTime)
+        }
 
-    // This device's place stayed: it goes up when it isn't sent yet (as Grimmory's queued saves) or is newer.
-    private suspend fun pushPlace(api: GrimmoryApi, token: String, item: ReadableItem, bookId: String, deskTime: Long?) {
-        val here = readerSessionStore.progressByItemIdFlow.value[item.id]
-            ?.takeIf { place ->
-                val unsent = place.syncState != SyncState.CLEAN
-                unsent || !place.isExplicitUnreadReset && (deskTime == null || place.updatedAtEpochMillis > deskTime)
-            }
-            ?: return
+    // [deskBook] is the desk's answer for the book, under the desk's book id.
+    private suspend fun pushPlace(
+        api: GrimmoryApi,
+        token: String,
+        item: ReadableItem,
+        here: ReaderProgressSnapshot,
+        deskBook: GrimmoryBookCatalogEntry,
+    ) {
+        val bookId = deskBook.item.remoteId ?: return
         if (here.isExplicitUnreadReset) {
             // Marked unread here: the desk forgets its place too, as Grimmory does.
             api.resetBookProgress(accessToken = token, bookId = bookId)
         } else {
             val pageCount = readerSessionStore.getSession(item)?.pageCount ?: item.pageCount
             val update = here.toGrimmoryProgressUpdate(item = item.copy(remoteId = bookId), pageCount = pageCount) ?: return
-            api.updateProgress(accessToken = token, progress = update)
+            // Read again here, finished there: the desk's finish goes (its Read becomes Reading), as the desk asks.
+            val deskFinished = deskBook.dateFinished != null || deskBook.progress?.isFinished == true
+            api.updateProgress(accessToken = token, progress = update.copy(clearsFinishedState = deskFinished && !here.isFinished))
         }
         // Sent: no longer a save waiting to go up, so a newer place on the desk wins without Grimmory's margin.
         readerSessionStore.replaceProgressIfCurrent(expected = here, replacement = here.copy(syncState = SyncState.CLEAN))
+    }
+
+    private fun pullStatus(item: ReadableItem, deskBook: GrimmoryBookCatalogEntry, placeGoesUp: Boolean) {
+        val places = readerSessionStore.progressByItemIdFlow.value
+        statuses.applyServerStatuses(
+            statuses = listOf(
+                ServerBookStatus(
+                    itemId = item.id,
+                    status = deskBook.readStatus,
+                    setAtEpochMillis = deskBook.readStatusModifiedTime?.toServerEpochMillisOrNull(),
+                ),
+            ),
+            placeOf = places::get,
+            placeUnsent = { placeGoesUp },
+            nowEpochMillis = System.currentTimeMillis(),
+        )
+    }
+
+    // A status set here goes up after the place, so the desk's own Reading or Read of the place can't undo it;
+    // the desk's answer is kept unless the status changed here meanwhile.
+    private suspend fun pushStatus(api: GrimmoryApi, token: String, item: ReadableItem, bookId: String) {
+        val record = statuses.get(item.id)?.takeIf { it.unsent } ?: return
+        val answer = api.setReadStatus(accessToken = token, bookId = bookId, status = record.status.serverName)
+        val kept = ReadStatus.fromServer(answer.status) ?: record.status
+        statuses.replaceIfCurrent(item.id, record, record.copy(status = kept, unsent = false))
     }
 
     private suspend fun syncHighlights(api: GrimmoryApi, token: String, book: AnnotatedBook, bookId: String) {

@@ -1,6 +1,9 @@
 package com.example.unifiedreader
 
 import com.example.unifiedreader.core.model.LocatorType
+import com.example.unifiedreader.core.model.ReadStatus
+import com.example.unifiedreader.core.model.ReadStatusRecord
+import com.example.unifiedreader.core.model.ReadStatusStore
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SyncState
 import com.example.unifiedreader.core.model.supportsManualReadStatusAction
@@ -14,9 +17,14 @@ data class ReadStatusChangeResult(
     val applied: Boolean,
 )
 
+/**
+ * Mark finished and Mark unread: the book's place (finished, or cleared) waits to go to its server, the
+ * journal follows, and its reading status becomes Read or Unread, waiting to go up too ([ReadStatusStore]).
+ */
 class ApplyReadStatusChangeUseCase @Inject constructor(
     private val progressSyncStore: ProgressSyncStore,
     private val journalRepository: JournalRepository? = null,
+    private val readStatusStore: ReadStatusStore? = null,
 ) {
     suspend operator fun invoke(
         item: ReadableItem,
@@ -26,6 +34,15 @@ class ApplyReadStatusChangeUseCase @Inject constructor(
             return ReadStatusChangeResult(applied = false)
         }
         val updatedAtEpochMillis = System.currentTimeMillis()
+        // The status first: the place saved next then reads as this very change, not as reading here.
+        readStatusStore?.put(
+            itemId = item.id,
+            record = ReadStatusRecord(
+                status = if (markAsRead) ReadStatus.READ else ReadStatus.UNREAD,
+                setAtEpochMillis = updatedAtEpochMillis,
+                unsent = true,
+            ),
+        )
         applyLocalReadStatus(
             item = item,
             markAsRead = markAsRead,

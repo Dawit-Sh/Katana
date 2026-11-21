@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.unifiedreader.core.model.LibraryBrowseChip
+import com.example.unifiedreader.core.model.ReadStatus
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.libraryDisplayLabel
 import com.example.unifiedreader.feature.reader.preferences.ComicReaderMode
@@ -73,13 +74,14 @@ import kotlinx.coroutines.withContext
 
 /**
  * Everything about one book in a side sheet (a bottom sheet on phones): its cover, Continue,
- * Mark finished and Download, its progress, how it opens, its description, genres and facts,
+ * Download and Add to list, its progress and reading status, how it opens, its description, genres and facts,
  * rows of more in its series, more by its author and similar books, and at the end the quiet
  * row that removes it. [relatedPool] is
  * where those rows come from (the books of its source); a cover there shows that book's page.
  * A tag or genre filters the library by it when [onFilterByTag] is given.
  * [onBack], when given, returns to the book this page was opened from (Back, or the arrow).
- * The app's [LocalLibraryBookPageBookmarks] adds the book's bookmarks after its progress.
+ * The app's [LocalLibraryBookPageBookmarks] adds the book's bookmarks after its progress, and its
+ * [LocalLibraryBookPageStatus] the reading status pill under the progress.
  */
 @Composable
 fun LibraryBookPage(
@@ -358,11 +360,11 @@ private fun LibraryBookPageTop(
                         modifier = Modifier.padding(start = 8.dp),
                     )
                 }
-                val actions = bookPageActions(item, progress, actionContext)
+                val actions = bookPageActions(item, actionContext)
                 if (actions.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(10.dp))
-                    // Equal tiles, the icon over the label, so Mark finished, Download and Add to list always fit.
-                    // Each tile is a third of the row even when a book has fewer actions.
+                    // Equal tiles, the icon over the label, so Download and Add to list always fit.
+                    // Each tile is half the row even when a book has one action.
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         actions.forEach { action -> LibraryBookPageTonalAction(action, tint) }
                         repeat((BookPageActionColumns - actions.size).coerceAtLeast(0)) { Spacer(modifier = Modifier.weight(1f)) }
@@ -401,17 +403,19 @@ private fun LibraryBookPageTop(
                                 trackColor = tint.track,
                             ),
                     )
-                    // Back to unread in one tap, where Mark finished is the tile above.
-                    if (libraryBookCanMarkUnread(item, progress)) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                            AppTextButton(
-                                onClick = { actionContext.onSetReadStatus(item, false) },
-                                colors = AppButtonDefaults.textColors(contentColor = tint.content),
-                            ) {
-                                Text(text = "Mark unread", fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-                    }
+                }
+                // The reading status under the progress (or the actions, before any): Read and Unread are Mark
+                // finished and Mark unread, the others only the status.
+                LocalLibraryBookPageStatus.current?.takeIf { it.choices.isNotEmpty() }?.let { status ->
+                    Spacer(modifier = Modifier.height(if (progress != null && text.progressLine != null) 12.dp else 16.dp))
+                    LibraryBookStatusPill(
+                        shown = libraryBookShownStatus(status.own, progress),
+                        choices = status.choices,
+                        tint = tint,
+                        onSelect = { picked ->
+                            if (picked.movesPlace) actionContext.onSetReadStatus(item, picked == ReadStatus.READ) else status.onSelect(picked)
+                        },
+                    )
                 }
             }
         }
@@ -425,20 +429,15 @@ private class BookPageAction(
     val onClick: () -> Unit,
 )
 
-/** Mark finished or unread, Download, and Add to list; removing a file is the row at the page's end. */
+/**
+ * Download and Add to list; finished and unread are in the reading status pill, and removing a file is the row
+ * at the page's end.
+ */
 @Composable
 private fun bookPageActions(
     item: ReadableItem,
-    progress: ItemProgressSummary?,
     actionContext: LibraryItemActionContext,
 ): List<BookPageAction> {
-    val read = when (libraryBookReadAction(item, progress)) {
-        LibraryBookReadAction.MarkFinished ->
-            BookPageAction(label = "Mark finished", icon = AppIcons.Check) { actionContext.onSetReadStatus(item, true) }
-        LibraryBookReadAction.MarkUnread ->
-            BookPageAction(label = "Mark unread", icon = AppIcons.History) { actionContext.onSetReadStatus(item, false) }
-        null -> null
-    }
     val files = libraryBookFileActions(item, actionContext).mapNotNull { action ->
         when (action) {
             LibraryBookFileAction.Downloading ->
@@ -452,7 +451,7 @@ private fun bookPageActions(
     val addToList = actionContext.onAddToList?.let { onAddToList ->
         BookPageAction(label = "Add to list", icon = AppIcons.Checklist) { onAddToList(item) }
     }
-    return listOfNotNull(read) + files + listOfNotNull(addToList)
+    return files + listOfNotNull(addToList)
 }
 
 /**
@@ -486,8 +485,8 @@ private fun LibraryBookPageRemoveRow(
     }
 }
 
-/** The book page's action tiles: Mark finished, Download, Add to list. */
-private const val BookPageActionColumns = 3
+/** The book page's action tiles: Download (or Downloading) and Add to list. */
+private const val BookPageActionColumns = 2
 
 @Composable
 private fun RowScope.LibraryBookPageTonalAction(action: BookPageAction, tint: AppCoverColors) {

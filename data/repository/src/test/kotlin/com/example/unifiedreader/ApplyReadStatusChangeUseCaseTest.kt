@@ -1,6 +1,8 @@
 package com.example.unifiedreader
 
 import com.example.unifiedreader.core.model.FormatType
+import com.example.unifiedreader.core.model.MemoryReadStatusStore
+import com.example.unifiedreader.core.model.ReadStatus
 import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.core.model.SyncState
@@ -146,6 +148,73 @@ class ApplyReadStatusChangeUseCaseTest {
         assertTrue(snapshot.isExplicitUnreadReset)
         assertEquals(0.0, snapshot.percent ?: -1.0, 0.0001)
         assertEquals(SyncState.DIRTY, snapshot.syncState)
+    }
+
+    @Test
+    fun `mark finished and mark unread make the status Read and Unread, waiting to go up`() = runTest {
+        val statuses = MemoryReadStatusStore()
+        val useCase = ApplyReadStatusChangeUseCase(progressSyncStore = TestProgressSyncStore(), readStatusStore = statuses)
+
+        useCase(item = grimmoryBook(), markAsRead = true)
+        val read = statuses.get(grimmoryBook().id)!!
+        assertEquals(ReadStatus.READ, read.status)
+        assertTrue(read.unsent)
+
+        useCase(item = grimmoryBook(), markAsRead = false)
+        assertEquals(ReadStatus.UNREAD, statuses.get(grimmoryBook().id)?.status)
+        assertTrue(statuses.get(grimmoryBook().id)!!.unsent)
+    }
+
+    @Test
+    fun `a status picked on the book page sets only the status, Read and Unread move the place too`() = runTest {
+        val store = TestProgressSyncStore()
+        val statuses = MemoryReadStatusStore()
+        val apply = ApplyReadStatusChangeUseCase(progressSyncStore = store, readStatusStore = statuses)
+        val setStatus = SetReadStatusUseCase(applyReadStatusChange = apply, readStatusStore = statuses)
+        val book = grimmoryBook()
+        store.saveProgress(
+            item = book,
+            locator = ProgressSyncLocator(locatorType = com.example.unifiedreader.core.model.LocatorType.PERCENT, percent = 0.4),
+            isFinished = false,
+        )
+        val place = store.progressByItemIdFlow.value.getValue(book.id)
+
+        listOf(ReadStatus.RE_READING, ReadStatus.PAUSED, ReadStatus.PARTIALLY_READ, ReadStatus.WONT_READ, ReadStatus.ABANDONED, ReadStatus.READING)
+            .forEach { status ->
+                assertTrue(setStatus(book, status))
+                assertEquals(status, statuses.get(book.id)?.status)
+                assertTrue(statuses.get(book.id)!!.unsent)
+                // The place stays as it was.
+                assertEquals(place, store.progressByItemIdFlow.value.getValue(book.id))
+            }
+
+        assertTrue(setStatus(book, ReadStatus.READ))
+        assertTrue(store.progressByItemIdFlow.value.getValue(book.id).isFinished)
+        assertEquals(ReadStatus.READ, statuses.get(book.id)?.status)
+
+        assertTrue(setStatus(book, ReadStatus.UNREAD))
+        assertTrue(store.progressByItemIdFlow.value.getValue(book.id).isExplicitUnreadReset)
+        assertEquals(ReadStatus.UNREAD, statuses.get(book.id)?.status)
+    }
+
+    @Test
+    fun `a Stump book takes the statuses that are only a word, a series none`() = runTest {
+        val store = TestProgressSyncStore()
+        val statuses = MemoryReadStatusStore()
+        val setStatus = SetReadStatusUseCase(
+            applyReadStatusChange = ApplyReadStatusChangeUseCase(progressSyncStore = store, readStatusStore = statuses),
+            readStatusStore = statuses,
+        )
+        val stump = grimmoryBook(id = "stump:item:3").copy(sourceType = SourceType.STUMP)
+        assertFalse(setStatus(stump, ReadStatus.READ))
+        assertFalse(setStatus(stump, ReadStatus.UNREAD))
+        assertTrue(store.progressByItemIdFlow.value.isEmpty())
+        assertTrue(setStatus(stump, ReadStatus.PAUSED))
+        assertEquals(ReadStatus.PAUSED, statuses.get(stump.id)?.status)
+
+        val series = comicBook(id = "kavita:series:kavita:library:4::9")
+        assertFalse(setStatus(series, ReadStatus.PAUSED))
+        assertEquals(null, statuses.get(series.id))
     }
 }
 
