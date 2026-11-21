@@ -62,6 +62,7 @@ class LibraryLocalBookItems(
     val onFindOnPhone: (() -> Unit)?,
     val onCheckForNewBooks: (() -> Unit)?,
     val onBookFolders: (() -> Unit)?,
+    val onKatanaDesk: (() -> Unit)? = null,
 )
 
 @Composable
@@ -76,6 +77,7 @@ private fun LocalBookMenuItems(
     localBooks.onFindOnPhone?.let { LocalBookMenuItem("Find books on this phone", AppIcons.Refresh, it, onPicked) }
     localBooks.onCheckForNewBooks?.let { LocalBookMenuItem("Check for new books", AppIcons.Refresh, it, onPicked) }
     localBooks.onBookFolders?.let { LocalBookMenuItem("Book folders", AppIcons.MoreHoriz, it, onPicked) }
+    localBooks.onKatanaDesk?.let { LocalBookMenuItem("Sync with Katana Desk", AppIcons.Cloud, it, onPicked) }
 }
 
 @Composable

@@ -170,7 +170,7 @@ class GrimmoryHighlightSync @Inject constructor(
     }
 }
 
-private class GrimmoryHighlightServer(
+internal class GrimmoryHighlightServer(
     private val annotations: GrimmoryAnnotationsApi,
     private val token: String,
     private val bookId: String,

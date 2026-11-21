@@ -831,6 +831,7 @@ object AppModule {
         annotationStore: ReaderAnnotationStore,
         annotationJumps: AnnotationJumps,
         localCopies: GrimmoryLocalCopies,
+        katanaDesk: KatanaDeskConnection,
         @ApplicationScope applicationScope: CoroutineScope,
         appDispatchers: AppDispatchers,
     ): List<@JvmSuppressWildcards ReaderScreenFactory> = listOf(
@@ -868,7 +869,8 @@ object AppModule {
                 annotations = annotationStore,
                 jumps = annotationJumps,
                 syncsHighlights = { item ->
-                    item.syncsHighlightsWithGrimmory() || item.format == FormatType.EPUB && localCopies.isLinked(item)
+                    item.syncsHighlightsWithGrimmory() ||
+                        item.format == FormatType.EPUB && (localCopies.isLinked(item) || katanaDesk.isLinked(item.id))
                 },
             ),
         ),

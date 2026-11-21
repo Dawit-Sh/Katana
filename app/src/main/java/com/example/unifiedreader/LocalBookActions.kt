@@ -33,7 +33,10 @@ class LocalBookActions(
     val onCheckForNewBooks: () -> Unit,
     val hasPlaces: Boolean = false,
     val onBookFolders: () -> Unit = {},
-)
+) {
+    /** Sync with Katana Desk, in the same menu. */
+    var onKatanaDesk: () -> Unit = {}
+}
 
 val LocalLocalBookActions = staticCompositionLocalOf<LocalBookActions?> { null }
 
@@ -43,6 +46,7 @@ internal fun LocalBookActions.menuItems(): LibraryLocalBookItems = LibraryLocalB
     onFindOnPhone = onFindOnPhone.takeUnless { findsOnPhone },
     onCheckForNewBooks = onCheckForNewBooks.takeIf { hasPlaces },
     onBookFolders = onBookFolders.takeIf { hasPlaces },
+    onKatanaDesk = onKatanaDesk,
 )
 
 /**
@@ -90,6 +94,7 @@ internal fun rememberLocalBookActions(localBooks: AppLocalBooksViewModel, viewMo
             onDismiss = { showingBookFolders = false },
         )
     }
+    val openKatanaDesk = rememberKatanaDeskDialog()
     return remember(localBooks, localBooks.shownPlaces) {
         LocalBookActions(
             onAddFolder = { folderPicker.launch(null) },
@@ -107,8 +112,16 @@ internal fun rememberLocalBookActions(localBooks: AppLocalBooksViewModel, viewMo
             onCheckForNewBooks = { localBooks.refresh { result -> report(result, true) } },
             hasPlaces = localBooks.shownPlaces.any,
             onBookFolders = { showingBookFolders = true },
-        )
+        ).apply { onKatanaDesk = openKatanaDesk }
     }
+}
+
+/** Katana Desk's dialog while it shows; the returned call opens it. */
+@Composable
+private fun rememberKatanaDeskDialog(): () -> Unit {
+    var showing by rememberSaveable { mutableStateOf(false) }
+    if (showing) KatanaDeskDialog(onDismiss = { showing = false })
+    return remember { { showing = true } }
 }
 
 // Android's All files access screen for Katana; the general list where a phone doesn't open it for one app.

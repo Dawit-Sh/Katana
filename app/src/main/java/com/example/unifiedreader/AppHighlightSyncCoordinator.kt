@@ -38,6 +38,9 @@ interface HighlightSyncTriggers {
     /** A library sync finished: every book's highlights come down, and what waits goes up. */
     fun afterLibrarySync() = Unit
 
+    /** The app came back to the front: Katana Desk is asked again. */
+    fun onAppResumed() = Unit
+
     data object None : HighlightSyncTriggers
 }
 
@@ -65,6 +68,7 @@ class AppHighlightSyncCoordinator @Inject constructor(
     private val connectivity: RemoteSourceConnectivityPolicy,
     private val localCopies: GrimmoryLocalCopies,
     private val reconnect: RemoteSourceConnectivityStartupCoordinator,
+    private val desk: KatanaDeskSync,
 ) : HighlightSyncTriggers {
     private val waiting = MutableStateFlow<List<WaitingHighlightKey>>(emptyList())
     private val waitingBookmarks = MutableStateFlow<List<WaitingBookmarkKey>>(emptyList())
@@ -74,6 +78,7 @@ class AppHighlightSyncCoordinator @Inject constructor(
     override fun start() {
         if (!started.compareAndSet(false, true)) return
         localCopies.start()
+        desk.start()
         scope.launch { store.observeWaiting().collect { keys -> waiting.value = keys } }
         scope.launch { bookmarkStore.observeWaiting().collect { keys -> waitingBookmarks.value = keys } }
         scope.launch {
@@ -116,9 +121,13 @@ class AppHighlightSyncCoordinator @Inject constructor(
 
     override fun retry() {
         scope.launch { syncWaitingBooks() }
+        desk.syncSoon()
     }
 
+    override fun onAppResumed() = desk.syncSoon()
+
     override fun afterLibrarySync() {
+        desk.syncSoon()
         scope.launch {
             val items = catalog.getItems()
             val highlightBooks = store.booksOnServer()

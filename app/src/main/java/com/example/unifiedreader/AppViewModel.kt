@@ -593,6 +593,7 @@ class AppViewModel @Inject constructor(
      */
     fun onAppResumed() {
         refreshProgress()
+        highlightSync.onAppResumed()
         if (remoteSourceConnectivityPolicy.offlineRemoteSources().isNotEmpty()) retryPendingRemoteSync()
     }
 

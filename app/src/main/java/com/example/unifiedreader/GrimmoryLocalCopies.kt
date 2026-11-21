@@ -54,6 +54,7 @@ class GrimmoryLocalCopies @Inject constructor(
     private val grimmoryApiFactory: GrimmoryApiFactory,
     private val credentialStore: GrimmoryCredentialStore,
     private val connectivity: RemoteSourceConnectivityPolicy,
+    private val desk: KatanaDeskConnection,
 ) {
     private val links = MutableStateFlow<Map<String, LocalServerLinkEntity>>(emptyMap())
     private val started = AtomicBoolean(false)
@@ -78,7 +79,8 @@ class GrimmoryLocalCopies @Inject constructor(
 
     /** [item] as a copy of a Grimmory book whose marks sync with it, checked now; null when it isn't one, or can't be told now. */
     suspend fun copyOf(item: ReadableItem): GrimmoryMarksBook? {
-        val canSync = item.sourceType == SourceType.LOCAL && item.format.sharesBookmarksWithGrimmory()
+        // A book linked to Katana Desk keeps syncing there: its marks carry the desk's ids.
+        val canSync = item.sourceType == SourceType.LOCAL && item.format.sharesBookmarksWithGrimmory() && !desk.isLinked(item.id)
         val session = credentialStore.sessionFlow.value?.takeIf { canSync } ?: return null
         val canAskServer = !connectivity.isUnavailable(SourceType.GRIMMORY)
         val checked = mutex.withLock {

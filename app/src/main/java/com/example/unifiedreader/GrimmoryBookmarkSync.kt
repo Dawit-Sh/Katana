@@ -140,7 +140,7 @@ class GrimmoryBookmarkSync @Inject constructor(
     }
 }
 
-private class GrimmoryBookmarkServer(
+internal class GrimmoryBookmarkServer(
     private val bookmarks: GrimmoryBookmarksApi,
     private val token: String,
     private val bookId: String,
