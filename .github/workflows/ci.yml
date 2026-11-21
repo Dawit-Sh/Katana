@@ -1,12 +1,24 @@
 name: CI
 
+# Only fire7 and pull requests into it, and not for the site or docs alone: GitHub paused this fork's
+# workflows on 2026-11-21 "due to the scale of GitHub Actions usage" after a run on every branch's push.
 on:
   push:
     branches:
-      - "**"
+      - fire7
+    paths-ignore:
+      - "site/**"
+      - "docs/**"
+      - "**/*.md"
+      - ".claude/**"
   pull_request:
     branches:
       - fire7
+    paths-ignore:
+      - "site/**"
+      - "docs/**"
+      - "**/*.md"
+      - ".claude/**"
 
 concurrency:
   group: ci-${{ github.ref }}
