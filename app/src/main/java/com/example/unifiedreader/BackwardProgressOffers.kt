@@ -23,6 +23,8 @@ data class BackwardProgressOffer(
     val server: ProgressSyncLocator,
     val serverFinished: Boolean,
     val serverUpdatedAtEpochMillis: Long,
+    /** Where the place came from, for the question ("Katana Desk"); null: the book's own server. */
+    val from: String? = null,
 )
 
 /**
@@ -54,9 +56,10 @@ internal fun applyOrOfferRemoteProgress(
     item: ReadableItem,
     pageCount: Int?,
     decision: RemoteProgressSyncDecision,
+    offeredBy: String? = null,
 ) {
     when (val asked = decision.askingBeforeGoingBack(store.getProgress(item))) {
-        is RemoteProgressSyncDecision.OfferRemote -> BackwardProgressOffers.offer(asked.toOffer(item.id))
+        is RemoteProgressSyncDecision.OfferRemote -> BackwardProgressOffers.offer(asked.toOffer(item.id, offeredBy))
         else -> {
             BackwardProgressOffers.withdraw(item.id)
             applyRemoteProgressSyncDecision(store = store, item = item, pageCount = pageCount, decision = asked)
@@ -64,11 +67,12 @@ internal fun applyOrOfferRemoteProgress(
     }
 }
 
-internal fun RemoteProgressSyncDecision.OfferRemote.toOffer(itemId: String) = BackwardProgressOffer(
+internal fun RemoteProgressSyncDecision.OfferRemote.toOffer(itemId: String, from: String? = null) = BackwardProgressOffer(
     itemId = itemId,
     server = locator,
     serverFinished = isFinished,
     serverUpdatedAtEpochMillis = updatedAtEpochMillis,
+    from = from,
 )
 
 /**

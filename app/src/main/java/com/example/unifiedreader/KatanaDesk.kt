@@ -242,6 +242,9 @@ internal fun String.normalizedDeskAddress(): String {
 
 internal fun deskBaseUrl(address: String): String = "http://${address.normalizedDeskAddress()}"
 
+/** How the app names the desk to the reader ("Katana Desk has you on p. 19"). */
+const val KATANA_DESK_NAME = "Katana Desk"
+
 /** The port Katana Desk answers on. */
 const val KATANA_DESK_PORT = 47615
 
@@ -412,7 +415,13 @@ private class KatanaDeskBookSync(
             missingRemoteClearsLocal = deskPlace.isExplicitUnreadReset,
             remoteClearOverridesLocal = false,
         )
-        applyOrOfferRemoteProgress(store = progressStore, item = item, pageCount = item.pageCount, decision = decision)
+        applyOrOfferRemoteProgress(
+            store = progressStore,
+            item = item,
+            pageCount = item.pageCount,
+            decision = decision,
+            offeredBy = KATANA_DESK_NAME,
+        )
         return decision == RemoteProgressSyncDecision.KeepLocal
     }
 
@@ -421,12 +430,17 @@ private class KatanaDeskBookSync(
         val here = readerSessionStore.progressByItemIdFlow.value[item.id]
             ?.takeIf { place ->
                 val unsent = place.syncState != SyncState.CLEAN
-                !place.isExplicitUnreadReset && (unsent || deskTime == null || place.updatedAtEpochMillis > deskTime)
+                unsent || !place.isExplicitUnreadReset && (deskTime == null || place.updatedAtEpochMillis > deskTime)
             }
             ?: return
-        val pageCount = readerSessionStore.getSession(item)?.pageCount ?: item.pageCount
-        val update = here.toGrimmoryProgressUpdate(item = item.copy(remoteId = bookId), pageCount = pageCount) ?: return
-        api.updateProgress(accessToken = token, progress = update)
+        if (here.isExplicitUnreadReset) {
+            // Marked unread here: the desk forgets its place too, as Grimmory does.
+            api.resetBookProgress(accessToken = token, bookId = bookId)
+        } else {
+            val pageCount = readerSessionStore.getSession(item)?.pageCount ?: item.pageCount
+            val update = here.toGrimmoryProgressUpdate(item = item.copy(remoteId = bookId), pageCount = pageCount) ?: return
+            api.updateProgress(accessToken = token, progress = update)
+        }
         // Sent: no longer a save waiting to go up, so a newer place on the desk wins without Grimmory's margin.
         readerSessionStore.replaceProgressIfCurrent(expected = here, replacement = here.copy(syncState = SyncState.CLEAN))
     }
