@@ -27,7 +27,8 @@ Once it's installed, Katana updates itself from Settings › About, and an updat
 - Your reading place syncs with the server, and books download for offline reading, picking up where they stopped
   if the Wi-Fi drops.
 - Bookmarks in every format, with a name and a note, synced with Grimmory too.
-- Save words and go over them as flashcards, search inside a book, and share a highlight as a quote card.
+- Save words and go over them as flashcards, or see them as a graph that links words with the same meaning
+  across your books. Search inside a book, and share a highlight as a quote card.
 - Export your highlights and notes as Markdown, and back everything up to a file.
 - Works away from home too, over something like Tailscale.
 - Runs on old Amazon Fire tablets and on new phones alike.
@@ -37,10 +38,6 @@ Once it's installed, Katana updates itself from Settings › About, and an updat
 Katana isn't trying to be a reader with every feature piled in. It does what I need, and I'll keep fixing what
 breaks. If you like it but want something it doesn't do, fork it and make it yours, with whatever AI agent you like
 to work with. That's pretty much how Katana started.
-
-## Things to implement
-
-- **Highlights in PDFs.** Highlighting works in EPUBs; PDFs need a text layer first.
 
 ## Build it yourself
 
