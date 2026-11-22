@@ -54,7 +54,7 @@ data class LibraryRefreshAction(
 )
 
 /**
- * Books on this device in the library's "•••": Add a folder, Find books on this phone (until it is on), Check
+ * Books on this device in the library's "•••": Add a folder, Find books on this device (until it is on), Check
  * for new books and Book folders (once there is a folder or the phone search).
  */
 class LibraryLocalBookItems(
@@ -74,7 +74,7 @@ private fun LocalBookMenuItems(
     LocalBookMenuItem("Import a file", AppIcons.Add, onImportFile, onPicked)
     if (localBooks == null) return
     LocalBookMenuItem("Add a folder", AppIcons.Add, localBooks.onAddFolder, onPicked)
-    localBooks.onFindOnPhone?.let { LocalBookMenuItem("Find books on this phone", AppIcons.Refresh, it, onPicked) }
+    localBooks.onFindOnPhone?.let { LocalBookMenuItem("Find books on this device", AppIcons.Refresh, it, onPicked) }
     localBooks.onCheckForNewBooks?.let { LocalBookMenuItem("Check for new books", AppIcons.Refresh, it, onPicked) }
     localBooks.onBookFolders?.let { LocalBookMenuItem("Book folders", AppIcons.MoreHoriz, it, onPicked) }
     localBooks.onKatanaDesk?.let { LocalBookMenuItem("Sync with Katana Desk", AppIcons.Cloud, it, onPicked) }
@@ -98,7 +98,7 @@ private fun LocalBookMenuItem(
 }
 
 /**
- * The library top bar's "•••": Import a file, Add a folder, Find books on this phone and, on a server,
+ * The library top bar's "•••": Import a file, Add a folder, Find books on this device and, on a server,
  * Refresh library. With [showSelectionTip]
  * it also explains, under the items, that a long-press selects books. The button turns a ring
  * while the library refreshes.

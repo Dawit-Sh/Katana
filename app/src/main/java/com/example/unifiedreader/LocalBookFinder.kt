@@ -14,7 +14,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Where books on this device come from besides Add books (2026-11-20, for friends who only read their own
- * files): folders picked once and read where they are, and, with "Find books on this phone", the whole
+ * files): folders picked once and read where they are, and, with "Find books on this device", the whole
  * phone's storage. Kept on this device only.
  */
 class LocalBookPlaces(context: Context) {
@@ -145,7 +145,7 @@ class LocalBookFinder(private val context: Context) {
     // Every book file in the phone's storage, past Android's own folders and hidden ones.
     private fun phoneBooks(): List<Uri> {
         val root = Environment.getExternalStorageDirectory()
-        if (!root.canRead()) error("Can't read the phone's storage")
+        if (!root.canRead()) error("Can't read this device's storage")
         return root.walkTopDown()
             .onEnter { dir ->
                 dir == root || (!dir.name.startsWith(".") && !(dir.parentFile == root && dir.name == "Android"))
@@ -173,7 +173,7 @@ internal fun folderLabelOf(treeDocumentId: String): String {
     val volume = treeDocumentId.substringBefore(':')
     val path = treeDocumentId.substringAfter(':', "").trim('/')
     return when {
-        volume == "primary" -> path.ifEmpty { "The phone's storage" }
+        volume == "primary" -> path.ifEmpty { "This device's storage" }
         // Picked under Downloads on older Android (the Fire): a file path, "raw:/storage/emulated/0/Download/…".
         volume == "raw" -> storagePathLabel(path)
         treeDocumentId == "downloads" -> "Download"
@@ -189,7 +189,7 @@ private fun storagePathLabel(path: String): String {
     val onPhone = parts.take(PHONE_STORAGE_PARTS).let { it.size == PHONE_STORAGE_PARTS && it[0] == "storage" && it[1] == "emulated" }
     val onCard = parts.size >= CARD_STORAGE_PARTS && parts[0] == "storage" && SdCardVolume.matches(parts[1])
     return when {
-        onPhone -> parts.drop(PHONE_STORAGE_PARTS).joinToString("/").ifEmpty { "The phone's storage" }
+        onPhone -> parts.drop(PHONE_STORAGE_PARTS).joinToString("/").ifEmpty { "This device's storage" }
         onCard -> parts.drop(CARD_STORAGE_PARTS).joinToString("/").let { rest -> if (rest.isEmpty()) "SD card" else "SD card · $rest" }
         else -> path
     }
@@ -205,7 +205,7 @@ private val SdCardVolume = Regex("^[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}$")
 fun folderLabel(tree: Uri): String =
     runCatching { folderLabelOf(DocumentsContract.getTreeDocumentId(tree)) }.getOrNull() ?: tree.lastPathSegment.orEmpty()
 
-/** What a refresh of the places changed: books added, and books gone from the phone. */
+/** What a refresh of the places changed: books added, and books gone from this device. */
 data class LocalBookRefresh(val added: Int, val removed: Int)
 
 /**
@@ -243,7 +243,7 @@ class LocalBookRefresher(
 
     /**
      * Takes a place out of Book folders: Katana stops looking there, and its books leave the library. The files
-     * stay on the phone, and their highlights, bookmarks and places come back with the folder. Returns how many
+     * stay on this device, and their highlights, bookmarks and places come back with the folder. Returns how many
      * books left.
      */
     suspend fun forget(place: LocalBookPlace): Int = running.withLock {

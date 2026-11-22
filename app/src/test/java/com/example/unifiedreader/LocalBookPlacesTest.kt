@@ -10,7 +10,7 @@ class LocalBookPlacesTest {
     fun `a picked folder reads as its path on the phone, or on the SD card`() {
         assertEquals("Download/Katana-formats-test", folderLabelOf("primary:Download/Katana-formats-test"))
         assertEquals("Books", folderLabelOf("primary:Books"))
-        assertEquals("The phone's storage", folderLabelOf("primary:"))
+        assertEquals("This device's storage", folderLabelOf("primary:"))
         assertEquals("SD card · Books/Comics", folderLabelOf("1A2B-3C4D:Books/Comics"))
         assertEquals("SD card", folderLabelOf("1A2B-3C4D:"))
     }
@@ -20,7 +20,7 @@ class LocalBookPlacesTest {
     fun `a folder picked under Downloads on older Android reads as its path`() {
         assertEquals("Download/Katana-formats-test", folderLabelOf("raw:/storage/emulated/0/Download/Katana-formats-test"))
         assertEquals("SD card · Books", folderLabelOf("raw:/storage/1A2B-3C4D/Books"))
-        assertEquals("The phone's storage", folderLabelOf("raw:/storage/emulated/0"))
+        assertEquals("This device's storage", folderLabelOf("raw:/storage/emulated/0"))
         assertEquals("Download", folderLabelOf("downloads"))
         assertEquals("1234", folderLabelOf("msd:1234"))
     }
@@ -41,7 +41,7 @@ class LocalBookPlacesTest {
 
     @Test
     fun `the toast after removing says the files stay`() {
-        assertEquals("Removed, with its 1 book. The file stays on the phone", removedToastText(1))
-        assertEquals("Removed, with its 3 books. The files stay on the phone", removedToastText(3))
+        assertEquals("Removed, with its 1 book. The file stays on this device", removedToastText(1))
+        assertEquals("Removed, with its 3 books. The files stay on this device", removedToastText(3))
     }
 }

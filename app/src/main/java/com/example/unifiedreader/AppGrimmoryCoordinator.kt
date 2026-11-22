@@ -212,7 +212,8 @@ class AppGrimmoryCoordinator @Inject constructor(
     internal suspend fun executeConnect(
         preparation: GrimmorySyncReady,
     ): SourceConnectExecutionResult = runSuspendCatching {
-        val result = grimmoryCatalogSyncer.connect(preparation.request)
+        // A Wi-Fi still waking up (the Fire's, after a restart or a fresh install) gets two more tries.
+        val result = retryWhileUnreachable { grimmoryCatalogSyncer.connect(preparation.request) }
         persistRemoteSession(
             sessionStore = grimmoryCredentialStore,
             session = result.session,
@@ -254,11 +255,16 @@ class AppGrimmoryCoordinator @Inject constructor(
         )
     }.getOrElse { throwable ->
         remoteSourceConnectivityPolicy.markFromFailure(SourceType.GRIMMORY, throwable)
+        val message = if (throwable.isRemoteServerAddressRetryableFailure()) {
+            unreachableServerMessage(preparation.failurePrefix, preparation.request.baseUrl)
+        } else {
+            "${preparation.failurePrefix}: ${throwable.userFacingMessage()}"
+        }
         SourceConnectExecutionResult.Failure(
-            message = "${preparation.failurePrefix}: ${throwable.userFacingMessage()}",
+            message = message,
             connection = preparation.activeConnection.copy(
                 isConnecting = false,
-                message = "${preparation.failurePrefix}: ${throwable.userFacingMessage()}",
+                message = message,
                 isError = true,
             ),
         )

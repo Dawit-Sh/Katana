@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import com.example.unifiedreader.core.model.SourceConnectivityState
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.feature.settings.RemoteSourceSettingsActions
@@ -145,8 +146,11 @@ internal fun rememberSourceSettingsEntries(
             onClearCoverCache = { viewModel.clearCachedCovers(SourceType.KAVITA) },
         )
     }
-    val grimmoryActions = remember(viewModel) {
+    val appContext = LocalContext.current.applicationContext
+    val grimmoryActions = remember(viewModel, appContext) {
+        val finder = GrimmoryWifiFinder(appContext)
         RemoteSourceSettingsActions(
+            findOnWifi = finder::find,
             onDisplayNameChanged = viewModel::onGrimmoryDisplayNameChanged,
             onBaseUrlChanged = viewModel::onGrimmoryBaseUrlChanged,
             onBackupBaseUrlChanged = viewModel::onGrimmoryBackupBaseUrlChanged,

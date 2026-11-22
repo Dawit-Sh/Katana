@@ -22,7 +22,7 @@ import com.example.unifiedreader.ui.components.AppTextButton
 
 /**
  * Book folders, from the Local library's "•••": the folders Katana reads books from and, when it is on, the
- * whole phone. Remove takes the folder out and its books out of the library; the files stay on the phone.
+ * whole phone. Remove takes the folder out and its books out of the library; the files stay on this device.
  */
 @Composable
 internal fun BookFoldersDialog(
@@ -39,13 +39,13 @@ internal fun BookFoldersDialog(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = "Katana shows the books in these places and looks for new ones. Removing one takes its " +
-                        "books out of the library; the files stay on the phone.",
+                        "books out of the library; the files stay on this device.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 if (places.wholePhone) {
-                    BookFolderRow(label = "The whole phone", action = "Stop", onAction = onStopPhone)
+                    BookFolderRow(label = "The whole device", action = "Stop", onAction = onStopPhone)
                 }
                 places.folders.forEach { (tree, label) ->
                     BookFolderRow(label = label, action = "Remove", onAction = { onRemoveFolder(tree) })

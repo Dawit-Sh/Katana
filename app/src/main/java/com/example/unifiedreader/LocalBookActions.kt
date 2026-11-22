@@ -25,7 +25,7 @@ import com.example.unifiedreader.feature.library.LibraryLocalBookItems
 import com.example.unifiedreader.ui.components.AppToastIcon
 import com.example.unifiedreader.ui.components.AppToastMessage
 
-/** Add a folder and Find books on this phone, for the library's "•••" (null where there's no library). */
+/** Add a folder and Find books on this device, for the library's "•••" (null where there's no library). */
 class LocalBookActions(
     val onAddFolder: () -> Unit,
     val onFindOnPhone: () -> Unit,
@@ -50,7 +50,7 @@ internal fun LocalBookActions.menuItems(): LibraryLocalBookItems = LibraryLocalB
 )
 
 /**
- * The folder picker, the permission Find books on this phone needs (All files access from Android 11, asked
+ * The folder picker, the permission Find books on this device needs (All files access from Android 11, asked
  * in the system's own screen; storage before), Book folders, and a look through the folders whenever the Local
  * library shows. What changed shows as a toast.
  */

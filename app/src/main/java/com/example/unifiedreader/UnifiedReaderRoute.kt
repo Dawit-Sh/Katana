@@ -75,7 +75,7 @@ fun UnifiedReaderRoute(
     readerDisplay: AppReaderDisplayViewModel = hiltViewModel(),
     // The offline dictionary, for the readers' Dictionary card and Settings › Reading.
     dictionary: AppDictionaryViewModel = hiltViewModel(),
-    // Folders and Find books on this phone, for the library's "•••" and the start screen.
+    // Folders and Find books on this device, for the library's "•••" and the start screen.
     localBooks: AppLocalBooksViewModel = hiltViewModel(),
 ) {
     val viewModel: AppViewModel = hiltViewModel()

@@ -153,8 +153,8 @@ private fun DeviceStartChoices(
     if (onFindOnPhone != null) {
         SourceStartChoice(
             icon = SourceType.LOCAL.navigationIcon(),
-            title = "Find books on this phone",
-            supporting = "Katana looks through the phone for books (needs All files access)",
+            title = "Find books on this device",
+            supporting = "Katana looks through this device for books (needs All files access)",
             onClick = onFindOnPhone,
         )
         StartChoiceDivider()
@@ -293,10 +293,19 @@ private fun SourceConnectPage(
             entry.actions.onSync()
         }
     }
+    val wifiSearch = rememberWifiServerSearch(entry)
     SourceStartPage(onBack = onBack) {
         if (!connection.hasStoredSession) {
             AppScreenTitle(text = "Connect $name")
             SourceStartLead(text = "Use the address you open $name at in a browser, and your $name account.")
+            wifiSearch.line(name)?.let { line ->
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = line,
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Spacer(modifier = Modifier.height(24.dp))
             AppPanel(modifier = Modifier.fillMaxWidth()) {
                 ServerConnectionForm(

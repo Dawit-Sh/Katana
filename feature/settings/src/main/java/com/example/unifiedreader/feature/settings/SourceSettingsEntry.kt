@@ -67,6 +67,8 @@ data class RemoteSourceSettingsActions(
     val onClearCoverCache: () -> Unit,
     /** Forgets the server's saved sign-in on this device; null leaves Sign out off the page. */
     val onSignOut: (() -> Unit)? = null,
+    /** Looks for the server on this device's Wi-Fi and gives its address; null when the server can't be found so. */
+    val findOnWifi: (suspend () -> String?)? = null,
 )
 
 /** One remote source as the settings hub and its page see it. */
