@@ -25,7 +25,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -57,9 +56,11 @@ internal fun WordGraphCard(
     onOpen: () -> Unit,
     onPick: (String) -> Unit,
     side: Boolean,
+    /** The graph's height: a side card stays inside it, a sheet takes at most part of it. */
+    areaHeight: Dp,
     modifier: Modifier = Modifier,
 ) {
-    val maxHeight = LocalConfiguration.current.screenHeightDp.dp * if (side) SIDE_HEIGHT_SHARE else SHEET_HEIGHT_SHARE
+    val maxHeight = if (side) areaHeight - AppLayout.contentTop - AppLayout.contentBottom else areaHeight * SHEET_HEIGHT_SHARE
     val corner = UnifiedReaderThemeTokens.presentation.cardCornerRadius
     AppPanel(
         modifier = modifier
@@ -75,19 +76,7 @@ internal fun WordGraphCard(
                 .padding(AppLayout.inset),
             verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = word.word,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontFamily = rememberQuoteFontFamily(),
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                WordStateTag(model.states[word.id] ?: wordState(word))
-                AppIconButton(onClick = onClose) { Icon(AppIcons.Close, contentDescription = WordGraphCopy.Close) }
-            }
+            CardHeading(word, model.states[word.id] ?: wordState(word), onClose)
             meaning?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
             word.sentence?.takeIf(String::isNotBlank)?.let { sentence ->
                 Text(
@@ -98,43 +87,72 @@ internal fun WordGraphCard(
                 )
             }
             Text(
-                text = listOfNotNull(word.book.title, wordPlace(word), BookmarksCopy.moment(word.createdAtEpochMillis)).joinToString(" · "),
+                text = WordGraphCopy.from(word),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // Open in book comes before the reviews and synonyms, so a short sheet still shows it.
+            AppButton(onClick = onOpen) {
+                Icon(AppIcons.MenuBook, contentDescription = null, modifier = Modifier.size(SmallIcon))
+                Spacer(Modifier.width(AppLayout.headingGap))
+                Text(WordGraphCopy.OpenInBook)
+            }
             Text(
                 text = WordGraphCopy.reviews(word, System.currentTimeMillis()),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            val same = model.synonymsOf[word.id].orEmpty().mapNotNull(model.wordsById::get)
-            if (same.isNotEmpty()) {
-                Text(WordGraphCopy.SameMeaning, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = AppLayout.headingGap))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
-                    verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
-                ) {
-                    same.forEach { other ->
-                        AppChip(
-                            selected = false,
-                            onClick = { onPick(other.id) },
-                            label = {
-                                Text(
-                                    text = if (other.book.itemId == word.book.itemId) other.word else "${other.word} · ${other.book.title}",
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            },
-                            leadingIcon = { WordStateDot(model.states[other.id] ?: wordState(other)) },
+            SameMeaning(word, model, onPick)
+        }
+    }
+}
+
+/** The word in the book's face, how far it is learned, and Close. */
+@Composable
+private fun CardHeading(word: SavedWord, state: WordState, onClose: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = word.word,
+            style = MaterialTheme.typography.headlineSmall,
+            fontFamily = rememberQuoteFontFamily(),
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        WordStateTag(state)
+        AppIconButton(onClick = onClose) { Icon(AppIcons.Close, contentDescription = WordGraphCopy.Close) }
+    }
+}
+
+/** The saved words of the same meaning, each a chip that picks it. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SameMeaning(word: SavedWord, model: WordGraphModel, onPick: (String) -> Unit) {
+    val same = model.synonymsOf[word.id].orEmpty().mapNotNull(model.wordsById::get)
+    if (same.isEmpty()) return
+    Column(
+        modifier = Modifier.padding(top = AppLayout.headingGap),
+        verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
+    ) {
+        Text(text = WordGraphCopy.SameMeaning, style = MaterialTheme.typography.titleSmall)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
+            verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
+        ) {
+            same.forEach { other ->
+                AppChip(
+                    selected = false,
+                    onClick = { onPick(other.id) },
+                    label = {
+                        Text(
+                            text = WordGraphCopy.synonym(other, sameBook = other.book.itemId == word.book.itemId),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
-                    }
-                }
-            }
-            Spacer(Modifier.size(AppLayout.headingGap))
-            AppButton(onClick = onOpen) {
-                Icon(AppIcons.MenuBook, contentDescription = null, modifier = Modifier.size(SmallIcon))
-                Spacer(Modifier.width(AppLayout.headingGap))
-                Text(WordGraphCopy.OpenInBook)
+                    },
+                    leadingIcon = { WordStateDot(model.states[other.id] ?: wordState(other)) },
+                )
             }
         }
     }
@@ -245,6 +263,13 @@ object WordGraphCopy {
 
     fun speed(speed: Int): String = "$speed×"
 
+    /** "A Christmas Carol · p. 12 · 3 Aug": the book, the page and when the word was saved. */
+    fun from(word: SavedWord): String =
+        listOfNotNull(word.book.title, wordPlace(word), BookmarksCopy.moment(word.createdAtEpochMillis)).joinToString(" · ")
+
+    /** A synonym's chip: the word, with its book when it comes from another one. */
+    fun synonym(word: SavedWord, sameBook: Boolean): String = if (sameBook) word.word else "${word.word} · ${word.book.title}"
+
     /** For TalkBack: "Graph of 34 words from 6 books", or "from Hamlet". */
     fun description(model: WordGraphModel): String {
         val from = if (model.bookId != null) model.books.firstOrNull()?.title.orEmpty() else MarkCounts.books(model.books.size)
@@ -280,5 +305,4 @@ private val CardShadow: Dp = 6.dp
 private val DotSize: Dp = 10.dp
 private val TagGap: Dp = 6.dp
 private const val DOT_STROKE = 1.5f
-private const val SIDE_HEIGHT_SHARE = 0.7f
-private const val SHEET_HEIGHT_SHARE = 0.55f
+private const val SHEET_HEIGHT_SHARE = 0.62f

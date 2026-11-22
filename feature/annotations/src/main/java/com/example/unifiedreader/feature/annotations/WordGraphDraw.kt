@@ -19,14 +19,11 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
-import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
-import kotlin.math.roundToInt
-import kotlin.math.sin
 
 /** Where the graph is looked at from: world point (x, y) shows at (x * scale + tx, y * scale + ty) on screen. */
 @Stable
@@ -115,12 +112,11 @@ internal data class GraphLook(
     }
 }
 
-/** What one frame shows: the selection, the filter, Play's progress, and how names are drawn. */
-internal class GraphFrame(
-    val model: WordGraphModel,
-    val camera: GraphCamera,
-    val look: GraphLook,
-    val density: Float,
+/** How the graph is drawn: its colours, the screen's density and the names measured. */
+internal class GraphStyle(val look: GraphLook, val density: Float, val labels: GraphLabels)
+
+/** What shows now: the picked word, the state filter, and what Play has brought in. */
+internal class GraphShowing(
     val selectedId: String?,
     val filter: WordStateFilter,
     /** Words shown so far while Play runs; null shows every word. */
@@ -128,19 +124,33 @@ internal class GraphFrame(
     /** The word Play just brought in, and how far its lines have drawn (0..1). */
     val freshId: String?,
     val freshProgress: () -> Float,
-    val labels: GraphLabels,
-    /** Whether book covers are drawn by the cover slot (then only their titles are drawn here). */
-    val coversDrawnAbove: Boolean,
+)
+
+/** One frame of the graph: what it holds, where it is looked at from, how it is drawn and what shows. */
+internal class GraphFrame(
+    val model: WordGraphModel,
+    val camera: GraphCamera,
+    val style: GraphStyle,
+    showing: GraphShowing,
+    /** The books whose covers the cover slot draws over the graph now (only their titles are drawn here). */
+    val coversDrawnAbove: Set<String>,
 ) {
+    val look: GraphLook get() = style.look
+    val density: Float get() = style.density
+    val labels: GraphLabels get() = style.labels
+    val selectedId: String? = showing.selectedId
+    val filter: WordStateFilter = showing.filter
+    val playShown: Set<String>? = showing.playShown
+    val freshId: String? = showing.freshId
+    val freshProgress: () -> Float = showing.freshProgress
+
     val highlighted: Set<String> = selectedId?.let { id -> setOf(id) + model.synonymsOf[id].orEmpty() }.orEmpty()
 
     fun isShown(id: String): Boolean = playShown == null || id in playShown
 
-    fun isDim(id: String): Boolean {
-        if (selectedId != null && id !in highlighted) return true
-        val state = model.states[id] ?: return false
-        return !filter.matches(state)
-    }
+    /** Faded: not among the picked word and its synonyms, or not what the state filter keeps. */
+    fun isDim(id: String): Boolean =
+        (selectedId != null && id !in highlighted) || model.states[id]?.let { !filter.matches(it) } == true
 
     /** Names show in book mode, once zoomed in far enough for every book, and on picked words always. */
     fun labelsOn(id: String): Boolean =
@@ -244,99 +254,6 @@ internal fun DrawScope.drawWordGraph(frame: GraphFrame, paths: GraphPaths) {
 
 private fun zigStroke(width: Float) = Stroke(width = width, cap = StrokeCap.Round, join = StrokeJoin.Round)
 
-private fun DrawScope.buildEdges(frame: GraphFrame, paths: GraphPaths) {
-    bookEdges(frame, paths)
-    synonymEdges(frame, paths)
-}
-
-private fun DrawScope.bookEdges(frame: GraphFrame, paths: GraphPaths) {
-    val model = frame.model
-    val cam = frame.camera
-    model.playOrder.forEachIndexed { i, word ->
-        if (!frame.isShown(word.id)) return@forEachIndexed
-        val p = model.positions[word.id] ?: return@forEachIndexed
-        val b = model.bookPositions[word.book.itemId] ?: return@forEachIndexed
-        val x0 = cam.screenX(b.x)
-        val y0 = cam.screenY(b.y)
-        val x1 = cam.screenX(p.x)
-        val y1 = cam.screenY(p.y)
-        if (!onScreen(min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))) return@forEachIndexed
-        val bend = if (i % 2 == 0) CURVE_BEND else -CURVE_BEND
-        val target = when {
-            word.id == frame.freshId -> paths.fresh
-            word.id == frame.selectedId -> paths.plainHi
-            frame.isDim(word.id) -> paths.plainDim
-            else -> paths.plain
-        }
-        val t = if (word.id == frame.freshId) (frame.freshProgress() * LINE_FIRST).coerceAtMost(1f) else 1f
-        curve(target, x0, y0, x1, y1, bend, t)
-    }
-}
-
-private fun DrawScope.synonymEdges(frame: GraphFrame, paths: GraphPaths) {
-    val model = frame.model
-    val cam = frame.camera
-    val amp = ZIG_AMPLITUDE * frame.density
-    model.links.forEach { link ->
-        if (!frame.isShown(link.a) || !frame.isShown(link.b)) return@forEach
-        val a = model.positions[link.a] ?: return@forEach
-        val b = model.positions[link.b] ?: return@forEach
-        val x0 = cam.screenX(a.x)
-        val y0 = cam.screenY(a.y)
-        val x1 = cam.screenX(b.x)
-        val y1 = cam.screenY(b.y)
-        if (!onScreen(min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))) return@forEach
-        val fresh = link.a == frame.freshId || link.b == frame.freshId
-        val target = when {
-            fresh -> paths.fresh
-            link.a == frame.selectedId || link.b == frame.selectedId -> paths.zigHi
-            frame.isDim(link.a) || frame.isDim(link.b) -> paths.zigDim
-            else -> paths.zig
-        }
-        val t = if (fresh) ((frame.freshProgress() - ZIG_DELAY) / (1f - ZIG_DELAY)).coerceIn(0f, 1f) else 1f
-        if (t > 0f) zigzag(target, x0, y0, x1, y1, amp, t)
-    }
-}
-
-private fun DrawScope.onScreen(left: Float, top: Float, right: Float, bottom: Float): Boolean =
-    right >= -OFFSCREEN && bottom >= -OFFSCREEN && left <= size.width + OFFSCREEN && top <= size.height + OFFSCREEN
-
-/** A gentle curve from the book to the word, drawn up to [t] of the way. */
-private fun curve(path: Path, x0: Float, y0: Float, x1: Float, y1: Float, bend: Float, t: Float) {
-    val mx = (x0 + x1) / 2f - (y1 - y0) * bend
-    val my = (y0 + y1) / 2f + (x1 - x0) * bend
-    path.moveTo(x0, y0)
-    if (t >= 1f) {
-        path.quadraticTo(mx, my, x1, y1)
-        return
-    }
-    val steps = CURVE_STEPS
-    for (s in 1..steps) {
-        val u = t * s / steps
-        val v = 1f - u
-        path.lineTo(v * v * x0 + 2 * v * u * mx + u * u * x1, v * v * y0 + 2 * v * u * my + u * u * y1)
-    }
-}
-
-/** The synonym line: a zigzag that tapers at both ends, drawn up to [t] of the way. */
-private fun zigzag(path: Path, x0: Float, y0: Float, x1: Float, y1: Float, amp: Float, t: Float) {
-    val dx = x1 - x0
-    val dy = y1 - y0
-    val length = max(1f, hypot(dx, dy))
-    val n = max(MIN_ZIGS, (length / (amp * ZIG_WAVELENGTH)).roundToInt())
-    val px = -dy / length
-    val py = dx / length
-    val last = (n * t).toInt()
-    path.moveTo(x0, y0)
-    for (i in 1 until n) {
-        if (i > last) return
-        val f = i.toFloat() / n
-        val o = (if (i % 2 == 1) 1f else -1f) * amp * sin(PI.toFloat() * f).pow(ZIG_TAPER)
-        path.lineTo(x0 + dx * f + px * o, y0 + dy * f + py * o)
-    }
-    if (t >= 1f) path.lineTo(x1, y1)
-}
-
 private fun DrawScope.drawBooks(frame: GraphFrame) {
     val model = frame.model
     val cam = frame.camera
@@ -352,7 +269,7 @@ private fun DrawScope.drawBooks(frame: GraphFrame) {
         val dim = frame.selectedId != null && model.wordsById[frame.selectedId]?.book?.itemId != b.itemId &&
             frame.highlighted.none { model.wordsById[it]?.book?.itemId == b.itemId }
         val alpha = if (dim) BOOK_DIM_ALPHA else 1f
-        if (!frame.coversDrawnAbove) {
+        if (b.itemId !in frame.coversDrawnAbove) {
             drawRoundRect(GraphBooks.color(b.title, frame.look.bookFill), Offset(left, top), Size(w, h), corner, alpha = alpha)
         }
         if (model.bookId != null || cam.scale >= BOOK_TITLE_SCALE) {
@@ -383,38 +300,49 @@ private fun DrawScope.drawWords(frame: GraphFrame) {
 }
 
 private fun DrawScope.drawWord(frame: GraphFrame, word: SavedWord, ghost: Boolean) {
-    if (!ghost && !frame.isShown(word.id)) return
-    val p = frame.model.positions[word.id] ?: return
+    val p = frame.model.positions[word.id]?.takeIf { ghost || frame.isShown(word.id) } ?: return
     val cam = frame.camera
-    val look = frame.look
-    val d = frame.density
-    val x = cam.screenX(p.x)
-    val y = cam.screenY(p.y)
+    val center = Offset(cam.screenX(p.x), cam.screenY(p.y))
     val r = frame.radius(word.id)
-    if (!onScreen(x - r, y - r, x + r, y + r + LABEL_ROOM * d)) return
-    val state = frame.model.states[word.id] ?: WordState.New
-    val alpha = when {
-        frame.isDim(word.id) -> DIM_ALPHA
-        ghost -> GHOST_ALPHA
-        else -> 1f
+    val reach = LABEL_ROOM * frame.density
+    if (onScreen(center.x - r, center.y - r, center.x + r, center.y + r + reach)) {
+        val state = frame.model.states[word.id] ?: WordState.New
+        val alpha = wordAlpha(frame, word.id, ghost)
+        drawDot(frame.look, state, center, r, alpha)
+        if (frame.labelsOn(word.id)) drawWordLabel(frame, word, state, Offset(center.x, center.y + r), alpha)
     }
-    val center = Offset(x, y)
+}
+
+private fun wordAlpha(frame: GraphFrame, id: String, ghost: Boolean): Float = when {
+    frame.isDim(id) -> DIM_ALPHA
+    ghost -> GHOST_ALPHA
+    else -> 1f
+}
+
+/** A word's circle: learned filled with a soft glow, learning filled, new hollow. */
+private fun DrawScope.drawDot(look: GraphLook, state: WordState, center: Offset, r: Float, alpha: Float) {
     if (state == WordState.Learned && alpha == 1f) {
         drawCircle(look.learned, r * GLOW_OUTER, center, alpha = GLOW_OUTER_ALPHA)
         drawCircle(look.learned, r * GLOW_INNER, center, alpha = GLOW_INNER_ALPHA)
     }
     drawCircle(look.fill(state), r, center, alpha = alpha)
-    if (state == WordState.New) drawCircle(look.newStroke, r - NEW_STROKE * d / 2f, center, alpha = alpha, style = Stroke(NEW_STROKE * d))
-    if (frame.labelsOn(word.id)) {
-        val label = frame.labels.word(word.word)
-        drawText(
-            textLayoutResult = label,
-            color = if (state == WordState.Learned || word.id in frame.highlighted) look.labelStrong else look.label,
-            topLeft = Offset(x - label.size.width / 2f, y + r + LABEL_GAP * d),
-            alpha = alpha,
-            shadow = Shadow(look.halo, Offset.Zero, HALO_BLUR * d),
-        )
+    if (state == WordState.New) {
+        val stroke = NEW_STROKE * density
+        drawCircle(look.newStroke, r - stroke / 2f, center, alpha = alpha, style = Stroke(stroke))
     }
+}
+
+/** The word's name under its circle ([under] is the circle's lowest point). */
+private fun DrawScope.drawWordLabel(frame: GraphFrame, word: SavedWord, state: WordState, under: Offset, alpha: Float) {
+    val label = frame.labels.word(word.word)
+    val strong = state == WordState.Learned || word.id in frame.highlighted
+    drawText(
+        textLayoutResult = label,
+        color = if (strong) frame.look.labelStrong else frame.look.label,
+        topLeft = Offset(under.x - label.size.width / 2f, under.y + LABEL_GAP * frame.density),
+        alpha = alpha,
+        shadow = Shadow(frame.look.halo, Offset.Zero, HALO_BLUR * frame.density),
+    )
 }
 
 /** What a tap on the graph lands on. */
@@ -454,15 +382,6 @@ private const val EDGE_WIDTH = 1.05f
 private const val EDGE_HI_WIDTH = 1.7f
 private const val ZIG_WIDTH = 1.25f
 private const val ZIG_HI_WIDTH = 1.8f
-private const val ZIG_AMPLITUDE = 3.2f
-private const val ZIG_WAVELENGTH = 2.8f
-private const val ZIG_TAPER = 0.4f
-private const val MIN_ZIGS = 4
-private const val CURVE_BEND = 0.12f
-private const val CURVE_STEPS = 16
-private const val LINE_FIRST = 1.6f
-private const val ZIG_DELAY = 0.45f
-private const val OFFSCREEN = 80f
 private const val BOOK_CORNER = 2f
 private const val BOOK_TITLE_SCALE = 0.45f
 private const val LABEL_GAP = 4f

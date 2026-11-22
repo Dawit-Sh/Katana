@@ -237,6 +237,7 @@ internal fun MyWordsRoute(
             modifier = Modifier.fillMaxSize(),
             senseGroups = senseGroups,
             bookCover = cover,
+            coveredBooks = itemsById.keys,
         )
         // Under the app's bar, painted solid: the page itself is what the bar's glass shows.
         ReaderDictionaryOverlay(

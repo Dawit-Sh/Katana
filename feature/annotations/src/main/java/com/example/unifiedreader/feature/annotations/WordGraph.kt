@@ -119,11 +119,14 @@ class WordGraphModel(
     /** The books that have nodes: the one book in book mode, every book of [words] otherwise. */
     val books: List<AnnotatedBook>,
     val links: List<WordLink>,
-    val positions: Map<String, GraphPoint>,
-    val bookPositions: Map<String, GraphPoint>,
+    /** Where the layout put each book and word. */
+    placement: GraphPlacement,
     /** The one book in book mode; null for every book. */
     val bookId: String?,
 ) {
+    val positions: Map<String, GraphPoint> = placement.words
+    val bookPositions: Map<String, GraphPoint> = placement.books
+
     val states: Map<String, WordState> = (words + ghosts).associate { it.id to wordState(it) }
 
     /** Each word's linked words, by id. */
@@ -171,7 +174,7 @@ fun buildWordGraph(all: List<SavedWord>, groups: Map<String, Set<Long>>, bookId:
     return if (bookId == null) {
         val books = newestFirst.reversed().map(SavedWord::book).distinctBy(AnnotatedBook::itemId)
         val layout = WordGraphLayouts.everyBook(books, wordPlayOrder(newestFirst), allLinks)
-        WordGraphModel(newestFirst, emptyList(), books, allLinks, layout.words, layout.books, bookId = null)
+        WordGraphModel(newestFirst, emptyList(), books, allLinks, layout, bookId = null)
     } else {
         val shown = newestFirst.filter { it.book.itemId == bookId }
         val shownIds = shown.mapTo(HashSet(), SavedWord::id)
@@ -180,7 +183,7 @@ fun buildWordGraph(all: List<SavedWord>, groups: Map<String, Set<Long>>, bookId:
         val ghosts = newestFirst.filter { it.id in ghostIds }
         val book = shown.firstOrNull()?.book
         val layout = WordGraphLayouts.oneBook(bookId, wordPlayOrder(shown), ghosts, links)
-        WordGraphModel(shown, ghosts, listOfNotNull(book), links, layout.words, layout.books, bookId = bookId)
+        WordGraphModel(shown, ghosts, listOfNotNull(book), links, layout, bookId = bookId)
     }
 }
 
@@ -249,12 +252,7 @@ object WordGraphLayouts {
             sim.addLink(word.id, bookId, ring, WORD_TO_BOOK)
         }
         val shown = words.mapTo(HashSet(), SavedWord::id)
-        ghosts.forEachIndexed { k, ghost ->
-            val partner = links.firstOrNull { (it.a == ghost.id && it.b in shown) || (it.b == ghost.id && it.a in shown) }
-            val near = partner?.let { if (it.a == ghost.id) it.b else it.a }?.let(sim::position)
-            val a = near?.let { kotlin.math.atan2(it.y, it.x) + (k % GHOST_FAN - 1) * GHOST_SPREAD } ?: (k * GOLDEN_ANGLE)
-            sim.addNode(ghost.id, GraphPoint(ring * GHOST_DISTANCE * cos(a), ring * GHOST_DISTANCE * sin(a)))
-        }
+        placeGhosts(sim, ghosts, links, shown, ring)
         val ghostIds = ghosts.mapTo(HashSet(), SavedWord::id)
         links.forEach { link ->
             when {
@@ -269,6 +267,16 @@ object WordGraphLayouts {
             books = mapOf(bookId to sim.position(bookId)),
             words = (words + ghosts).associate { it.id to sim.position(it.id) },
         )
+    }
+
+    /** Other books' synonyms start further out, each near the word it means the same as. */
+    private fun placeGhosts(sim: Simulation, ghosts: List<SavedWord>, links: List<WordLink>, shown: Set<String>, ring: Float) {
+        ghosts.forEachIndexed { k, ghost ->
+            val partner = links.firstOrNull { (it.a == ghost.id && it.b in shown) || (it.b == ghost.id && it.a in shown) }
+            val near = partner?.let { if (it.a == ghost.id) it.b else it.a }?.let(sim::position)
+            val a = near?.let { kotlin.math.atan2(it.y, it.x) + (k % GHOST_FAN - 1) * GHOST_SPREAD } ?: (k * GOLDEN_ANGLE)
+            sim.addNode(ghost.id, GraphPoint(ring * GHOST_DISTANCE * cos(a), ring * GHOST_DISTANCE * sin(a)))
+        }
     }
 
     private const val BOOK_MASS = 5f
