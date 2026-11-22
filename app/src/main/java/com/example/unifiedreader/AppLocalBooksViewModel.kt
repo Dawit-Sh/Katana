@@ -109,9 +109,9 @@ class AppLocalBooksViewModel @Inject constructor(
 
 /** The toast after a look through the folders and the phone; null when nothing changed and nobody asked. */
 internal fun LocalBookRefresh.toastText(asked: Boolean): String? = when {
-    added > 0 && removed > 0 -> "${books(added)} added, ${books(removed)} gone from the phone"
+    added > 0 && removed > 0 -> "${books(added)} added, ${books(removed)} gone from this device"
     added > 0 -> "${books(added)} added"
-    removed > 0 -> "${books(removed)} gone from the phone"
+    removed > 0 -> "${books(removed)} gone from this device"
     asked -> "No new books found"
     else -> null
 }
@@ -127,7 +127,7 @@ data class LocalBookPlacesShown(
 }
 
 internal fun removedToastText(removed: Int): String = if (removed == 1) {
-    "Removed, with its 1 book. The file stays on the phone"
+    "Removed, with its 1 book. The file stays on this device"
 } else {
-    "Removed, with its $removed books. The files stay on the phone"
+    "Removed, with its $removed books. The files stay on this device"
 }

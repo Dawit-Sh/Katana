@@ -74,7 +74,7 @@ private fun LocalBookMenuItems(
     LocalBookMenuItem("Import a file", AppIcons.Add, onImportFile, onPicked)
     if (localBooks == null) return
     LocalBookMenuItem("Add a folder", AppIcons.Add, localBooks.onAddFolder, onPicked)
-    localBooks.onFindOnPhone?.let { LocalBookMenuItem("Find books on this phone", AppIcons.Refresh, it, onPicked) }
+    localBooks.onFindOnPhone?.let { LocalBookMenuItem("Find books on this device", AppIcons.Refresh, it, onPicked) }
     localBooks.onCheckForNewBooks?.let { LocalBookMenuItem("Check for new books", AppIcons.Refresh, it, onPicked) }
     localBooks.onBookFolders?.let { LocalBookMenuItem("Book folders", AppIcons.MoreHoriz, it, onPicked) }
     localBooks.onKatanaDesk?.let { LocalBookMenuItem("Sync with Katana Desk", AppIcons.Cloud, it, onPicked) }

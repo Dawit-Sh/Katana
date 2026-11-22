@@ -116,7 +116,10 @@ fun ReadableItem.libraryPrimaryText(): String = when (kind) {
 }
 
 fun ReadableItem.librarySecondaryText(): String? = when (kind) {
-    ReadableItemKind.BOOK -> bookMetadata?.primaryAuthor()?.takeIf(String::isNotBlank)
+    // A file without an author often has its own name there: the title again is no author line.
+    ReadableItemKind.BOOK -> bookMetadata?.primaryAuthor()
+        ?.takeIf(String::isNotBlank)
+        ?.takeUnless { author -> author.trim().equals(title.trim(), ignoreCase = true) }
     ReadableItemKind.COMIC -> {
         val metadata = comicMetadata ?: return null
         // A Kavita volume's generated "Chapter v1" reads "Volume 1".

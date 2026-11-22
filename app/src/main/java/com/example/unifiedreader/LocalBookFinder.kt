@@ -145,7 +145,7 @@ class LocalBookFinder(private val context: Context) {
     // Every book file in the phone's storage, past Android's own folders and hidden ones.
     private fun phoneBooks(): List<Uri> {
         val root = Environment.getExternalStorageDirectory()
-        if (!root.canRead()) error("Can't read the phone's storage")
+        if (!root.canRead()) error("Can't read this device's storage")
         return root.walkTopDown()
             .onEnter { dir ->
                 dir == root || (!dir.name.startsWith(".") && !(dir.parentFile == root && dir.name == "Android"))
@@ -173,7 +173,7 @@ internal fun folderLabelOf(treeDocumentId: String): String {
     val volume = treeDocumentId.substringBefore(':')
     val path = treeDocumentId.substringAfter(':', "").trim('/')
     return when {
-        volume == "primary" -> path.ifEmpty { "The phone's storage" }
+        volume == "primary" -> path.ifEmpty { "This device's storage" }
         // Picked under Downloads on older Android (the Fire): a file path, "raw:/storage/emulated/0/Download/…".
         volume == "raw" -> storagePathLabel(path)
         treeDocumentId == "downloads" -> "Download"
@@ -189,7 +189,7 @@ private fun storagePathLabel(path: String): String {
     val onPhone = parts.take(PHONE_STORAGE_PARTS).let { it.size == PHONE_STORAGE_PARTS && it[0] == "storage" && it[1] == "emulated" }
     val onCard = parts.size >= CARD_STORAGE_PARTS && parts[0] == "storage" && SdCardVolume.matches(parts[1])
     return when {
-        onPhone -> parts.drop(PHONE_STORAGE_PARTS).joinToString("/").ifEmpty { "The phone's storage" }
+        onPhone -> parts.drop(PHONE_STORAGE_PARTS).joinToString("/").ifEmpty { "This device's storage" }
         onCard -> parts.drop(CARD_STORAGE_PARTS).joinToString("/").let { rest -> if (rest.isEmpty()) "SD card" else "SD card · $rest" }
         else -> path
     }

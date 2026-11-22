@@ -33,6 +33,22 @@ class DesignSystemRuleTest {
     }
 
     @Test
+    fun `on-screen text says this device, never phone or tablet`() {
+        // Katana runs on phones, the Fire and other tablets alike (his word, 2026-11-18).
+        val root = repositoryRoot()
+        val found = sourceFiles(root).flatMap { file ->
+            file.readLines().withIndex()
+                .filter { (_, line) -> !line.trimStart().startsWith("//") && !line.trimStart().startsWith("*") }
+                .filter { (_, line) -> StringLiteral.findAll(line).any { DeviceWord.containsMatchIn(it.value) } }
+                .map { (index, line) -> "${file.relativeTo(root).invariantSeparatorsPath}:${index + 1}: ${line.trim()}" }
+        }
+        assertTrue(
+            "Say \"this device\" on screen, not phone or tablet:\n" + found.joinToString("\n"),
+            found.isEmpty(),
+        )
+    }
+
+    @Test
     fun `no new literal dp paddings in app and feature code`() {
         assertRatchet(
             baseline = "literal-paddings.txt",
@@ -125,6 +141,8 @@ class DesignSystemRuleTest {
 
     internal companion object {
         const val BaselineDir = "core/ui-components/src/test/design-baselines"
+        private val StringLiteral = Regex("\"[^\"]*\"")
+        private val DeviceWord = Regex("""\b(this|the|your|whole) (phone|tablet)s?\b""", RegexOption.IGNORE_CASE)
 
         val AppScreenTitleCall = Regex("""\bAppScreenTitle\(""")
 

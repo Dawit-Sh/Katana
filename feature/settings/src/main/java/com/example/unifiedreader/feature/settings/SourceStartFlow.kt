@@ -153,8 +153,8 @@ private fun DeviceStartChoices(
     if (onFindOnPhone != null) {
         SourceStartChoice(
             icon = SourceType.LOCAL.navigationIcon(),
-            title = "Find books on this phone",
-            supporting = "Katana looks through the phone for books (needs All files access)",
+            title = "Find books on this device",
+            supporting = "Katana looks through this device for books (needs All files access)",
             onClick = onFindOnPhone,
         )
         StartChoiceDivider()
