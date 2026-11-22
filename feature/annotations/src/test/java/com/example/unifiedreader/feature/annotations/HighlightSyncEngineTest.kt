@@ -165,6 +165,29 @@ class HighlightSyncEngineTest {
     }
 
     @Test
+    fun `a new server takes the highlights as new and nothing reads as removed there`() = runBlocking {
+        val first = FakeServer()
+        val kept = annotations.addHighlight(hole, place, "Once", HighlightLook(), note = "kept")
+        annotations.placement.setServerPlace(kept.id, cfi)
+        val gone = annotations.addHighlight(hole, place.copy(progression = 0.2), "Twice", HighlightLook())
+        annotations.placement.setServerPlace(gone.id, "epubcfi(/6/8!/4/4,/1:0,/1:5)")
+        sync(first)
+        annotations.deleteHighlight(gone.id)
+
+        // Another desk paired: the first desk's ids mean nothing there.
+        syncStore.newServer(hole.itemId)
+        val second = FakeServer().apply { nextId = 500 }
+        sync(second)
+
+        assertEquals(listOf("create ${kept.id}"), second.requests)
+        assertEquals("kept", second.list().single().note)
+        val row = syncStore.rowsOf(hole.itemId).single()
+        assertEquals("500", row.remoteId)
+        assertEquals(HIGHLIGHT_IN_STEP, row.syncState)
+        assertEquals(1, annotations.highlights(hole.itemId).first().size)
+    }
+
+    @Test
     fun `a highlight removed here is removed on the server, then gone for good`() = runBlocking {
         val server = FakeServer()
         val made = annotations.addHighlight(hole, place, "Once", HighlightLook())

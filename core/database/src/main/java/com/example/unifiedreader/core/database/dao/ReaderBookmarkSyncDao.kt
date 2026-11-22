@@ -65,4 +65,15 @@ interface ReaderBookmarkSyncDao {
     /** The server lost it: the change on this device makes it again there. */
     @Query("UPDATE reader_bookmarks SET remoteId = NULL WHERE id = :id")
     fun forgetBookmarkRemoteId(id: String)
+
+    /** Another server takes over the book: removals meant for the old one go ([sendBookmarksToNewServer] next). */
+    @Query("DELETE FROM reader_bookmarks WHERE itemId = :itemId AND deleted = 1 AND remoteId IS NOT NULL")
+    fun dropBookmarkRemovalsForOldServer(itemId: String)
+
+    /** Another server takes over the book: its bookmarks go there as new. */
+    @Query(
+        "UPDATE reader_bookmarks SET remoteId = NULL, syncState = '$HIGHLIGHT_WAITING' " +
+            "WHERE itemId = :itemId AND deleted = 0 AND remoteId IS NOT NULL",
+    )
+    fun sendBookmarksToNewServer(itemId: String)
 }

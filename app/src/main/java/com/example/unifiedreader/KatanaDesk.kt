@@ -272,8 +272,8 @@ class KatanaDeskSync @Inject constructor(
     private val httpClient: HttpClient,
     private val localDocuments: LocalDocumentDataSource,
     private val grimmoryCopies: dagger.Lazy<GrimmoryLocalCopies>,
-    highlightStore: HighlightSyncStore,
-    bookmarkStore: BookmarkSyncStore,
+    private val highlightStore: HighlightSyncStore,
+    private val bookmarkStore: BookmarkSyncStore,
     private val readerSessionStore: ReaderSessionStore,
     private val readStatuses: ReadStatusStore,
 ) {
@@ -315,8 +315,14 @@ class KatanaDeskSync @Inject constructor(
     /** Pairs with the desk at [address] with the [code] it shows, then syncs. */
     suspend fun pair(address: String, code: String): KatanaDeskPaired {
         val paired = client.pair(address, code, connection.deviceId)
-        // Another desk than the one the books were linked with: its book ids mean other books.
-        if (connection.linkedDeskId != null && connection.linkedDeskId != paired.deskId) connection.saveLinks(emptyMap())
+        // Another desk than the one the books were linked with: its book ids mean other books, and the marks
+        // carry the first desk's ids, which this one would read as removed: they go up to it as new instead.
+        if (connection.linkedDeskId != null && connection.linkedDeskId != paired.deskId) {
+            mutex.withLock {
+                moveMarksToNewServer(connection.links.value.keys, highlightStore, bookmarkStore)
+                connection.saveLinks(emptyMap())
+            }
+        }
         connection.save(paired)
         syncSoon()
         return paired
@@ -537,5 +543,17 @@ private class KatanaDeskBookSync(
     private companion object {
         // A book whose desk list changes under each round waits for the next sync.
         const val MAX_ROUNDS = 3
+    }
+}
+
+/** [itemIds]' highlights and bookmarks start over with another server ([HighlightSyncStore.newServer]). */
+internal suspend fun moveMarksToNewServer(
+    itemIds: Collection<String>,
+    highlights: HighlightSyncStore,
+    bookmarks: BookmarkSyncStore,
+) {
+    for (itemId in itemIds) {
+        highlights.newServer(itemId)
+        bookmarks.newServer(itemId)
     }
 }

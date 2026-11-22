@@ -62,4 +62,15 @@ interface ReaderHighlightSyncDao {
     /** The server lost it: the change on this device makes it again there. */
     @Query("UPDATE reader_highlights SET remoteId = NULL WHERE id = :id")
     fun forgetHighlightRemoteId(id: String)
+
+    /** Another server takes over the book: removals meant for the old one go ([sendHighlightsToNewServer] next). */
+    @Query("DELETE FROM reader_highlights WHERE itemId = :itemId AND deleted = 1 AND remoteId IS NOT NULL")
+    fun dropHighlightRemovalsForOldServer(itemId: String)
+
+    /** Another server takes over the book: its highlights go there as new. */
+    @Query(
+        "UPDATE reader_highlights SET remoteId = NULL, syncState = '$HIGHLIGHT_WAITING' " +
+            "WHERE itemId = :itemId AND deleted = 0 AND remoteId IS NOT NULL",
+    )
+    fun sendHighlightsToNewServer(itemId: String)
 }

@@ -71,6 +71,13 @@ interface HighlightSyncStore {
     suspend fun lostOnServer(localId: String)
 
     suspend fun refused(localId: String, expectedUpdatedAt: Long)
+
+    /**
+     * Another server takes over [itemId]'s marks (a different Katana Desk paired): each goes to it as new,
+     * and removals meant for the old server are dropped. Their ids were the old server's and mean nothing
+     * to the new one, which would read them as removed there.
+     */
+    suspend fun newServer(itemId: String) = Unit
 }
 
 /**
@@ -161,6 +168,11 @@ class RoomHighlightSyncStore(
     override suspend fun removedOnServer(localId: String) = io { dao.purgeRemovedHighlight(localId) }
 
     override suspend fun lostOnServer(localId: String) = io { dao.forgetHighlightRemoteId(localId) }
+
+    override suspend fun newServer(itemId: String) = io {
+        dao.dropHighlightRemovalsForOldServer(itemId)
+        dao.sendHighlightsToNewServer(itemId)
+    }
 
     override suspend fun refused(localId: String, expectedUpdatedAt: Long) =
         io { dao.setSyncStateIfUnchanged(localId, HIGHLIGHT_ON_DEVICE, expectedUpdatedAt) }

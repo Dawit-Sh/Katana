@@ -308,6 +308,13 @@ interface BookmarkSyncStore {
     suspend fun lostOnServer(localId: String)
 
     suspend fun refused(localId: String, expectedUpdatedAt: Long)
+
+    /**
+     * Another server takes over [itemId]'s marks (a different Katana Desk paired): each goes to it as new,
+     * and removals meant for the old server are dropped. Their ids were the old server's and mean nothing
+     * to the new one, which would read them as removed there.
+     */
+    suspend fun newServer(itemId: String) = Unit
 }
 
 /**
@@ -399,6 +406,11 @@ class RoomBookmarkSyncStore(
     override suspend fun removedOnServer(localId: String) = io { dao.purgeRemovedBookmark(localId) }
 
     override suspend fun lostOnServer(localId: String) = io { dao.forgetBookmarkRemoteId(localId) }
+
+    override suspend fun newServer(itemId: String) = io {
+        dao.dropBookmarkRemovalsForOldServer(itemId)
+        dao.sendBookmarksToNewServer(itemId)
+    }
 
     override suspend fun refused(localId: String, expectedUpdatedAt: Long) =
         io { dao.setBookmarkSyncStateIfUnchanged(localId, HIGHLIGHT_ON_DEVICE, expectedUpdatedAt) }
