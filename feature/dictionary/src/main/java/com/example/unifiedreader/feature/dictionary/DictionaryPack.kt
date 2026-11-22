@@ -18,6 +18,9 @@ interface DictionarySource : Closeable {
 
     /** The irregular base forms of [form] as [part] of speech (geese -> goose). */
     fun irregularBases(form: String, part: PartOfSpeech): List<String>
+
+    /** The sense groups (WordNet synsets) [word] belongs to; words sharing one mean the same in that sense. */
+    fun senseGroups(word: String): List<Long> = emptyList()
 }
 
 /**
@@ -49,6 +52,11 @@ class SqliteDictionaryPack(file: File) : DictionarySource {
         arrayOf(form, part.code),
     ).use { cursor -> buildList { while (cursor.moveToNext()) add(cursor.getString(0)) } }
 
+    override fun senseGroups(word: String): List<Long> = db.rawQuery(
+        "SELECT synset FROM senses WHERE word = ?",
+        arrayOf(word),
+    ).use { cursor -> buildList { while (cursor.moveToNext()) add(cursor.getLong(0)) } }
+
     override fun close() = db.close()
 }
 
@@ -79,6 +87,20 @@ fun DictionarySource.lookUp(text: String, maxSenses: Int = DEFAULT_MAX_SENSES): 
         WordForms.bases(form, part, irregularBases(form, part)).forEach { base -> addMeanings(base, only = part) }
     }
     return if (meanings.isEmpty()) null else DictionaryEntry(word = form, meanings = meanings)
+}
+
+/**
+ * The sense groups of [text] for My words' graph: the word's own, and those of the base forms it may be an
+ * inflection of ("grasping" -> grasp), as [lookUp] finds them. Empty when the dictionary doesn't know it.
+ */
+fun DictionarySource.senseGroupsOf(text: String): Set<Long> {
+    val form = WordForms.normalize(text)
+    if (form.isEmpty()) return emptySet()
+    val groups = LinkedHashSet(senseGroups(form))
+    PartOfSpeech.entries.forEach { part ->
+        WordForms.bases(form, part, irregularBases(form, part)).forEach { base -> groups += senseGroups(base) }
+    }
+    return groups
 }
 
 private const val DEFAULT_MAX_SENSES = 3

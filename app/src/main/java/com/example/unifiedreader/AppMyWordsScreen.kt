@@ -19,6 +19,8 @@ import com.example.unifiedreader.feature.annotations.AnnotationExports
 import com.example.unifiedreader.feature.annotations.AnnotationJumps
 import com.example.unifiedreader.feature.annotations.KeptWord
 import com.example.unifiedreader.feature.annotations.MarkdownExport
+import com.example.unifiedreader.feature.annotations.MarkedBookCover
+import com.example.unifiedreader.feature.annotations.MarkedBookPlaceholderCover
 import com.example.unifiedreader.feature.annotations.MyWordsActions
 import com.example.unifiedreader.feature.annotations.MyWordsBar
 import com.example.unifiedreader.feature.annotations.MyWordsCopy
@@ -28,11 +30,14 @@ import com.example.unifiedreader.feature.annotations.ReaderAnnotationStore
 import com.example.unifiedreader.feature.annotations.SavedWord
 import com.example.unifiedreader.feature.annotations.WordMeanings
 import com.example.unifiedreader.feature.annotations.WordOfTheDay
+import com.example.unifiedreader.feature.annotations.WordSynonyms
 import com.example.unifiedreader.feature.annotations.meaningLine
 import com.example.unifiedreader.feature.annotations.meaningsOf
 import com.example.unifiedreader.feature.annotations.removeWordWithUndo
 import com.example.unifiedreader.feature.dictionary.DictionaryRequest
 import com.example.unifiedreader.feature.dictionary.ReaderDictionaryOverlay
+import com.example.unifiedreader.feature.library.LibraryCoverImageVariant
+import com.example.unifiedreader.feature.library.VisibleResolvedLibraryCover
 import com.example.unifiedreader.ui.components.AppToastIcon
 import com.example.unifiedreader.ui.components.AppToastMessage
 import com.example.unifiedreader.ui.components.AppToastState
@@ -61,6 +66,7 @@ class AppMyWordsViewModel @Inject constructor(
     store: ReaderAnnotationStore,
     jumps: AnnotationJumps,
     meanings: WordMeanings,
+    synonyms: WordSynonyms,
     @ApplicationContext context: Context,
 ) : ViewModel() {
     val screen = AppMyWordsScreen(
@@ -69,6 +75,7 @@ class AppMyWordsViewModel @Inject constructor(
         wordMeanings = meanings,
         scope = viewModelScope,
         wordOfTheDayStore = WordOfTheDayStore(context),
+        wordSynonyms = synonyms,
     )
 }
 
@@ -84,6 +91,8 @@ class AppMyWordsScreen(
     private val scope: CoroutineScope,
     /** Keeps the side menu's word of the day for its day; null keeps it in memory only. */
     private val wordOfTheDayStore: WordOfTheDayStore? = null,
+    /** The dictionary's sense groups, for the graph's synonym lines. */
+    private val wordSynonyms: WordSynonyms = WordSynonyms.None,
 ) {
     /** Where the page is; kept here so it is still there after a book opened from it closes. */
     val state = MyWordsState()
@@ -103,6 +112,14 @@ class AppMyWordsScreen(
     val meanings: StateFlow<Map<String, String>> =
         words.filterNotNull()
             .mapLatest { list -> wordMeanings.meaningsOf(list, language = MEANING_LANGUAGE) }
+            .stateIn(scope, SharingStarted.WhileSubscribed(KEEP_MILLIS), emptyMap())
+
+    /** Each saved word's sense groups in the dictionary, for the graph; looked up again only when the words change. */
+    val senseGroups: StateFlow<Map<String, Set<Long>>> =
+        words.filterNotNull()
+            .map { list -> list.mapTo(HashSet(), SavedWord::word) }
+            .distinctUntilChanged()
+            .mapLatest { texts -> wordSynonyms.senseGroups(texts) }
             .stateIn(scope, SharingStarted.WhileSubscribed(KEEP_MILLIS), emptyMap())
 
     private val exports = AnnotationExports(store)
@@ -186,9 +203,30 @@ internal fun MyWordsRoute(
     onOpenBook: (ReadableItem) -> Unit,
     contentTopInset: Dp,
     modifier: Modifier = Modifier,
+    coverImageUrlFor: (ReadableItem, LibraryCoverImageVariant) -> String? = { item, _ -> item.coverUrl },
+    onCoverVisible: (ReadableItem, LibraryCoverImageVariant) -> Unit = { _, _ -> },
 ) {
     val words by myWords.words.collectAsStateWithLifecycle()
     val meanings by myWords.meanings.collectAsStateWithLifecycle()
+    val senseGroups by myWords.senseGroups.collectAsStateWithLifecycle()
+    val itemsById = rememberWordBooks(words, uiState.items)
+    // The graph's covers: the library's own, a plain cover for a book no longer in the library.
+    val cover: MarkedBookCover = remember(itemsById, coverImageUrlFor, onCoverVisible) {
+        { book, coverModifier ->
+            val item = itemsById[book.itemId]
+            if (item == null) {
+                MarkedBookPlaceholderCover(book = book, modifier = coverModifier)
+            } else {
+                VisibleResolvedLibraryCover(
+                    item = item,
+                    coverImageUrlProvider = coverImageUrlFor,
+                    onCoverVisible = onCoverVisible,
+                    imageVariant = LibraryCoverImageVariant.Grid,
+                    modifier = coverModifier,
+                )
+            }
+        }
+    }
     Box(modifier = modifier) {
         MyWordsScreen(
             state = myWords.state,
@@ -197,6 +235,8 @@ internal fun MyWordsRoute(
             actions = rememberMyWordsActions(myWords, words, uiState.items, onOpenBook),
             contentTopInset = contentTopInset,
             modifier = Modifier.fillMaxSize(),
+            senseGroups = senseGroups,
+            bookCover = cover,
         )
         // Under the app's bar, painted solid: the page itself is what the bar's glass shows.
         ReaderDictionaryOverlay(
@@ -227,6 +267,14 @@ internal fun MyWordsTopBar(
     }
 }
 
+/** Only the books that have saved words, not a map of the whole catalog. */
+@Composable
+private fun rememberWordBooks(words: List<SavedWord>?, items: List<ReadableItem>): Map<String, ReadableItem> =
+    remember(words, items) {
+        val wanted = words?.mapTo(hashSetOf()) { it.book.itemId }.orEmpty()
+        if (wanted.isEmpty()) emptyMap() else items.filter { item -> item.id in wanted }.associateBy(ReadableItem::id)
+    }
+
 @Composable
 private fun rememberMyWordsActions(
     myWords: AppMyWordsScreen,
@@ -235,11 +283,7 @@ private fun rememberMyWordsActions(
     onOpenBook: (ReadableItem) -> Unit,
 ): MyWordsActions {
     val toasts = LocalAppToastState.current
-    // Only the books that have saved words, not a map of the whole catalog.
-    val itemsById = remember(words, items) {
-        val wanted = words?.mapTo(hashSetOf()) { it.book.itemId }.orEmpty()
-        if (wanted.isEmpty()) emptyMap() else items.filter { item -> item.id in wanted }.associateBy(ReadableItem::id)
-    }
+    val itemsById = rememberWordBooks(words, items)
     return remember(myWords, itemsById, onOpenBook, toasts) { AppMyWordsActions(myWords, itemsById, onOpenBook, toasts) }
 }
 

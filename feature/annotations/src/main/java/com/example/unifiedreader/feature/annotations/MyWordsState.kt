@@ -20,6 +20,9 @@ interface MyWordsActions : WordStudyActions {
     suspend fun export(words: List<SavedWord>): MarkdownExport
 }
 
+/** How the My words page shows the words: as a list, or as the graph of books and words. */
+enum class MyWordsView { List, Graph }
+
 /** Where the My words page is: the list, or the flashcards. */
 sealed interface MyWordsPage {
     data object Words : MyWordsPage
@@ -46,6 +49,15 @@ class MyWordsState {
 
     /** The flashcard round under way, if any. */
     var round: WordReviewRound? by mutableStateOf(null)
+
+    /** The list or the graph. */
+    var view: MyWordsView by mutableStateOf(MyWordsView.List)
+
+    /** The graph's state filter: words that don't match fade. */
+    var stateFilter: WordStateFilter by mutableStateOf(WordStateFilter.All)
+
+    /** The word picked on the graph, its card open; null for none. */
+    var graphSelected: String? by mutableStateOf(null)
 
     /** Whether anything has scrolled under the bar (it then needs its glass). */
     var scrolled: Boolean by mutableStateOf(false)

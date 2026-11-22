@@ -664,6 +664,8 @@ fun UnifiedReaderScaffold(
                                     onOpenBook = viewModel::onItemSelected,
                                     contentTopInset = AppTopBarDefaults.contentInset,
                                     modifier = Modifier.fillMaxSize(),
+                                    coverImageUrlFor = viewModel::coverImageUrlFor,
+                                    onCoverVisible = viewModel::ensureCoverCached,
                                 )
                             }
 

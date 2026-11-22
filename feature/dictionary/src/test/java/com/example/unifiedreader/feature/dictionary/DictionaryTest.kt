@@ -159,6 +159,22 @@ class DictionaryTest {
     }
 
     @Test
+    fun `the graph's sense groups take a word's own and its base forms', and leave out unknown words`() = runTest {
+        val dictionary = installed(this)
+
+        val groups = dictionary.senseGroups(listOf("ran", "Running", "geese", "zzyzx"))
+
+        assertEquals(setOf(11L, 12L, 13L), groups["ran"])
+        // "running" is a word of its own (41, 42) and a form of run (11, 12, 13).
+        assertEquals(setOf(41L, 42L, 11L, 12L, 13L), groups["Running"])
+        assertEquals(setOf(21L), groups["geese"])
+        assertFalse("zzyzx" in groups)
+        // ran and running share run's groups: the graph joins them.
+        assertTrue(groups.getValue("ran").intersect(groups.getValue("Running")).isNotEmpty())
+        assertEquals(groups, DictionaryWordSynonyms(dictionary).senseGroups(listOf("ran", "Running", "geese", "zzyzx")))
+    }
+
+    @Test
     fun `a word is shown with its part of speech and first senses, the most common first`() = runTest {
         val dictionary = installed(this)
 

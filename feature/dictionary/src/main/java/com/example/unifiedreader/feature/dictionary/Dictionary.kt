@@ -7,6 +7,7 @@ import com.example.unifiedreader.core.network.PartialDownloadFile
 import com.example.unifiedreader.core.network.downloadResumably
 import com.example.unifiedreader.core.network.isConnectionFailure
 import com.example.unifiedreader.feature.annotations.WordMeanings
+import com.example.unifiedreader.feature.annotations.WordSynonyms
 import io.ktor.client.HttpClient
 import io.ktor.client.request.url
 import io.ktor.http.isSuccess
@@ -135,6 +136,15 @@ class Dictionary(
             ?: DictionaryLookup.NotFound(WordForms.normalize(word).ifEmpty { word.trim() })
     }
 
+    /** The sense groups of each of [words] (as given), off the main thread; words it doesn't know are left out. */
+    suspend fun senseGroups(words: Collection<String>): Map<String, Set<Long>> = withContext(ioDispatcher) {
+        val source = openLock.withLock {
+            if (!packFile.isFile) unpackBundled()
+            open ?: if (packFile.isFile) openPack(packFile).also { open = it } else null
+        } ?: return@withContext emptyMap()
+        words.distinct().mapNotNull { word -> source.senseGroupsOf(word).takeIf(Set<Long>::isNotEmpty)?.let { word to it } }.toMap()
+    }
+
     /** The first lookup copies the built-in pack out of the APK, checked like a download. Fails quietly. */
     private fun unpackBundled() {
         val open = bundled ?: return
@@ -209,6 +219,11 @@ class DictionaryWordMeanings(private val dictionary: Dictionary) : WordMeanings 
         if (!language.startsWith("en", ignoreCase = true)) return null
         return (dictionary.lookUp(word) as? DictionaryLookup.Found)?.entry?.firstDefinition
     }
+}
+
+/** My words' graph's synonyms from the dictionary: English sense groups. */
+class DictionaryWordSynonyms(private val dictionary: Dictionary) : WordSynonyms {
+    override suspend fun senseGroups(words: Collection<String>): Map<String, Set<Long>> = dictionary.senseGroups(words)
 }
 
 /** A saved word's own stored meaning when it has one, else what [meanings] finds. */

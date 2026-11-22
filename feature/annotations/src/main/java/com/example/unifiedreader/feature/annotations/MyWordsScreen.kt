@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -40,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.example.unifiedreader.ui.components.AppButton
 import com.example.unifiedreader.ui.components.AppChip
 import com.example.unifiedreader.ui.components.AppEmptyState
@@ -51,6 +53,8 @@ import com.example.unifiedreader.ui.components.AppPanel
 import com.example.unifiedreader.ui.components.AppScreenBack
 import com.example.unifiedreader.ui.components.AppScreenHost
 import com.example.unifiedreader.ui.components.AppSearchField
+import com.example.unifiedreader.ui.components.AppSegment
+import com.example.unifiedreader.ui.components.AppSegmentedRow
 import com.example.unifiedreader.ui.components.AppWindowWidth
 import com.example.unifiedreader.ui.components.appGutter
 
@@ -69,6 +73,10 @@ fun MyWordsScreen(
     actions: MyWordsActions,
     contentTopInset: Dp,
     modifier: Modifier = Modifier,
+    /** The words' sense groups (the dictionary's), for the graph's synonym lines. */
+    senseGroups: Map<String, Set<Long>> = emptyMap(),
+    /** Draws a book's cover on the graph; null draws plain rectangles. */
+    bookCover: MarkedBookCover? = null,
 ) {
     val list = remember(words) { words?.let(::MyWordsList) }
     // The book on the filter lost its last word: show every book again.
@@ -84,7 +92,11 @@ fun MyWordsScreen(
     ) { page ->
         val shown = list ?: return@AppScreenHost
         when (page) {
-            MyWordsPage.Words -> MyWordsListPage(state, shown, meanings, actions, contentTopInset)
+            MyWordsPage.Words -> if (state.view == MyWordsView.Graph && !shown.isEmpty) {
+                MyWordsGraphPage(state, shown, senseGroups, meanings, actions, bookCover, contentTopInset)
+            } else {
+                MyWordsListPage(state, shown, meanings, actions, contentTopInset)
+            }
             MyWordsPage.Review -> WordReviewPage(
                 words = shown.inBook(state.bookId),
                 round = state.round,
@@ -158,14 +170,50 @@ private fun MyWordsListPage(
     }
 }
 
-/** How many words from how many books with Review, then the search, then the book filter. */
+/**
+ * The graph: the header (count, Review, List | Graph, the book and state filters) on top, the graph filling the
+ * rest of the page edge to edge.
+ */
+@Composable
+private fun MyWordsGraphPage(
+    state: MyWordsState,
+    list: MyWordsList,
+    senseGroups: Map<String, Set<Long>>,
+    meanings: Map<String, String>,
+    actions: MyWordsActions,
+    bookCover: MarkedBookCover?,
+    contentTopInset: Dp,
+) {
+    LaunchedEffect(Unit) { state.scrolled = false }
+    Column(modifier = Modifier.fillMaxSize()) {
+        Spacer(Modifier.height(contentTopInset + AppLayout.contentTop))
+        MyWordsHeader(state = state, list = list, modifier = Modifier.padding(horizontal = appGutter()))
+        WordGraphPane(
+            state = state,
+            words = list.words,
+            senseGroups = senseGroups,
+            meanings = meanings,
+            actions = actions,
+            bookCover = bookCover,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+        )
+    }
+}
+
+/**
+ * How many words from how many books with Review, then (on the list) the search, then List | Graph and the book
+ * filter, and on the graph the state filter.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun MyWordsHeader(state: MyWordsState, list: MyWordsList) {
+private fun MyWordsHeader(state: MyWordsState, list: MyWordsList, modifier: Modifier = Modifier) {
     val now = remember(list) { System.currentTimeMillis() }
     val book = list.book(state.bookId)
+    val graph = state.view == MyWordsView.Graph
     Column(
-        modifier = Modifier.padding(bottom = AppLayout.headingGap),
+        modifier = modifier.padding(bottom = AppLayout.headingGap),
         verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
     ) {
         FlowRow(
@@ -185,14 +233,70 @@ private fun MyWordsHeader(state: MyWordsState, list: MyWordsList) {
                 Text(MyWordsCopy.review(list.dueCount(now, state.bookId)))
             }
         }
-        AppSearchField(
-            query = state.query,
-            onQueryChange = { state.query = it },
-            placeholder = MyWordsCopy.SearchPlaceholder,
+        if (!graph) {
+            AppSearchField(
+                query = state.query,
+                onQueryChange = { state.query = it },
+                placeholder = MyWordsCopy.SearchPlaceholder,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
-        )
-        BookFilter(list = list, selected = book, onSelect = { state.bookId = it })
+            horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
+            verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
+        ) {
+            ViewToggle(state)
+            BookFilter(list = list, selected = book, onSelect = { state.bookId = it })
+        }
+        if (graph) StateFilters(state)
     }
+}
+
+/** List | Graph. */
+@Composable
+private fun ViewToggle(state: MyWordsState) {
+    AppSegmentedRow(modifier = Modifier.width(ToggleWidth)) {
+        AppSegment(
+            selected = state.view == MyWordsView.List,
+            onClick = { state.view = MyWordsView.List },
+            label = { Text(WordGraphCopy.List) },
+            icon = { Icon(AppIcons.ViewList, contentDescription = null, modifier = Modifier.size(SmallIcon)) },
+        )
+        AppSegment(
+            selected = state.view == MyWordsView.Graph,
+            onClick = { state.view = MyWordsView.Graph },
+            label = { Text(WordGraphCopy.Graph) },
+            icon = { Icon(AppIcons.Hub, contentDescription = null, modifier = Modifier.size(SmallIcon)) },
+        )
+    }
+}
+
+/** All, Learned, Learning, New: the graph fades the words that don't match. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun StateFilters(state: MyWordsState) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
+        verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
+    ) {
+        WordStateFilter.entries.forEach { filter ->
+            val dot: (@Composable () -> Unit)? = filterState(filter)?.let { shownState -> { WordStateDot(shownState) } }
+            AppChip(
+                selected = state.stateFilter == filter,
+                onClick = { state.stateFilter = filter },
+                label = { Text(WordGraphCopy.filter(filter)) },
+                leadingIcon = dot,
+            )
+        }
+    }
+}
+
+private fun filterState(filter: WordStateFilter): WordState? = when (filter) {
+    WordStateFilter.All -> null
+    WordStateFilter.Learned -> WordState.Learned
+    WordStateFilter.Learning -> WordState.Learning
+    WordStateFilter.New -> WordState.New
 }
 
 /** "All books" or the book shown, opening the list of books with their word counts. */
@@ -361,7 +465,7 @@ private fun WordContext(word: SavedWord, modifier: Modifier = Modifier) {
 
 /** The sentence around the saved word, on one line, with the word in bold. */
 @Composable
-private fun sentenceWithWord(sentence: String, word: String): AnnotatedString {
+internal fun sentenceWithWord(sentence: String, word: String): AnnotatedString {
     val text = sentenceAround(sentence, word)
     val span = wordSpan(text, word)
     val strong = SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
@@ -376,6 +480,7 @@ private fun sentenceWithWord(sentence: String, word: String): AnnotatedString {
     }
 }
 
+private val ToggleWidth: Dp = 196.dp
 private const val WordColumnWeight = 0.42f
 private const val SentenceLines = 6
 private const val MetaLines = 3
