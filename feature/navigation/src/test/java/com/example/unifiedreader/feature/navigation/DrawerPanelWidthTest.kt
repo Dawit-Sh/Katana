@@ -25,9 +25,11 @@ class DrawerPanelWidthTest {
     }
 
     @Test
-    fun `the reading card leaves the side menu only at very large text, where it would be cut off`() {
+    fun `the reading card stays in the side menu at every text size Android offers`() {
         assertEquals(true, drawerShowsReadingCard(fontScale = 1f))
         assertEquals(true, drawerShowsReadingCard(fontScale = 1.3f))
-        assertEquals(false, drawerShowsReadingCard(fontScale = 2f))
+        // At 200% the menu stood half empty without it; the fit shrinks it or drops it when height runs out.
+        assertEquals(true, drawerShowsReadingCard(fontScale = 2f))
+        assertEquals(false, drawerShowsReadingCard(fontScale = 2.5f))
     }
 }
