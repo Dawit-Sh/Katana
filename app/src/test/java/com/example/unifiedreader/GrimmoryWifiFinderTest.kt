@@ -11,7 +11,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class GrimmoryOnThisWifiTest {
+class GrimmoryWifiFinderTest {
 
     @Test
     fun `the device's own network is asked nearest first, without the device itself`() {
@@ -58,7 +58,7 @@ class GrimmoryOnThisWifiTest {
         val failure = runCatching {
             retryWhileUnreachable(waitsMillis = listOf(1L, 1L)) {
                 tries += 1
-                throw IllegalStateException("Invalid credentials")
+                error("Invalid credentials")
             }
         }.exceptionOrNull()
         assertEquals("Invalid credentials", failure?.message)

@@ -88,7 +88,8 @@ fun SourceStartFlow(
     var page by rememberSaveable { mutableStateOf(initialServer) }
     // A server's page opened from the choices goes back to them; one opened directly closes the flow.
     val pageBack = page?.takeIf { initialServer == null }?.let { AppScreenBack<SourceType?>(target = null) { page = null } }
-    AppScreenBackHandler(enabled = pageBack == null && (mode == SourceStartMode.AddSource || page != null)) { onClose() }
+    // On the choices themselves Back closes the flow, as its close button does, instead of leaving the app.
+    AppScreenBackHandler(enabled = pageBack == null) { onClose() }
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -298,14 +299,7 @@ private fun SourceConnectPage(
         if (!connection.hasStoredSession) {
             AppScreenTitle(text = "Connect $name")
             SourceStartLead(text = "Use the address you open $name at in a browser, and your $name account.")
-            wifiSearch.line(name)?.let { line ->
-                Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = line,
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            WifiServerSearchLine(search = wifiSearch, serverName = name)
             Spacer(modifier = Modifier.height(24.dp))
             AppPanel(modifier = Modifier.fillMaxWidth()) {
                 ServerConnectionForm(

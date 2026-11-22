@@ -2,6 +2,7 @@ package com.example.unifiedreader
 
 import com.example.unifiedreader.core.database.UnifiedReaderDatabase
 import com.example.unifiedreader.core.database.dao.LocalServerLinkDao
+import com.example.unifiedreader.core.database.dao.ReaderMarkServerMoveDao
 import com.example.unifiedreader.feature.annotations.AnnotationJumps
 import com.example.unifiedreader.feature.annotations.BookmarkSyncStore
 import com.example.unifiedreader.feature.annotations.HighlightSyncStore
@@ -58,6 +59,11 @@ object AppAnnotationsModule {
     /** Which local books are copies of a server's books, for their marks' sync. */
     @Provides
     fun provideLocalServerLinkDao(database: UnifiedReaderDatabase): LocalServerLinkDao = database.localServerLinkDao()
+
+    /** Moves a book's marks to another server (a different Katana Desk paired). */
+    @Provides
+    fun provideReaderMarkServerMoveDao(database: UnifiedReaderDatabase): ReaderMarkServerMoveDao =
+        database.readerMarkServerMoveDao()
 
     /** When highlights sync with Grimmory; the app shell starts it and asks it. */
     @Provides

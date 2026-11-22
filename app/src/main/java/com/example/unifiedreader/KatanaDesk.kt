@@ -4,11 +4,12 @@ import android.content.Context
 import android.os.Build
 import android.util.Log
 import com.example.unifiedreader.core.common.ApplicationScope
+import com.example.unifiedreader.core.database.dao.ReaderMarkServerMoveDao
 import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.ReadStatus
 import com.example.unifiedreader.core.model.ReadStatusStore
-import com.example.unifiedreader.core.model.SyncState
 import com.example.unifiedreader.core.model.ReadableItem
+import com.example.unifiedreader.core.model.SyncState
 import com.example.unifiedreader.core.model.primaryAuthor
 import com.example.unifiedreader.core.model.runSuspendCatching
 import com.example.unifiedreader.core.model.toServerEpochMillisOrNull
@@ -43,14 +44,15 @@ import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
@@ -60,6 +62,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
 import org.json.JSONObject
@@ -272,8 +275,9 @@ class KatanaDeskSync @Inject constructor(
     private val httpClient: HttpClient,
     private val localDocuments: LocalDocumentDataSource,
     private val grimmoryCopies: dagger.Lazy<GrimmoryLocalCopies>,
-    private val highlightStore: HighlightSyncStore,
-    private val bookmarkStore: BookmarkSyncStore,
+    highlightStore: HighlightSyncStore,
+    bookmarkStore: BookmarkSyncStore,
+    private val markServerMove: ReaderMarkServerMoveDao,
     private val readerSessionStore: ReaderSessionStore,
     private val readStatuses: ReadStatusStore,
 ) {
@@ -319,7 +323,7 @@ class KatanaDeskSync @Inject constructor(
         // carry the first desk's ids, which this one would read as removed: they go up to it as new instead.
         if (connection.linkedDeskId != null && connection.linkedDeskId != paired.deskId) {
             mutex.withLock {
-                moveMarksToNewServer(connection.links.value.keys, highlightStore, bookmarkStore)
+                withContext(Dispatchers.IO) { markServerMove.moveToNewServer(connection.links.value.keys.toList()) }
                 connection.saveLinks(emptyMap())
             }
         }
@@ -543,17 +547,5 @@ private class KatanaDeskBookSync(
     private companion object {
         // A book whose desk list changes under each round waits for the next sync.
         const val MAX_ROUNDS = 3
-    }
-}
-
-/** [itemIds]' highlights and bookmarks start over with another server ([HighlightSyncStore.newServer]). */
-internal suspend fun moveMarksToNewServer(
-    itemIds: Collection<String>,
-    highlights: HighlightSyncStore,
-    bookmarks: BookmarkSyncStore,
-) {
-    for (itemId in itemIds) {
-        highlights.newServer(itemId)
-        bookmarks.newServer(itemId)
     }
 }

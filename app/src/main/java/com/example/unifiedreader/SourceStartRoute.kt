@@ -37,10 +37,13 @@ data class SourceStartRequest(
 internal fun rememberSourceStartRequest(uiState: AppUiState): MutableState<SourceStartRequest?> {
     val request = rememberSaveable(stateSaver = SourceStartRequestSaver) { mutableStateOf<SourceStartRequest?>(null) }
     var decided by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+    // A book folder picked (or the whole device searched) is a source set up, even before its books have loaded.
+    val hasBookPlaces = remember(context) { LocalBookPlaces(context.applicationContext).hasPlaces }
     val noSources = noSourcesSetUp(
         serverSessions = uiState.serverSessions,
         localBooksKnown = SourceType.LOCAL in uiState.hydratedSources,
-        hasLocalBooks = uiState.items.any { item -> item.sourceType == SourceType.LOCAL },
+        hasLocalBooks = hasBookPlaces || uiState.items.any { item -> item.sourceType == SourceType.LOCAL },
     )
     LaunchedEffect(noSources) {
         if (decided || noSources == null) return@LaunchedEffect

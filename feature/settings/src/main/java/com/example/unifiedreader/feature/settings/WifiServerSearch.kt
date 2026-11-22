@@ -1,5 +1,10 @@
 package com.example.unifiedreader.feature.settings
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -7,6 +12,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /** Where the Connect page's look for the server on this Wi-Fi stands. */
 enum class WifiServerSearchState { Idle, Looking, Found, NotFound }
@@ -66,4 +74,22 @@ internal fun rememberWifiServerSearch(entry: SourceSettingsEntry): WifiServerSea
         }
     }
     return WifiServerSearch(state = state, foundUrl = foundUrl, typedUrl = entry.connection.baseUrl)
+}
+
+/** The search's line under the Connect page's lead, when it has one to say. */
+@Composable
+internal fun WifiServerSearchLine(
+    search: WifiServerSearch,
+    serverName: String,
+    modifier: Modifier = Modifier,
+) {
+    val line = search.line(serverName) ?: return
+    Column(modifier = modifier) {
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = line,
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }

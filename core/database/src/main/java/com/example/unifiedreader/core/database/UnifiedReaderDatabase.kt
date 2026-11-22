@@ -21,6 +21,7 @@ import com.example.unifiedreader.core.database.dao.ListPreferenceDao
 import com.example.unifiedreader.core.database.dao.ReaderAnnotationDao
 import com.example.unifiedreader.core.database.dao.ReaderBookmarkDao
 import com.example.unifiedreader.core.database.dao.ReaderBookmarkSyncDao
+import com.example.unifiedreader.core.database.dao.ReaderMarkServerMoveDao
 import com.example.unifiedreader.core.database.dao.SavedWordStudyDao
 import com.example.unifiedreader.core.database.dao.ServerListDao
 import com.example.unifiedreader.core.database.dao.UserListDao
@@ -102,6 +103,7 @@ abstract class UnifiedReaderDatabase : RoomDatabase() {
     abstract fun readerHighlightPlacementDao(): ReaderHighlightPlacementDao
     abstract fun readerBookmarkDao(): ReaderBookmarkDao
     abstract fun readerBookmarkSyncDao(): ReaderBookmarkSyncDao
+    abstract fun readerMarkServerMoveDao(): ReaderMarkServerMoveDao
     abstract fun savedWordStudyDao(): SavedWordStudyDao
     abstract fun localServerLinkDao(): LocalServerLinkDao
 }

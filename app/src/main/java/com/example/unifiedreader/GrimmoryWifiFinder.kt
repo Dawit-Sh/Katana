@@ -2,6 +2,7 @@ package com.example.unifiedreader
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import com.example.unifiedreader.core.model.runSuspendCatching
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.net.HttpURLConnection
@@ -38,14 +39,20 @@ class GrimmoryWifiFinder @Inject constructor(
         }
     }
 
-    // The device's IPv4 address on its active network (the Wi-Fi), as four numbers.
+    // The device's IPv4 address on its Wi-Fi or cable network (never mobile data), as four numbers.
     private fun deviceWifiAddress(): IntArray? {
         val connectivity = context.getSystemService(ConnectivityManager::class.java) ?: return null
-        val links = connectivity.getLinkProperties(connectivity.activeNetwork) ?: return null
-        return links.linkAddresses
-            .map { it.address }
-            .filterIsInstance<Inet4Address>()
-            .firstOrNull { !it.isLoopbackAddress }
+        val network = connectivity.activeNetwork
+        val local = network?.let(connectivity::getNetworkCapabilities)?.let { capabilities ->
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+        } == true
+        return network.takeIf { local }
+            ?.let(connectivity::getLinkProperties)
+            ?.linkAddresses
+            ?.map { it.address }
+            ?.filterIsInstance<Inet4Address>()
+            ?.firstOrNull { !it.isLoopbackAddress }
             ?.address
             ?.map { byte -> byte.toInt() and BYTE_MASK }
             ?.toIntArray()
@@ -77,10 +84,11 @@ class GrimmoryWifiFinder @Inject constructor(
 /** The other addresses of [own]'s /24 network, 1 to 254, nearest first (a home server sits near the device). */
 internal fun sameNetworkHosts(own: IntArray): List<String> {
     if (own.size != IPV4_PARTS) return emptyList()
-    val prefix = "${own[0]}.${own[1]}.${own[2]}."
+    val prefix = own.take(IPV4_PARTS - 1).joinToString(separator = ".", postfix = ".")
+    val ownHost = own.last()
     return (FIRST_HOST..LAST_HOST)
-        .filter { it != own[3] }
-        .sortedBy { kotlin.math.abs(it - own[3]) }
+        .filter { it != ownHost }
+        .sortedBy { kotlin.math.abs(it - ownHost) }
         .map { prefix + it }
 }
 
@@ -108,7 +116,7 @@ internal suspend fun <T> retryWhileUnreachable(
 
 /** What a sign-in that found no server at [baseUrl] says, in place of the network library's own words. */
 internal fun unreachableServerMessage(prefix: String, baseUrl: String): String =
-    "$prefix: no answer from $baseUrl. Check that this device is on the same Wi-Fi as the server. " +
+    "$prefix: no answer from $baseUrl. Check the address, and that this device is on the same Wi-Fi as the server. " +
         "If a browser here can't open that address either, turn the Wi-Fi off and on, or restart the device."
 
 private const val GRIMMORY_PORT = 6060

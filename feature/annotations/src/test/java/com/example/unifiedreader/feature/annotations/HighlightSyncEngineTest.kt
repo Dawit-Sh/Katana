@@ -175,7 +175,7 @@ class HighlightSyncEngineTest {
         annotations.deleteHighlight(gone.id)
 
         // Another desk paired: the first desk's ids mean nothing there.
-        syncStore.newServer(hole.itemId)
+        database.readerMarkServerMoveDao().moveToNewServer(listOf(hole.itemId))
         val second = FakeServer().apply { nextId = 500 }
         sync(second)
 
