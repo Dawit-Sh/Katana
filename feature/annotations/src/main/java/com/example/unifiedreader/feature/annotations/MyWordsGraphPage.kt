@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.unifiedreader.ui.components.AppChip
@@ -59,7 +60,9 @@ internal fun MyWordsGraphPage(
 /** List | Graph. */
 @Composable
 internal fun ViewToggle(state: MyWordsState) {
-    AppSegmentedRow(modifier = Modifier.width(ToggleWidth)) {
+    // Wider with the text size, so "Graph" never cuts off at 150% or 200%.
+    val fontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
+    AppSegmentedRow(modifier = Modifier.width(ToggleWidth * fontScale)) {
         AppSegment(
             selected = state.view == MyWordsView.List,
             onClick = { state.view = MyWordsView.List },
