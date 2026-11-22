@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Drawn for Katana: a word graph (three words joined to a book), in the Material Symbols Rounded weight. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M6.6,6.6L10.2,10.2M17.4,6.6L13.8,10.2M12,15L12,17.8" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M9,12a3,3 0 1,0 6,0a3,3 0 1,0 -6,0ZM2.6,5a2.4,2.4 0 1,0 4.8,0a2.4,2.4 0 1,0 -4.8,0ZM16.6,5a2.4,2.4 0 1,0 4.8,0a2.4,2.4 0 1,0 -4.8,0ZM9.6,20.2a2.4,2.4 0 1,0 4.8,0a2.4,2.4 0 1,0 -4.8,0Z" />
+</vector>

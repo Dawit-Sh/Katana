@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Material Symbols Rounded, Apache License 2.0: https://github.com/google/material-design-icons -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <group
+        android:translateX="-0"
+        android:translateY="960">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M800-600v-120H680q-17 0-28.5-11.5T640-760q0-17 11.5-28.5T680-800h120q33 0 56.5 23.5T880-720v120q0 17-11.5 28.5T840-560q-17 0-28.5-11.5T800-600Zm-720 0v-120q0-33 23.5-56.5T160-800h120q17 0 28.5 11.5T320-760q0 17-11.5 28.5T280-720H160v120q0 17-11.5 28.5T120-560q-17 0-28.5-11.5T80-600Zm720 440H680q-17 0-28.5-11.5T640-200q0-17 11.5-28.5T680-240h120v-120q0-17 11.5-28.5T840-400q17 0 28.5 11.5T880-360v120q0 33-23.5 56.5T800-160Zm-640 0q-33 0-56.5-23.5T80-240v-120q0-17 11.5-28.5T120-400q17 0 28.5 11.5T160-360v120h120q17 0 28.5 11.5T320-200q0 17-11.5 28.5T280-160H160Zm120-160q-17 0-28.5-11.5T240-360v-240q0-17 11.5-28.5T280-640h400q17 0 28.5 11.5T720-600v240q0 17-11.5 28.5T680-320H280Z" />
+    </group>
+</vector>

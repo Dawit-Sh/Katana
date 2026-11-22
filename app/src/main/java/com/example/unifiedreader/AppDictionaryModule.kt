@@ -5,9 +5,11 @@ import androidx.lifecycle.ViewModel
 import com.example.unifiedreader.core.common.ApplicationScope
 import com.example.unifiedreader.core.network.buildHttpClient
 import com.example.unifiedreader.feature.annotations.WordMeanings
+import com.example.unifiedreader.feature.annotations.WordSynonyms
 import com.example.unifiedreader.feature.dictionary.Dictionary
 import com.example.unifiedreader.feature.dictionary.DictionaryPackInfo
 import com.example.unifiedreader.feature.dictionary.DictionaryWordMeanings
+import com.example.unifiedreader.feature.dictionary.DictionaryWordSynonyms
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -43,6 +45,10 @@ object AppDictionaryModule {
     @Provides
     @Singleton
     fun provideWordMeanings(dictionary: Dictionary): WordMeanings = DictionaryWordMeanings(dictionary)
+
+    @Provides
+    @Singleton
+    fun provideWordSynonyms(dictionary: Dictionary): WordSynonyms = DictionaryWordSynonyms(dictionary)
 
     private const val DICTIONARY_CONNECT_TIMEOUT_MILLIS = 10_000L
     private const val DICTIONARY_SOCKET_TIMEOUT_MILLIS = 30_000L

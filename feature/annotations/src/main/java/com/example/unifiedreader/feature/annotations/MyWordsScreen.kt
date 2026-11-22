@@ -69,6 +69,12 @@ fun MyWordsScreen(
     actions: MyWordsActions,
     contentTopInset: Dp,
     modifier: Modifier = Modifier,
+    /** The words' sense groups (the dictionary's), for the graph's synonym lines. */
+    senseGroups: Map<String, Set<Long>> = emptyMap(),
+    /** Draws a book's cover on the graph; null draws plain rectangles. */
+    bookCover: MarkedBookCover? = null,
+    /** The books [bookCover] can draw (those in the library); the rest stay plain rectangles. */
+    coveredBooks: Set<String> = emptySet(),
 ) {
     val list = remember(words) { words?.let(::MyWordsList) }
     // The book on the filter lost its last word: show every book again.
@@ -84,7 +90,11 @@ fun MyWordsScreen(
     ) { page ->
         val shown = list ?: return@AppScreenHost
         when (page) {
-            MyWordsPage.Words -> MyWordsListPage(state, shown, meanings, actions, contentTopInset)
+            MyWordsPage.Words -> if (state.view == MyWordsView.Graph && !shown.isEmpty) {
+                MyWordsGraphPage(state, shown, senseGroups, meanings, actions, bookCover, coveredBooks, contentTopInset)
+            } else {
+                MyWordsListPage(state, shown, meanings, actions, contentTopInset)
+            }
             MyWordsPage.Review -> WordReviewPage(
                 words = shown.inBook(state.bookId),
                 round = state.round,
@@ -158,14 +168,18 @@ private fun MyWordsListPage(
     }
 }
 
-/** How many words from how many books with Review, then the search, then the book filter. */
+/**
+ * How many words from how many books with Review, then (on the list) the search, then List | Graph and the book
+ * filter, and on the graph the state filter.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun MyWordsHeader(state: MyWordsState, list: MyWordsList) {
+internal fun MyWordsHeader(state: MyWordsState, list: MyWordsList, modifier: Modifier = Modifier) {
     val now = remember(list) { System.currentTimeMillis() }
     val book = list.book(state.bookId)
+    val graph = state.view == MyWordsView.Graph
     Column(
-        modifier = Modifier.padding(bottom = AppLayout.headingGap),
+        modifier = modifier.padding(bottom = AppLayout.headingGap),
         verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
     ) {
         FlowRow(
@@ -185,13 +199,23 @@ private fun MyWordsHeader(state: MyWordsState, list: MyWordsList) {
                 Text(MyWordsCopy.review(list.dueCount(now, state.bookId)))
             }
         }
-        AppSearchField(
-            query = state.query,
-            onQueryChange = { state.query = it },
-            placeholder = MyWordsCopy.SearchPlaceholder,
+        if (!graph) {
+            AppSearchField(
+                query = state.query,
+                onQueryChange = { state.query = it },
+                placeholder = MyWordsCopy.SearchPlaceholder,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
-        )
-        BookFilter(list = list, selected = book, onSelect = { state.bookId = it })
+            horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
+            verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
+        ) {
+            ViewToggle(state)
+            BookFilter(list = list, selected = book, onSelect = { state.bookId = it })
+            if (graph) StateFilters(state)
+        }
     }
 }
 
@@ -361,7 +385,7 @@ private fun WordContext(word: SavedWord, modifier: Modifier = Modifier) {
 
 /** The sentence around the saved word, on one line, with the word in bold. */
 @Composable
-private fun sentenceWithWord(sentence: String, word: String): AnnotatedString {
+internal fun sentenceWithWord(sentence: String, word: String): AnnotatedString {
     val text = sentenceAround(sentence, word)
     val span = wordSpan(text, word)
     val strong = SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
