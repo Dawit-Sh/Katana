@@ -45,7 +45,7 @@ internal fun BookFoldersDialog(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 if (places.wholePhone) {
-                    BookFolderRow(label = "The whole device", action = "Stop", onAction = onStopPhone)
+                    BookFolderRow(label = "All of this device", action = "Stop", onAction = onStopPhone)
                 }
                 places.folders.forEach { (tree, label) ->
                     BookFolderRow(label = label, action = "Remove", onAction = { onRemoveFolder(tree) })

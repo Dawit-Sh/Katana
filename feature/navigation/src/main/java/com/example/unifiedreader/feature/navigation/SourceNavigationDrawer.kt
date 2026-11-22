@@ -98,7 +98,7 @@ fun SourceNavigationDrawer(
 ) {
     val presentation = UnifiedReaderThemeTokens.presentation
     val drawerShape = RoundedCornerShape(presentation.cardCornerRadius)
-    // With very large text the card can't fit the side menu whole; the Journal row below opens it instead.
+    // At any text size: the menu's fit (DrawerFitLayout) shrinks the card or leaves it out only when it can't fit.
     val shownReadingCard = readingCard.takeIf { drawerShowsReadingCard(LocalDensity.current.fontScale) }
     // A phone on its side has no height for the rows one under another: Sources and Your reading go side by side.
     val sideBySide = currentAppWindowHeight() == AppWindowHeight.Compact
@@ -295,10 +295,14 @@ private fun DrawerDestination(
 /** The My words row's name, in the drawer and on the rail. */
 internal const val MyWordsLabel = "My words"
 
-/** The reading card sits in the side menu up to 150% text; past that it would be cut off. */
-internal fun drawerShowsReadingCard(fontScale: Float): Boolean = fontScale < DrawerLargeTextScale
+/**
+ * The reading card sits in the side menu at every text size Android offers (to 200%): its lines end in "…"
+ * rather than wrap, and the menu's fit shrinks its heat map or leaves it out only when the height runs out.
+ * (Before 1.2.4 it left at 150%, though the menu then stood half empty.)
+ */
+internal fun drawerShowsReadingCard(fontScale: Float): Boolean = fontScale <= DrawerLargestTextScale
 
-private const val DrawerLargeTextScale = 1.5f
+private const val DrawerLargestTextScale = 2f
 
 private val DrawerMaxWidth = 320.dp
 private val DrawerWithCardMaxWidth = 360.dp

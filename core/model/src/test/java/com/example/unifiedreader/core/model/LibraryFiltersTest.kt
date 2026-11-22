@@ -89,6 +89,15 @@ class LibraryFiltersTest {
     }
 
     @Test
+    fun `a book whose author is its own title shows no author line`() {
+        val scan = item(id = "scan", title = "Alice scan").copy(bookMetadata = BookMetadata(author = "alice SCAN "))
+        val novel = item(id = "novel", title = "Pride and Prejudice").copy(bookMetadata = BookMetadata(author = "Jane Austen"))
+
+        assertNull(scan.librarySecondaryText())
+        assertEquals("Jane Austen", novel.librarySecondaryText())
+    }
+
+    @Test
     fun `comic secondary text names a Kavita volume rather than its Chapter v3`() {
         val volume = item(id = "volume", title = "Chapter v3").copy(
             format = FormatType.CBZ,
