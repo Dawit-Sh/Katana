@@ -4,6 +4,9 @@ import com.example.unifiedreader.core.model.ReadableItem
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.core.model.belongsToKavitaSeries
 import com.example.unifiedreader.core.model.belongsToStumpSeries
+import com.example.unifiedreader.feature.navigation.NavigationServerSources
+import com.example.unifiedreader.feature.navigation.SourceNavigationState
+import com.example.unifiedreader.feature.navigation.navigationSources
 import com.example.unifiedreader.feature.reader.core.ReaderOpenMode
 
 internal fun AppUiState.toActiveRouteSnapshot(): AppActiveRouteSnapshot {
@@ -35,9 +38,7 @@ internal fun AppUiState.withActiveRouteSnapshot(
     val selectedSource = if (shouldRestoreReader) {
         restoredReaderItem.sourceType
     } else {
-        snapshot.selectedSource.takeIf { source -> source in sourceOrder }
-            ?: sourceOrder.firstOrNull()
-            ?: SourceType.KAVITA
+        restoredLibrarySource(snapshot.selectedSource, toSourceNavigationState())
     }
     val selectedKavitaSeriesKey = retainedSeriesKey(
         seriesKey = snapshot.selectedKavitaSeriesKey,
@@ -113,3 +114,16 @@ internal fun retainedSeriesKey(
 private fun AppUiState.itemById(
     itemId: String,
 ): ReadableItem? = items.firstOrNull { item -> item.id == itemId }
+
+/**
+ * The library a launch opens on: the one left open last time while the rail still lists it, else the first
+ * it lists. A server signed out since (or never signed in, after Clear storage) isn't opened on: a device
+ * with only its own books opened on "Kavita isn't connected" before 1.2.4.
+ */
+internal fun restoredLibrarySource(lastOpen: SourceType, navigation: SourceNavigationState): SourceType {
+    val listed = navigationSources(
+        sourceOrder = navigation.sourceOrder,
+        connectedServers = navigation.lastConnectedSources ?: NavigationServerSources.toSet(),
+    )
+    return lastOpen.takeIf { it in listed } ?: navigation.startupSource
+}
