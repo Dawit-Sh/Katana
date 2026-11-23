@@ -23,10 +23,26 @@ internal fun ProvideQuoteCover(
     val coverUrl by rememberUpdatedState(coverImageUrlProvider)
     val loader = remember(item, context) {
         QuoteCoverLoader {
-            coverUrl(item, LibraryCoverImageVariant.Detailed)
-                ?.takeIf(String::isNotBlank)
-                ?.let { url -> loadLibraryCoverBitmap(context, url) }
+            firstQuoteCover(urlFor = { variant -> coverUrl(item, variant) }) { url -> loadLibraryCoverBitmap(context, url) }
         }
     }
     CompositionLocalProvider(LocalQuoteCover provides loader, content = content)
 }
+
+/**
+ * The first cover that loads, largest first: the book page's, then the library's sizes. Offline only
+ * the sizes already saved on this device can load, and the library grid's always is.
+ */
+internal suspend fun <T : Any> firstQuoteCover(
+    urlFor: (LibraryCoverImageVariant) -> String?,
+    load: suspend (String) -> T?,
+): T? = QuoteCoverSizes.firstNotNullOfOrNull { variant ->
+    urlFor(variant)?.takeIf(String::isNotBlank)?.let { url -> load(url) }
+}
+
+internal val QuoteCoverSizes = listOf(
+    LibraryCoverImageVariant.Detailed,
+    LibraryCoverImageVariant.GridExtraLarge,
+    LibraryCoverImageVariant.GridLarge,
+    LibraryCoverImageVariant.Grid,
+)

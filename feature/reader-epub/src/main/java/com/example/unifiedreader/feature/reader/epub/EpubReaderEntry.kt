@@ -714,6 +714,8 @@ fun EpubReaderScreen(
                         searchMatches = bookSearch.decorations,
                         volumeKeysTurnPages = comfort.comfort.volumeKeysTurnPages,
                         onBookmarkCornerTap = toggleBookmark,
+                        // Turning with the volume keys is reading too: the page they reach is saved, as after a tap.
+                        onPageKey = { readerTouched = true },
                     )
                     EpubBookmarkRibbon(visible = pageBookmarks.isNotEmpty())
                     EpubWarmthTint(comfort)

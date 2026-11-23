@@ -76,6 +76,8 @@ internal fun ReadiumEpubNavigatorHost(
     volumeKeysTurnPages: Boolean = false,
     // A tap in the page's top-end corner bookmarks the page (or takes its bookmark off), KOReader style.
     onBookmarkCornerTap: (() -> Unit)? = null,
+    // A volume key pressed to turn the page, just before the page turns: the reader reading, like a touch.
+    onPageKey: () -> Unit = {},
 ) {
     val containerId = remember(item.id) { View.generateViewId() }
     val fragmentTag = remember(item.id) { epubNavigatorTag(item.id) }
@@ -484,8 +486,16 @@ internal fun ReadiumEpubNavigatorHost(
     LaunchedEffect(searchLayer, searchMatches) { searchLayer.show(searchMatches) }
 
     // The volume keys turn pages as the page's sides do, mirrored in a right-to-left book.
+    val latestOnPageKey = rememberUpdatedState(onPageKey)
     DisposableEffect(activity, volumeKeysTurnPages, pageTaps) {
-        val release = if (volumeKeysTurnPages) activity.turnPagesWithVolumeKeys(pageTaps::onTap) else null
+        val release = if (volumeKeysTurnPages) {
+            activity.turnPagesWithVolumeKeys { side ->
+                latestOnPageKey.value()
+                pageTaps.onTap(side)
+            }
+        } else {
+            null
+        }
         onDispose { release?.invoke() }
     }
 
