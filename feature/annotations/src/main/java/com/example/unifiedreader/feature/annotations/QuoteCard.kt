@@ -44,6 +44,7 @@ data class QuoteCardText(
 /**
  * Draws a quote as an image card: a quote mark in the accent, the quote in Literata italic as large
  * as fits, then the book and its author on the left and the Katana mark (刀 Katana) on the right.
+ * The ground is a colour, or a picture ([QuoteCardBackdrop]: the cover or a photo) darkened under white text.
  */
 object QuoteCardRenderer {
     fun render(
@@ -51,28 +52,32 @@ object QuoteCardRenderer {
         colors: QuoteCardColors,
         type: QuoteCardType,
         shape: QuoteCardShape = QuoteCardShape.Square,
+        backdrop: QuoteCardBackdrop? = null,
     ): Bitmap {
         val width = shape.width
         val height = shape.height
         val bitmap = createBitmap(width, height)
         val canvas = Canvas(bitmap)
-        canvas.drawColor(colors.ground)
+        if (backdrop == null) canvas.drawColor(colors.ground) else QuoteCardBackdrops.draw(canvas, backdrop, width, height)
+        // Over a picture every line gets a soft shadow, so it reads on light patches too.
+        val shadow = if (backdrop == null) 0f else width * SHADOW_RADIUS
+        fun textPaint(face: Typeface, color: Int, size: Float): TextPaint = paint(face, color, size, shadow)
         val side = width * SIDE_INSET
         val top = width * TOP_INSET
         val bottom = width * BOTTOM_INSET
         val textWidth = (width - side * 2).toInt()
 
         // The quote mark.
-        val markPaint = paint(type.mark, colors.accent, width * MARK_SIZE)
+        val markPaint = textPaint(type.mark, colors.accent, width * MARK_SIZE)
         val markTop = top - markPaint.ascent() * MARK_TOP_TRIM
         canvas.drawText("“", side, markTop, markPaint)
 
         // The footer, bottom up: the author, the title, and the mark on the right.
         val captionSize = width * CAPTION_SIZE
-        val titlePaint = paint(type.captionBold, colors.ink, width * TITLE_SIZE)
-        val authorPaint = paint(type.caption, colors.secondary, captionSize)
-        val brandPaint = paint(type.captionBold, colors.accent, captionSize)
-        val kanjiPaint = paint(type.captionBold, colors.accent, width * KANJI_SIZE)
+        val titlePaint = textPaint(type.captionBold, colors.ink, width * TITLE_SIZE)
+        val authorPaint = textPaint(type.caption, colors.secondary, captionSize)
+        val brandPaint = textPaint(type.captionBold, colors.accent, captionSize)
+        val kanjiPaint = textPaint(type.captionBold, colors.accent, width * KANJI_SIZE)
         val baseline = height - bottom
         val brandWidth = brandPaint.measureText(BRAND) + kanjiPaint.measureText(KANJI) + width * BRAND_GAP
         val footerTextWidth = (textWidth - brandWidth - width * BRAND_GAP).coerceAtLeast(1f)
@@ -93,7 +98,8 @@ object QuoteCardRenderer {
         // The quote, as large as fits between the mark and the footer.
         val quoteTop = markTop + markPaint.descent() + width * QUOTE_GAP
         val room = RectF(side, quoteTop, side + textWidth, footerTop - width * QUOTE_GAP)
-        val layout = fittedQuote(quoteBody(text.quote), { size -> paint(type.quote, colors.ink, size) }, width, textWidth, room.height())
+        val quotePaint = { size: Float -> textPaint(type.quote, colors.ink, size) }
+        val layout = fittedQuote(quoteBody(text.quote), quotePaint, width, textWidth, room.height())
         canvas.withTranslation(room.left, room.top) { layout.draw(this) }
         return bitmap
     }
@@ -127,11 +133,12 @@ object QuoteCardRenderer {
             .setEllipsize(TextUtils.TruncateAt.END)
             .build()
 
-    private fun paint(face: Typeface, color: Int, size: Float): TextPaint =
+    private fun paint(face: Typeface, color: Int, size: Float, shadow: Float): TextPaint =
         TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = face
             this.color = color
             textSize = size
+            if (shadow > 0f) setShadowLayer(shadow, 0f, shadow / 2, SHADOW_COLOR)
         }
 
     private const val BRAND = "Katana"
@@ -153,6 +160,8 @@ object QuoteCardRenderer {
     private const val KANJI_SIZE = 20f / 440f
     private const val BRAND_GAP = 6f / 440f
     private const val LINE_GAP = 4f / 440f
+    private const val SHADOW_RADIUS = 3f / 440f
+    private const val SHADOW_COLOR = 0x8C000000.toInt()
 }
 
 private const val CARD_WIDTH = 1080

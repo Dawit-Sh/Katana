@@ -8,6 +8,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.ImageDecoder
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
@@ -112,6 +114,26 @@ object QuoteImages {
             resolver.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)
         }
         true
+    }
+
+    /**
+     * The picture at [uri] (from the photo picker) as a card's background: turned upright and read no
+     * larger than a card needs. Null when it can't be read (gone, not a picture, or no longer allowed).
+     */
+    suspend fun loadPhoto(context: Context, uri: Uri): Bitmap? = withContext(Dispatchers.IO) {
+        try {
+            ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) { decoder, info, _ ->
+                // A software bitmap, so the card can be drawn from it off the screen.
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                decoder.setTargetSampleSize(QuoteCardBackdrops.photoSampleSize(info.size.width, info.size.height))
+            }
+        } catch (_: IOException) {
+            null
+        } catch (_: SecurityException) {
+            null
+        } catch (_: IllegalArgumentException) {
+            null
+        }
     }
 
     private const val MAX_NAME = 60

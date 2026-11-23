@@ -219,29 +219,31 @@ fun UnifiedReaderAppContent(
                         if (screen is AppRootScreen.Reader && readerItem != null) {
                             // The reader's accent (slider fills, selected states) is the book's cover colour.
                             AppCoverAccentTheme(rememberLibraryCoverColors(readerItem, viewModel::coverImageUrlFor)) {
-                                ReaderHost(
-                                    item = readerItem,
-                                    factories = viewModel.readerFactories,
-                                    onBack = viewModel::onBackPressed,
-                                    readerWorkCoordinator = viewModel.readerWorkCoordinator,
-                                    navigationActions = ReaderNavigationActions(
-                                        onRequestNextInSeries = viewModel::onReaderNextRequested,
-                                        onRequestCompletion = viewModel::onReaderCompletionRequested,
-                                        currentOpenMode = uiState.selectedReaderOpenMode,
-                                    ),
-                                    cover = { coverItem, modifier ->
-                                        VisibleResolvedLibraryCover(
-                                            item = coverItem,
-                                            coverImageUrlProvider = viewModel::coverImageUrlFor,
-                                            onCoverVisible = viewModel::ensureCoverCached,
-                                            modifier = modifier,
-                                        )
-                                    },
-                                    downloadAgain = ReaderDownloadAgain(
-                                        isDownloaded = { book -> book.id in uiState.downloadedRemoteItemIds },
-                                        start = viewModel::onDownloadAgain,
-                                    ),
-                                )
+                                ProvideQuoteCover(readerItem, viewModel::coverImageUrlFor) {
+                                    ReaderHost(
+                                        item = readerItem,
+                                        factories = viewModel.readerFactories,
+                                        onBack = viewModel::onBackPressed,
+                                        readerWorkCoordinator = viewModel.readerWorkCoordinator,
+                                        navigationActions = ReaderNavigationActions(
+                                            onRequestNextInSeries = viewModel::onReaderNextRequested,
+                                            onRequestCompletion = viewModel::onReaderCompletionRequested,
+                                            currentOpenMode = uiState.selectedReaderOpenMode,
+                                        ),
+                                        cover = { coverItem, modifier ->
+                                            VisibleResolvedLibraryCover(
+                                                item = coverItem,
+                                                coverImageUrlProvider = viewModel::coverImageUrlFor,
+                                                onCoverVisible = viewModel::ensureCoverCached,
+                                                modifier = modifier,
+                                            )
+                                        },
+                                        downloadAgain = ReaderDownloadAgain(
+                                            isDownloaded = { book -> book.id in uiState.downloadedRemoteItemIds },
+                                            start = viewModel::onDownloadAgain,
+                                        ),
+                                    )
+                                }
                             }
                         } else {
                             // Remote covers are asked for again after a reset or a catalog sync.

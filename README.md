@@ -28,7 +28,7 @@ Once it's installed, Katana updates itself from Settings › About, and an updat
   if the Wi-Fi drops.
 - Bookmarks in every format, with a name and a note, synced with Grimmory too.
 - Save words and go over them as flashcards, or see them as a graph that links words with the same meaning
-  across your books. Search inside a book, and share a highlight as a quote card.
+  across your books. Search inside a book, and share a highlight as a quote card, on a colour, the book's cover or a photo of your own.
 - Export your highlights and notes as Markdown, and back everything up to a file.
 - Works away from home too, over something like Tailscale.
 - Runs on old Amazon Fire tablets and on new phones alike.

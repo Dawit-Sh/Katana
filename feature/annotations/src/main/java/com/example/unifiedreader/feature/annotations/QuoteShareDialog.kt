@@ -11,7 +11,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -58,24 +59,36 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** The grounds a quote card can have; [Cover] takes the open book's cover colours. */
-enum class QuoteCardGround(val label: String) {
+/**
+ * The grounds a quote card can have: three colours, [Cover] (the open book's cover colours), and two
+ * pictures, [CoverPicture] (the book's cover itself) and [Photo] (one the reader picks).
+ */
+enum class QuoteCardGround(val label: String, val isPicture: Boolean = false) {
     Paper("Paper card"),
     Dusk("Dusk card"),
     Teal("Teal card"),
     Cover("Book cover colours"),
+    CoverPicture("Book cover", isPicture = true),
+    Photo("Your photo", isPicture = true),
 }
 
 /**
- * Share a highlight as an image: a preview of the card, its ground (paper, dusk, teal or the
- * book's cover colours) and shape, then Share (Android's share sheet) or Save image (Pictures/Katana).
+ * Share a highlight as an image: a preview of the card, its ground (paper, dusk, teal, the book's
+ * cover colours, the cover itself or a photo of the reader's own, blurred or not) and shape, then
+ * Share (Android's share sheet) or Save image (Pictures/Katana).
  */
 @Composable
 fun QuoteShareDialog(highlight: ReaderHighlight, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     var ground by rememberSaveable { mutableStateOf(QuoteCardGround.Paper) }
     var shape by rememberSaveable { mutableStateOf(QuoteCardShape.Square) }
+    var blurred by rememberSaveable { mutableStateOf(true) }
     val coverColors = coverCardColors()
-    val card = rememberQuoteCard(highlight, ground.colors(coverColors), shape)
+    val pictures = rememberQuoteCardPictures(
+        onPhotoPicked = { ground = QuoteCardGround.Photo },
+        onPhotoLost = { if (ground == QuoteCardGround.Photo) ground = QuoteCardGround.Paper },
+    )
+    val backdrop = pictures.backdrop(ground, blurred)
+    val card = rememberQuoteCard(highlight, ground.colors(coverColors), shape, backdrop, waiting = ground.isPicture && backdrop == null)
     val fileName = remember(highlight) { QuoteImages.fileName(highlight.book.title, System.currentTimeMillis()) }
     AppDialogCard(
         onDismissRequest = onDismiss,
@@ -86,39 +99,122 @@ fun QuoteShareDialog(highlight: ReaderHighlight, onDismiss: () -> Unit, modifier
         Column(verticalArrangement = Arrangement.spacedBy(AppLayout.gridGap)) {
             CardPreview(card = card, shape = shape)
             Text(text = QuoteCopy.Card, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                QuoteCardGround.entries.forEach { option ->
-                    GroundSwatch(
-                        option = option,
-                        colors = option.colors(coverColors),
-                        selected = ground == option,
-                        onClick = { ground = option },
-                    )
-                }
-                Spacer(Modifier.weight(1f))
-                AppChip(
-                    selected = false,
-                    onClick = { shape = if (shape == QuoteCardShape.Square) QuoteCardShape.Tall else QuoteCardShape.Square },
-                    label = { Text(if (shape == QuoteCardShape.Square) QuoteCopy.Square else QuoteCopy.Tall) },
-                )
-            }
+            QuoteGroundRow(
+                ground = ground,
+                coverColors = coverColors,
+                pictures = pictures,
+                onGround = { option ->
+                    // Your photo with none picked yet opens the picker; picking one selects it.
+                    if (option == QuoteCardGround.Photo && pictures.photo == null) pictures.pickPhoto() else ground = option
+                },
+            )
+            QuoteCardOptions(
+                ground = ground,
+                shape = shape,
+                blurred = blurred,
+                onShape = { shape = it },
+                onBlurred = { blurred = it },
+                onChangePhoto = pictures::pickPhoto,
+            )
         }
     }
 }
 
-/** The card for [highlight] in [colors] and [shape], drawn off the main thread; null while it is drawn. */
+/**
+ * The grounds as swatches, wrapping on a narrow dialog. The book cover shows once it has loaded,
+ * and only for a book that has one.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun rememberQuoteCard(highlight: ReaderHighlight, colors: QuoteCardColors, shape: QuoteCardShape): Bitmap? {
+private fun QuoteGroundRow(
+    ground: QuoteCardGround,
+    coverColors: QuoteCardColors,
+    pictures: QuoteCardPictures,
+    onGround: (QuoteCardGround) -> Unit,
+) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
+        verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
+    ) {
+        QuoteCardGround.entries
+            .filter { option -> option != QuoteCardGround.CoverPicture || pictures.cover != null }
+            .forEach { option ->
+                if (option.isPicture) {
+                    PictureSwatch(
+                        option = option,
+                        image = pictures.image(option),
+                        selected = ground == option,
+                        onClick = { onGround(option) },
+                    )
+                } else {
+                    GroundSwatch(
+                        option = option,
+                        colors = option.colors(coverColors),
+                        selected = ground == option,
+                        onClick = { onGround(option) },
+                    )
+                }
+            }
+    }
+}
+
+/** Square or tall; and on a picture, Blur and (for a photo) Change photo. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun QuoteCardOptions(
+    ground: QuoteCardGround,
+    shape: QuoteCardShape,
+    blurred: Boolean,
+    onShape: (QuoteCardShape) -> Unit,
+    onBlurred: (Boolean) -> Unit,
+    onChangePhoto: () -> Unit,
+) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
+        verticalArrangement = Arrangement.spacedBy(AppLayout.headingGap),
+    ) {
+        AppChip(
+            selected = false,
+            onClick = { onShape(if (shape == QuoteCardShape.Square) QuoteCardShape.Tall else QuoteCardShape.Square) },
+            label = { Text(if (shape == QuoteCardShape.Square) QuoteCopy.Square else QuoteCopy.Tall) },
+        )
+        if (ground.isPicture) {
+            AppChip(selected = blurred, onClick = { onBlurred(!blurred) }, label = { Text(QuoteCopy.Blur) })
+        }
+        if (ground == QuoteCardGround.Photo) {
+            AppChip(
+                selected = false,
+                onClick = onChangePhoto,
+                label = { Text(QuoteCopy.ChangePhoto) },
+                leadingIcon = { Icon(imageVector = AppIcons.Image, contentDescription = null, modifier = Modifier.size(SmallIcon)) },
+            )
+        }
+    }
+}
+
+/**
+ * The card for [highlight] in [colors] and [shape], on [backdrop] when it has a picture, drawn off
+ * the main thread; null while it is drawn, and while its picture is still [waiting] to load.
+ */
+@Composable
+private fun rememberQuoteCard(
+    highlight: ReaderHighlight,
+    colors: QuoteCardColors,
+    shape: QuoteCardShape,
+    backdrop: QuoteCardBackdrop?,
+    waiting: Boolean,
+): Bitmap? {
     val type = rememberQuoteCardType()
     val text = remember(highlight) {
         QuoteCardText(quote = highlight.text, title = highlight.book.title, author = highlight.book.author)
     }
-    val card by produceState<Bitmap?>(initialValue = null, text, colors, shape, type) {
-        value = withContext(Dispatchers.Default) {
-            QuoteCardRenderer.render(text = text, colors = colors, type = type, shape = shape)
+    val card by produceState<Bitmap?>(initialValue = null, text, colors, shape, type, backdrop, waiting) {
+        value = if (waiting) {
+            null
+        } else {
+            withContext(Dispatchers.Default) {
+                QuoteCardRenderer.render(text = text, colors = colors, type = type, shape = shape, backdrop = backdrop)
+            }
         }
     }
     return card
@@ -207,10 +303,10 @@ private fun GroundSwatch(option: QuoteCardGround, colors: QuoteCardColors, selec
     val corners = RoundedCornerShape(UnifiedReaderThemeTokens.presentation.innerCornerRadius)
     Box(
         modifier = Modifier
-            .size(SwatchSize)
+            .size(QuoteSwatchSize)
             .clip(corners)
             .background(Color(colors.ground))
-            .then(if (selected) Modifier.border(SwatchRing, MaterialTheme.colorScheme.primary, corners) else Modifier)
+            .then(if (selected) Modifier.border(QuoteSwatchRing, MaterialTheme.colorScheme.primary, corners) else Modifier)
             .clickable(onClick = onClick)
             .semantics {
                 contentDescription = option.label
@@ -260,6 +356,7 @@ internal fun QuoteCardGround.colors(cover: QuoteCardColors): QuoteCardColors = w
     QuoteCardGround.Dusk -> DuskCard
     QuoteCardGround.Teal -> TealCard
     QuoteCardGround.Cover -> cover
+    QuoteCardGround.CoverPicture, QuoteCardGround.Photo -> PictureCard
 }
 
 private val PaperCard = QuoteCardColors(
@@ -281,6 +378,14 @@ private val TealCard = QuoteCardColors(
     accent = 0xFFA7DDE2.toInt(),
 )
 
+/** White type over a darkened picture; the ground shows only if the picture can't be drawn. */
+private val PictureCard = QuoteCardColors(
+    ground = 0xFF1F1F1F.toInt(),
+    ink = 0xFFFFFFFF.toInt(),
+    secondary = 0xE6FFFFFF.toInt(),
+    accent = 0xFFF3EFE4.toInt(),
+)
+
 /** What the share dialog says. */
 object QuoteCopy {
     const val Title = "Share as an image"
@@ -294,9 +399,10 @@ object QuoteCopy {
     const val ShareFailed = "Nothing here can share images"
     const val NeedsPermission = "Katana needs storage access to save the image"
     const val Preview = "Quote card preview"
+    const val Blur = "Blur"
+    const val ChangePhoto = "Change photo"
+    const val PhotoFailed = "Couldn't open that picture"
 }
 
 private const val SECONDARY_ALPHA = 0.72f
-private val SwatchSize = 48.dp
 private val SwatchDot = 14.dp
-private val SwatchRing = 3.dp
