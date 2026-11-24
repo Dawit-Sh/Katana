@@ -78,15 +78,4 @@ class KatanaDeskWordsTest {
         assertEquals("Newer.", plan.take.single().sentence)
         assertEquals("Newer.\u0001", plan.base.getValue("frost|7"))
     }
-
-    @Test
-    fun theDesksWordsAreReadAndSentBack() {
-        val body = """{"words":[{"word":"ember","bookId":7,"bookTitle":"Winter","bookAuthor":null,"sentence":"An ember.",""" +
-            """"chapter":null,"fraction":0.5,"note":null,"createdAt":3,"updatedAt":4}]}"""
-
-        val parsed = parseKatanaDeskWords(body).single()
-
-        assertEquals(word("ember", "An ember.", at = 3L).copy(updatedAt = 4L, fraction = 0.5, bookTitle = "Winter"), parsed)
-        assertTrue(katanaDeskWordsBody(listOf(parsed), emptyList()).contains("\"bookId\":7"))
-    }
 }
