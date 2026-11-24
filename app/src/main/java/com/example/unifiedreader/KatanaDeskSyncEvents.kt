@@ -104,8 +104,8 @@ internal class CountingBookmarkServer(private val server: BookmarkServer, privat
 /**
  * Reading time for the desk's "time left at your pace": each reading session on a book here that's on the desk (the
  * Journal keeps them, with the place at each end) goes to the desk once, in Grimmory's own shape. A desk too old to
- * take them answers no, and the sessions wait; the sync goes on either way. They count toward the desk's pace only,
- * not its Journal.
+ * take them answers no, and the sessions wait; the sync goes on either way. Sessions that came from the desk
+ * ([cameFromDesk]) never go back to it.
  */
 internal class KatanaDeskReadingTime(
     private val journal: JournalRepository,
@@ -115,7 +115,7 @@ internal class KatanaDeskReadingTime(
         val deskBookId = bookId.toLongOrNull() ?: return
         val since = connection.readingSentUntil(item.id)
         val sessions = journal.getReadingSessionsForItem(item.id)
-            .filter { it.endedAtEpochMillis > since && it.durationMillis > 0 }
+            .filter { it.endedAtEpochMillis > since && it.durationMillis > 0 && !it.cameFromDesk() }
             .sortedBy { it.endedAtEpochMillis }
         for (session in sessions) {
             val sent = runSuspendCatching {

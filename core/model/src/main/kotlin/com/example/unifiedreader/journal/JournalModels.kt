@@ -345,6 +345,9 @@ interface JournalRepository : JournalEventRecorder {
 
     suspend fun getReadingSessionsForItem(itemId: String): List<JournalReadingSession> = emptyList()
 
+    /** Saves sessions by their id: one already here is replaced, never added to (reading time from a paired PC). */
+    suspend fun saveReadingSessions(sessions: List<JournalReadingSession>) = Unit
+
     suspend fun replaceCleanSourceJournalCache(
         sourceType: SourceType,
         events: List<JournalReadingEvent>,

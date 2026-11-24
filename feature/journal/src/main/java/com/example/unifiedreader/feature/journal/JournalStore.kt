@@ -174,6 +174,11 @@ class RoomJournalRepository(
             .map { entity -> entity.toDomain() }
     }
 
+    override suspend fun saveReadingSessions(sessions: List<JournalReadingSession>) {
+        if (sessions.isEmpty()) return
+        withContext(ioDispatcher) { journalDao.insertReadingSessions(sessions.map { it.toEntity() }) }
+    }
+
     override suspend fun replaceCleanSourceJournalCache(
         sourceType: SourceType,
         events: List<JournalReadingEvent>,
