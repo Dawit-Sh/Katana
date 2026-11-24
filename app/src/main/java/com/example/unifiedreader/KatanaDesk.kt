@@ -20,6 +20,7 @@ import com.example.unifiedreader.data.grimmory.GrimmoryBookCatalogEntry
 import com.example.unifiedreader.data.grimmory.KtorGrimmoryApi
 import com.example.unifiedreader.data.repository.ReadableItemRepository
 import com.example.unifiedreader.feature.annotations.AnnotatedBook
+import com.example.unifiedreader.feature.downloads.RemoteDownloadQueueController
 import com.example.unifiedreader.feature.annotations.BookmarkPlaces
 import com.example.unifiedreader.feature.annotations.BookmarkSync
 import com.example.unifiedreader.feature.annotations.BookmarkSyncEngine
@@ -112,7 +113,10 @@ class KatanaDeskConnection @Inject constructor(@param:ApplicationContext context
     }
 
     fun forget() {
-        prefs.edit().remove(KEY_ADDRESS).remove(KEY_TOKEN).remove(KEY_NAME).remove(KEY_BRING).remove(KEY_BRING_TRIES).apply()
+        prefs.edit()
+            .remove(KEY_ADDRESS).remove(KEY_TOKEN).remove(KEY_NAME)
+            .remove(KEY_BRING).remove(KEY_BROUGHT).remove(KEY_BRINGING).remove(KEY_BRING_TRIES)
+            .apply()
         pairedState.value = null
     }
 
@@ -129,10 +133,18 @@ class KatanaDeskConnection @Inject constructor(@param:ApplicationContext context
     /** The desk the links were made with, so another desk doesn't take them over. */
     val linkedDeskId: String? get() = prefs.getString(KEY_DESK, null)
 
-    /** The next sync brings the book being read on the PC (set by pairing; kept until it came, or was given up). */
-    var bringReadingBook: Boolean
-        get() = prefs.getBoolean(KEY_BRING, false)
-        set(value) = prefs.edit().putBoolean(KEY_BRING, value).apply()
+    /**
+     * The desk's book whose coming here is settled (it came, was here, or was given up): a sync brings the book being
+     * read on the PC when it's another one. Null after pairing, so the first sync brings the PC's book.
+     */
+    var broughtBookId: String?
+        get() = prefs.getString(KEY_BROUGHT, null)
+        set(value) = prefs.edit().putString(KEY_BROUGHT, value).remove(KEY_BRING).apply()
+
+    /** The desk's book the tries below are for. */
+    var bringingBookId: String?
+        get() = prefs.getString(KEY_BRINGING, null)
+        set(value) = prefs.edit().putString(KEY_BRINGING, value).apply()
 
     /** When the last reading session sent to the paired desk for [itemId] ended (each session goes once). */
     fun readingSentUntil(itemId: String): Long = prefs.getLong(readingKey(itemId), 0L)
@@ -169,7 +181,10 @@ class KatanaDeskConnection @Inject constructor(@param:ApplicationContext context
         const val KEY_LINKS = "links"
         const val KEY_SYNCED = "synced_at"
         const val KEY_DEVICE = "device_id"
+        // an older build's flag: the first sync after pairing brought the book
         const val KEY_BRING = "bring_reading_book"
+        const val KEY_BROUGHT = "brought_book"
+        const val KEY_BRINGING = "bringing_book"
         const val KEY_BRING_TRIES = "bring_tries"
         const val KEY_READING_SENT = "reading_sent:"
     }
@@ -424,8 +439,9 @@ const val KATANA_DESK_SERVICE = "_katana-desk._tcp"
  * Syncs the books here that are on Katana Desk too, with Grimmory's own rules (the desk answers Grimmory's
  * API for its books): the most recent place wins, asking before going back; the reading status the same way
  * ([decideServerReadStatus]); highlights and bookmarks through the same engines as Grimmory's, holds and Undo
- * included. A book linked to Grimmory syncs there, not here. The first sync after pairing brings the book being
- * read on the PC ([KatanaDeskBookBringer]). Each sync's start and end go out as [events] (and to the desk).
+ * included. A book linked to Grimmory syncs there, not here. The book being read on the PC comes here at the first sync
+ * after pairing and whenever the PC moves on to another one ([KatanaDeskBookBringer]). Each sync's start and end go
+ * out as [events] (and to the desk).
  */
 @Singleton
 class KatanaDeskSync @Inject constructor(
@@ -436,6 +452,8 @@ class KatanaDeskSync @Inject constructor(
     private val localDocuments: LocalDocumentDataSource,
     private val grimmoryCopies: dagger.Lazy<GrimmoryLocalCopies>,
     private val catalog: dagger.Lazy<ReadableItemRepository>,
+    itemLookup: dagger.Lazy<ReadableItemLookup>,
+    downloads: dagger.Lazy<RemoteDownloadQueueController>,
     highlightStore: HighlightSyncStore,
     bookmarkStore: BookmarkSyncStore,
     private val markServerMove: ReaderMarkServerMoveDao,
@@ -452,16 +470,13 @@ class KatanaDeskSync @Inject constructor(
         statuses = readStatuses,
         reading = KatanaDeskReadingTime(journal, connection),
     )
+    private val grimmoryCopy = KatanaDeskGrimmoryCopy(catalog, itemLookup, downloads)
     private val bringer = KatanaDeskBookBringer(
         context = context,
         httpClient = httpClient,
         documents = localDocuments,
         fingerprints = fingerprints,
-        onGrimmoryHere = { grimmoryId ->
-            withContext(Dispatchers.Default) {
-                catalog.get().getItems().any { it.sourceType == SourceType.GRIMMORY && it.remoteId == grimmoryId }
-            }
-        },
+        fromGrimmory = grimmoryCopy::start,
         syncsWithGrimmory = { item -> grimmoryCopies.get().isLinked(item) },
     )
     private val highlightWaiting = highlightStore.observeWaiting()
@@ -515,7 +530,8 @@ class KatanaDeskSync @Inject constructor(
             }
         }
         connection.save(paired)
-        connection.bringReadingBook = true
+        connection.broughtBookId = null
+        connection.bringTries = 0
         syncSoon()
         return paired
     }
@@ -583,7 +599,9 @@ class KatanaDeskSync @Inject constructor(
             val summary = tally.result(outcome.books, outcome.placesHere, outcome.brought, problem)
             if (problem == null) connection.markSynced(System.currentTimeMillis())
             problemState.value = problem
-            lastResultState.value = summary
+            // the sheet keeps saying what became of the PC's book after the syncs that had nothing new to bring
+            val earlier = lastResultState.value?.brought?.takeIf { summary.brought == KatanaDeskBringing.NothingRead }
+            lastResultState.value = earlier?.let { summary.copy(brought = it) } ?: summary
             if (problem == null || outcome.reached) client.tell(desk, end = summary)
             eventsFlow.tryEmit(KatanaDeskSyncEvent.Ended(System.currentTimeMillis(), desk.name, since, summary))
             Log.i(LOG_TAG, "Sync with ${desk.name} ended: $summary")
@@ -596,8 +614,9 @@ class KatanaDeskSync @Inject constructor(
 
     private suspend fun syncWith(desk: KatanaDeskPaired, tally: KatanaDeskTally, outcome: KatanaDeskOutcome): Int {
         val api = KtorGrimmoryApi(httpClient = httpClient, baseUrl = desk.baseUrl)
-        // The first sync after pairing: the book being read on the PC comes here (downloaded when it isn't).
-        if (connection.bringReadingBook) outcome.brought = bringReadingBook(desk)
+        // The book being read on the PC comes here (downloaded when it isn't), at the first sync after pairing and
+        // whenever the PC moves on to another book.
+        outcome.brought = bringReadingBook(desk)
         val grimmory = grimmoryCopies.get()
         val known = connection.links.value
         // A book here once linked to the desk stays with it; one linked to Grimmory syncs there.
@@ -635,8 +654,15 @@ class KatanaDeskSync @Inject constructor(
     // times; then it's left.
     private suspend fun bringReadingBook(desk: KatanaDeskPaired): KatanaDeskBringing {
         var title: String? = null
+        var bringing: String? = null
         val brought = runSuspendCatching {
             val reading = client.reading(desk) ?: return@runSuspendCatching KatanaDeskBringing.NothingRead
+            if (reading.bookId == connection.broughtBookId) return@runSuspendCatching KatanaDeskBringing.NothingRead
+            if (reading.bookId != connection.bringingBookId) {
+                connection.bringingBookId = reading.bookId
+                connection.bringTries = 0
+            }
+            bringing = reading.bookId
             title = reading.title
             val getting = { bytes: Long ->
                 activityState.value = activityState.value?.copy(getting = KatanaDeskGetting(reading.title, bytes, reading.sizeBytes))
@@ -656,8 +682,9 @@ class KatanaDeskSync @Inject constructor(
                 triesAgain = tries < KATANA_DESK_BRING_TRIES,
             )
         }
-        if (brought !is KatanaDeskBringing.Failed || !brought.triesAgain) {
-            connection.bringReadingBook = false
+        val settled = brought != KatanaDeskBringing.NothingRead && (brought !is KatanaDeskBringing.Failed || !brought.triesAgain)
+        if (bringing != null && settled) {
+            connection.broughtBookId = bringing
             connection.bringTries = 0
         }
         return brought

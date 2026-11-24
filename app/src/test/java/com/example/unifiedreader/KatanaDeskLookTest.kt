@@ -57,6 +57,9 @@ class KatanaDeskLookTest {
         assertEquals("Synced with KATANA-PC", katanaDeskDoneNote(ended(2_000L, KatanaDeskSyncResult(books = 3))) { null }?.text)
         // a quick check-in that changed nothing: no note
         assertNull(katanaDeskDoneNote(ended(150L, KatanaDeskSyncResult(books = 3))) { null })
+        val viaGrimmory = KatanaDeskSyncResult(brought = KatanaDeskBringing.OnGrimmory("cpumemory", downloading = true))
+        val grimmoryNote = katanaDeskDoneNote(ended(900L, viaGrimmory)) { null }
+        assertEquals("Synced with KATANA-PC · cpumemory is downloading from Grimmory", grimmoryNote?.text)
         val failed = katanaDeskDoneNote(ended(12_000L, KatanaDeskSyncResult(problem = "Can't reach Katana Desk."))) { null }
         assertEquals(AppToastIcon.Error, failed?.icon)
     }

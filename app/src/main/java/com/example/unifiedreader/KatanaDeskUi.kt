@@ -87,6 +87,7 @@ internal fun KatanaDeskHost(viewModel: KatanaDeskViewModel = hiltViewModel()) {
  */
 internal fun katanaDeskDoneNote(event: KatanaDeskSyncEvent.Ended, placeOf: (String) -> String?): AppToastMessage? {
     val arrived = event.result.brought as? KatanaDeskBringing.Arrived
+    val fromGrimmory = (event.result.brought as? KatanaDeskBringing.OnGrimmory)?.takeIf { it.downloading }
     val long = event.atEpochMillis - event.sinceEpochMillis >= KATANA_DESK_BAR_AFTER_MILLIS
     val problem = event.result.problem
     return when {
@@ -95,6 +96,10 @@ internal fun katanaDeskDoneNote(event: KatanaDeskSyncEvent.Ended, placeOf: (Stri
             val text = "Synced with ${event.deskName} · ${arrived.title} is on this device$at"
             AppToastMessage(text = text, icon = AppToastIcon.Download)
         }
+        fromGrimmory != null -> AppToastMessage(
+            text = "Synced with ${event.deskName} · ${fromGrimmory.title} is downloading from Grimmory",
+            icon = AppToastIcon.Download,
+        )
         long && problem != null -> AppToastMessage(
             text = "Didn't finish syncing with ${event.deskName}",
             supportingText = problem,
@@ -124,7 +129,11 @@ internal fun broughtText(brought: KatanaDeskBringing): String? = when (brought) 
     KatanaDeskBringing.NothingRead -> null
     is KatanaDeskBringing.Arrived -> "${brought.title} came from the PC, into Local. It opens where you are there."
     is KatanaDeskBringing.AlreadyHere -> "${brought.title}, the book open on the PC, is here too: it syncs."
-    is KatanaDeskBringing.OnGrimmory -> "${brought.title}, the book open on the PC, is on Grimmory here: it syncs there."
+    is KatanaDeskBringing.OnGrimmory -> if (brought.downloading) {
+        "${brought.title}, the book open on the PC, is downloading from Grimmory: its place syncs there."
+    } else {
+        "${brought.title}, the book open on the PC, is on Grimmory here: it syncs there."
+    }
     is KatanaDeskBringing.NotSynced -> "${brought.title} is a ${brought.format} book: those don't sync with the PC yet."
     is KatanaDeskBringing.Failed -> if (brought.triesAgain) {
         "${brought.title ?: "The PC's book"} didn't come yet: ${brought.problem} It's tried again at the next sync."

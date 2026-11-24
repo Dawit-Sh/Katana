@@ -103,6 +103,13 @@ internal fun SourceStartHost(
                 actions.onFindOnPhone()
             }
         },
+        onKatanaDesk = localBooks?.let { actions ->
+            {
+                finish()
+                viewModel.openLibrarySource(SourceType.LOCAL)
+                actions.onKatanaDesk()
+            }
+        },
         onServerConnected = { server ->
             // The first server connected opens when the app starts.
             if (uiState.navigationConnectedServers.none { it != server }) {

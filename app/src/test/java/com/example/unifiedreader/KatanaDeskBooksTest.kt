@@ -73,12 +73,12 @@ class KatanaDeskBooksTest {
         grimmoryId = null,
     )
 
-    private fun bringer(documents: FakeDocuments, onGrimmory: Boolean = false) = KatanaDeskBookBringer(
+    private fun bringer(documents: FakeDocuments, onGrimmory: Boolean = false, grimmoryDownloads: Boolean = false) = KatanaDeskBookBringer(
         context = context,
         httpClient = buildHttpClient(),
         documents = documents,
         fingerprints = FileFingerprints(),
-        onGrimmoryHere = { onGrimmory },
+        fromGrimmory = { if (onGrimmory) grimmoryDownloads else null },
         syncsWithGrimmory = { false },
     )
 
@@ -128,11 +128,15 @@ class KatanaDeskBooksTest {
     }
 
     @Test
-    fun `a Grimmory book on Grimmory here, and a kind that doesn't sync, stay where they are`() = runBlocking {
+    fun `a Grimmory book on Grimmory here comes through Grimmory, and a kind that doesn't sync stays`() = runBlocking {
         val documents = FakeDocuments()
         val onGrimmory = bringer(documents, onGrimmory = true)
             .bring(desk, reading().copy(grimmoryId = "812"), mutableMapOf(), {}) { _, _ -> }
         assertEquals(KatanaDeskBringing.OnGrimmory("Sync Test Novel"), onGrimmory)
+        // not on this device yet: Grimmory's own download of it starts
+        val coming = bringer(documents, onGrimmory = true, grimmoryDownloads = true)
+            .bring(desk, reading().copy(grimmoryId = "812"), mutableMapOf(), {}) { _, _ -> }
+        assertEquals(KatanaDeskBringing.OnGrimmory("Sync Test Novel", downloading = true), coming)
         val mobi = bringer(documents).bring(desk, reading().copy(formatName = "mobi"), mutableMapOf(), {}) { _, _ -> }
         assertEquals(KatanaDeskBringing.NotSynced("Sync Test Novel", "MOBI"), mobi)
         assertEquals(0, requests)

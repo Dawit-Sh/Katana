@@ -4,8 +4,12 @@ import android.content.Context
 import android.net.Uri
 import com.example.unifiedreader.core.model.FormatType
 import com.example.unifiedreader.core.model.ReadableItem
+import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.core.network.PartialDownloadFile
 import com.example.unifiedreader.data.grimmory.KtorGrimmoryApi
+import com.example.unifiedreader.data.repository.ReadableItemRepository
+import com.example.unifiedreader.feature.downloads.DownloadQueueOutcome
+import com.example.unifiedreader.feature.downloads.RemoteDownloadQueueController
 import io.ktor.client.HttpClient
 import java.io.File
 import java.io.IOException
@@ -29,8 +33,11 @@ sealed interface KatanaDeskBringing {
     /** This device has that book already (the same file): it syncs from now on. */
     data class AlreadyHere(val itemId: String, override val title: String) : KatanaDeskBringing
 
-    /** A Grimmory book there that is on Grimmory here too: it syncs through Grimmory. */
-    data class OnGrimmory(override val title: String) : KatanaDeskBringing
+    /**
+     * A Grimmory book there that is on Grimmory here too: it syncs through Grimmory. [downloading]: it wasn't on this
+     * device, so Grimmory's own download of it started.
+     */
+    data class OnGrimmory(override val title: String, val downloading: Boolean = false) : KatanaDeskBringing
 
     /** Downloaded from the PC into the Local library; it syncs from now on. */
     data class Arrived(val itemId: String, override val title: String) : KatanaDeskBringing
@@ -54,6 +61,22 @@ internal const val KATANA_DESK_BOOKS_DIR = "katana-desk-books"
 /** A book from Katana Desk while it downloads (a broken-off download goes on from here). */
 internal const val KATANA_DESK_PARTIAL_DIR = "katana-desk-downloads"
 
+/** The PC's book on this device's Grimmory: Grimmory's own download of it starts when it isn't on this device yet. */
+internal class KatanaDeskGrimmoryCopy(
+    private val catalog: dagger.Lazy<ReadableItemRepository>,
+    private val lookup: dagger.Lazy<ReadableItemLookup>,
+    private val downloads: dagger.Lazy<RemoteDownloadQueueController>,
+) {
+    /** Null when this device's Grimmory hasn't the book with [grimmoryId]; else whether its download started now. */
+    suspend fun start(grimmoryId: String): Boolean? {
+        val item = withContext(Dispatchers.Default) {
+            catalog.get().getItems().firstOrNull { it.sourceType == SourceType.GRIMMORY && it.remoteId == grimmoryId }
+        } ?: return null
+        val result = downloads.get().enqueue(item = item, items = lookup.get().getSeriesMemberItems(item))
+        return result.outcome == DownloadQueueOutcome.Queued || result.outcome == DownloadQueueOutcome.AlreadyQueued
+    }
+}
+
 /**
  * Brings the book being read on the PC to this device after pairing: nothing to do when it's here already (the same
  * file: then it's linked), or on Grimmory here too; otherwise its file is downloaded from the desk (Grimmory's own
@@ -65,8 +88,11 @@ internal class KatanaDeskBookBringer(
     private val httpClient: HttpClient,
     private val documents: LocalDocumentDataSource,
     private val fingerprints: LocalFileFingerprinter,
-    /** Whether this device's Grimmory library has the book with that Grimmory id */
-    private val onGrimmoryHere: suspend (String) -> Boolean,
+    /**
+     * The book with that Grimmory id in this device's Grimmory library: null when it isn't there; else whether its
+     * download started now (false: it's on this device already).
+     */
+    private val fromGrimmory: suspend (grimmoryId: String) -> Boolean?,
     /** Whether a book here syncs with Grimmory (then not with the desk) */
     private val syncsWithGrimmory: (ReadableItem) -> Boolean,
 ) {
@@ -81,6 +107,8 @@ internal class KatanaDeskBookBringer(
         val linkedHere = links.entries.firstOrNull { (itemId, bookId) -> bookId == reading.bookId && items.any { it.id == itemId } }
         val format = reading.format?.takeIf { it in KATANA_DESK_FORMATS }
         val sameFile = format?.takeIf { linkedHere == null }?.let { kind -> sameFileHere(reading, items.filter { it.format == kind }) }
+        val elsewhere = linkedHere == null && format != null && sameFile == null
+        val onGrimmory = if (elsewhere) reading.grimmoryId?.let { fromGrimmory(it) } else null
         return when {
             linkedHere != null -> KatanaDeskBringing.AlreadyHere(linkedHere.key, reading.title)
             format == null -> KatanaDeskBringing.NotSynced(reading.title, reading.formatName.uppercase())
@@ -88,7 +116,7 @@ internal class KatanaDeskBookBringer(
                 linkUnlessGrimmory(sameFile, reading, link)
                 KatanaDeskBringing.AlreadyHere(sameFile.id, sameFile.title)
             }
-            reading.grimmoryId != null && onGrimmoryHere(reading.grimmoryId) -> KatanaDeskBringing.OnGrimmory(reading.title)
+            onGrimmory != null -> KatanaDeskBringing.OnGrimmory(reading.title, downloading = onGrimmory)
             else -> downloadAndImport(desk, reading, format, progress, link)
         }
     }

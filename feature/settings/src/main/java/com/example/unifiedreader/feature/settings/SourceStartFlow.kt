@@ -84,6 +84,8 @@ fun SourceStartFlow(
     // Books on this device found where they are: a folder picked once, or the whole phone.
     onAddFolder: (() -> Unit)? = null,
     onFindOnPhone: (() -> Unit)? = null,
+    // Katana Desk on a PC on this Wi-Fi: the pairing sheet, where only its code is typed.
+    onKatanaDesk: (() -> Unit)? = null,
 ) {
     var page by rememberSaveable { mutableStateOf(initialServer) }
     // A server's page opened from the choices goes back to them; one opened directly closes the flow.
@@ -111,6 +113,7 @@ fun SourceStartFlow(
                     onClose = onClose,
                     onAddFolder = onAddFolder,
                     onFindOnPhone = onFindOnPhone,
+                    onKatanaDesk = onKatanaDesk,
                 )
             } else {
                 SourceConnectPage(
@@ -177,6 +180,7 @@ private fun SourceStartChoices(
     onClose: () -> Unit,
     onAddFolder: (() -> Unit)? = null,
     onFindOnPhone: (() -> Unit)? = null,
+    onKatanaDesk: (() -> Unit)? = null,
 ) {
     SourceStartPage(onBack = onClose.takeIf { mode == SourceStartMode.AddSource }) {
         val scheme = MaterialTheme.colorScheme
@@ -192,7 +196,7 @@ private fun SourceStartChoices(
         AppScreenTitle(text = "Where are your books?")
         SourceStartLead(
             text = "Katana reads EPUB, PDF, DjVu, comics (CBZ, CBR), MOBI, AZW, AZW3 and FB2 " +
-                "from your own server or from this device.",
+                "from your own server, your PC or this device.",
         )
         Spacer(modifier = Modifier.height(30.dp))
         AppPanel(modifier = Modifier.fillMaxWidth()) {
@@ -205,7 +209,9 @@ private fun SourceStartChoices(
                     onClick = { onServerSelected(entry.sourceType) },
                 )
             }
-            if (servers.isNotEmpty()) StartChoiceDivider()
+            if (onKatanaDesk != null && servers.isNotEmpty()) StartChoiceDivider()
+            if (onKatanaDesk != null) SourceStartChoice(AppIcons.Computer, "Katana Desk", KATANA_DESK_START_LINE, onKatanaDesk)
+            if (servers.isNotEmpty() || onKatanaDesk != null) StartChoiceDivider()
             DeviceStartChoices(onImportFile = onImportFile, onAddFolder = onAddFolder, onFindOnPhone = onFindOnPhone)
         }
         if (mode == SourceStartMode.FirstLaunch) {
@@ -432,5 +438,7 @@ private fun SourceType.startChoiceLine(): String = when (this) {
     SourceType.GRIMMORY -> "Books from a Grimmory server"
     SourceType.LOCAL -> "Import EPUB, PDF, DjVu, CBZ, CBR, MOBI, AZW, AZW3 or FB2 files"
 }
+
+private const val KATANA_DESK_START_LINE = "Your PC on this Wi-Fi: type the code it shows, and the book you read there comes here"
 
 private val SourceStartColumnMaxWidth = 560.dp
