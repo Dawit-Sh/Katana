@@ -74,20 +74,20 @@ enum class QuoteCardGround(val label: String, val isPicture: Boolean = false) {
 
 /**
  * Share a highlight as an image: a preview of the card, its ground (paper, dusk, teal, the book's
- * cover colours, the cover itself or a photo of the reader's own, blurred or not) and shape, then
- * Share (Android's share sheet) or Save image (Pictures/Katana).
+ * cover colours, the cover itself or a photo of the reader's own, with an effect on a picture) and
+ * shape, then Share (Android's share sheet) or Save image (Pictures/Katana).
  */
 @Composable
 fun QuoteShareDialog(highlight: ReaderHighlight, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     var ground by rememberSaveable { mutableStateOf(QuoteCardGround.Paper) }
     var shape by rememberSaveable { mutableStateOf(QuoteCardShape.Square) }
-    var blurred by rememberSaveable { mutableStateOf(true) }
+    var effect by rememberSaveable { mutableStateOf(QuoteCardEffect.Blur) }
     val coverColors = coverCardColors()
     val pictures = rememberQuoteCardPictures(
         onPhotoPicked = { ground = QuoteCardGround.Photo },
         onPhotoLost = { if (ground == QuoteCardGround.Photo) ground = QuoteCardGround.Paper },
     )
-    val backdrop = pictures.backdrop(ground, blurred)
+    val backdrop = pictures.backdrop(ground, effect)
     val card = rememberQuoteCard(highlight, ground.colors(coverColors), shape, backdrop, waiting = ground.isPicture && backdrop == null)
     val fileName = remember(highlight) { QuoteImages.fileName(highlight.book.title, System.currentTimeMillis()) }
     AppDialogCard(
@@ -111,11 +111,10 @@ fun QuoteShareDialog(highlight: ReaderHighlight, onDismiss: () -> Unit, modifier
             QuoteCardOptions(
                 ground = ground,
                 shape = shape,
-                blurred = blurred,
                 onShape = { shape = it },
-                onBlurred = { blurred = it },
                 onChangePhoto = pictures::pickPhoto,
             )
+            if (ground.isPicture) QuoteEffectRow(effect = effect, onEffect = { effect = it })
         }
     }
 }
@@ -158,15 +157,13 @@ private fun QuoteGroundRow(
     }
 }
 
-/** Square or tall; and on a picture, Blur and (for a photo) Change photo. */
+/** Square or tall; and on a photo, Change photo. A picture's effects are their own row ([QuoteEffectRow]). */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun QuoteCardOptions(
     ground: QuoteCardGround,
     shape: QuoteCardShape,
-    blurred: Boolean,
     onShape: (QuoteCardShape) -> Unit,
-    onBlurred: (Boolean) -> Unit,
     onChangePhoto: () -> Unit,
 ) {
     FlowRow(
@@ -178,9 +175,6 @@ private fun QuoteCardOptions(
             onClick = { onShape(if (shape == QuoteCardShape.Square) QuoteCardShape.Tall else QuoteCardShape.Square) },
             label = { Text(if (shape == QuoteCardShape.Square) QuoteCopy.Square else QuoteCopy.Tall) },
         )
-        if (ground.isPicture) {
-            AppChip(selected = blurred, onClick = { onBlurred(!blurred) }, label = { Text(QuoteCopy.Blur) })
-        }
         if (ground == QuoteCardGround.Photo) {
             AppChip(
                 selected = false,
@@ -399,7 +393,7 @@ object QuoteCopy {
     const val ShareFailed = "Nothing here can share images"
     const val NeedsPermission = "Katana needs storage access to save the image"
     const val Preview = "Quote card preview"
-    const val Blur = "Blur"
+    const val Effect = "Effect"
     const val ChangePhoto = "Change photo"
     const val PhotoFailed = "Couldn't open that picture"
 }

@@ -14,27 +14,32 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * A picture behind the quote: the book's cover or the reader's own photo, filling the card. [blurred]
- * softens it, so the cover's own words and a photo's detail don't fight the quote.
+ * A picture behind the quote: the book's cover or the reader's own photo, filling the card. Its
+ * [effect] (Blur unless the reader picks another) quiets it, so the cover's own words and a photo's
+ * detail don't fight the quote.
  */
-data class QuoteCardBackdrop(val image: Bitmap, val blurred: Boolean)
+data class QuoteCardBackdrop(val image: Bitmap, val effect: QuoteCardEffect = QuoteCardEffect.Blur)
 
-/** Drawing a [QuoteCardBackdrop]: the picture cropped to fill the card, blurred if asked, then darkened so white text reads. */
+/** Drawing a [QuoteCardBackdrop]: the picture cropped to fill the card, its effect drawn, then darkened so white text reads. */
 internal object QuoteCardBackdrops {
     fun draw(canvas: Canvas, backdrop: QuoteCardBackdrop, width: Int, height: Int) {
         val crop = fillCrop(backdrop.image.width, backdrop.image.height, width, height)
         val card = RectF(0f, 0f, width.toFloat(), height.toFloat())
         val filter = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
-        if (backdrop.blurred) {
-            val soft = softened(backdrop.image, crop, (width / BLUR_SCALE).coerceAtLeast(1), (height / BLUR_SCALE).coerceAtLeast(1))
-            canvas.drawBitmap(soft, null, card, filter)
-        } else {
-            canvas.drawBitmap(backdrop.image, crop, card, filter)
+        when (backdrop.effect) {
+            QuoteCardEffect.None -> canvas.drawBitmap(backdrop.image, crop, card, filter)
+            QuoteCardEffect.Blur -> {
+                val soft = softened(backdrop.image, crop, (width / BLUR_SCALE).coerceAtLeast(1), (height / BLUR_SCALE).coerceAtLeast(1))
+                canvas.drawBitmap(soft, null, card, filter)
+            }
+            else -> canvas.drawBitmap(withEffect(backdrop, crop, card, filter), 0f, 0f, null)
         }
-        canvas.drawColor(if (backdrop.blurred) SCRIM_BLURRED else SCRIM_SHARP)
+        // A quieted picture (any effect) takes the lighter scrim; the sharp one the deeper.
+        val quiet = backdrop.effect.quiets
+        canvas.drawColor(if (quiet) SCRIM_BLURRED else SCRIM_SHARP)
         // Deeper at the foot, where the book line sits; deepest on a sharp picture, where a cover's own title often is.
         val footTop = height * FOOT_START
-        val footShade = if (backdrop.blurred) FOOT_SHADE_BLURRED else FOOT_SHADE_SHARP
+        val footShade = if (quiet) FOOT_SHADE_BLURRED else FOOT_SHADE_SHARP
         val foot = Paint().apply {
             shader = LinearGradient(0f, footTop, 0f, height.toFloat(), TRANSPARENT, footShade, Shader.TileMode.CLAMP)
         }
@@ -75,6 +80,20 @@ internal object QuoteCardBackdrops {
         return createBitmap(width, height).apply { setPixels(pixels, 0, width, 0, 0, width, height) }
     }
 
+    /**
+     * [crop] of the backdrop's picture at the [card]'s size, drawn as the sharp one is, with its
+     * effect then worked on the pixels ([QuoteCardEffects]).
+     */
+    private fun withEffect(backdrop: QuoteCardBackdrop, crop: Rect, card: RectF, filter: Paint): Bitmap {
+        val grid = PixelGrid(card.width().toInt(), card.height().toInt())
+        val picture = createBitmap(grid.width, grid.height)
+        Canvas(picture).drawBitmap(backdrop.image, crop, card, filter)
+        picture.getPixels(grid.pixels, 0, grid.width, 0, 0, grid.width, grid.height)
+        QuoteCardEffects.apply(backdrop.effect, grid)
+        picture.setPixels(grid.pixels, 0, grid.width, 0, 0, grid.width, grid.height)
+        return picture
+    }
+
     /** One pass of a box blur of [radius], across and then down; three passes come close to a Gaussian. */
     fun boxBlur(pixels: IntArray, width: Int, height: Int, radius: Int) {
         for (y in 0 until height) blurLine(pixels, BlurLine(start = y * width, stride = 1, count = width), radius)
@@ -108,6 +127,8 @@ internal object QuoteCardBackdrops {
     private const val BLUR_RADIUS = 3
     private const val BLUR_PASSES = 3
     private const val CARD_SIDE = 1350
+
+    // The blurred strengths are every effect's but None's.
     private const val SCRIM_BLURRED = 0x52000000
     private const val SCRIM_SHARP = 0x70000000
     private const val FOOT_START = 0.6f

@@ -69,8 +69,8 @@ class QuoteCardPictures internal constructor(
         else -> null
     }
 
-    fun backdrop(ground: QuoteCardGround, blurred: Boolean): QuoteCardBackdrop? =
-        image(ground)?.let { QuoteCardBackdrop(image = it, blurred = blurred) }
+    fun backdrop(ground: QuoteCardGround, effect: QuoteCardEffect): QuoteCardBackdrop? =
+        image(ground)?.let { QuoteCardBackdrop(image = it, effect = effect) }
 }
 
 /**
