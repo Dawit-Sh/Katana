@@ -1,12 +1,9 @@
 package com.example.unifiedreader
 
 import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import com.example.unifiedreader.core.model.runSuspendCatching
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.net.HttpURLConnection
-import java.net.Inet4Address
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.URL
@@ -30,32 +27,13 @@ class GrimmoryWifiFinder @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) {
     suspend fun find(): String? = withContext(Dispatchers.IO) {
-        val own = deviceWifiAddress() ?: return@withContext null
+        val own = context.wifiIpv4Address() ?: return@withContext null
         val limiter = Semaphore(FIND_PARALLEL_PROBES)
         coroutineScope {
             sameNetworkHosts(own).map { host ->
                 async { limiter.withPermit { host.takeIf { answersAsGrimmory(it) } } }
             }.awaitAll().filterNotNull().firstOrNull()?.let { host -> "http://$host:$GRIMMORY_PORT" }
         }
-    }
-
-    // The device's IPv4 address on its Wi-Fi or cable network (never mobile data), as four numbers.
-    private fun deviceWifiAddress(): IntArray? {
-        val connectivity = context.getSystemService(ConnectivityManager::class.java) ?: return null
-        val network = connectivity.activeNetwork
-        val local = network?.let(connectivity::getNetworkCapabilities)?.let { capabilities ->
-            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
-        } == true
-        return network.takeIf { local }
-            ?.let(connectivity::getLinkProperties)
-            ?.linkAddresses
-            ?.map { it.address }
-            ?.filterIsInstance<Inet4Address>()
-            ?.firstOrNull { !it.isLoopbackAddress }
-            ?.address
-            ?.map { byte -> byte.toInt() and BYTE_MASK }
-            ?.toIntArray()
     }
 
     private suspend fun answersAsGrimmory(host: String): Boolean = runSuspendCatching {
@@ -125,7 +103,6 @@ private const val FIND_PARALLEL_PROBES = 48
 private const val FIND_CONNECT_TIMEOUT_MILLIS = 400
 private const val FIND_READ_TIMEOUT_MILLIS = 1500
 private const val HEALTH_CHECK_READ_LIMIT = 2048
-private const val BYTE_MASK = 0xFF
 private const val IPV4_PARTS = 4
 private const val FIRST_HOST = 1
 private const val LAST_HOST = 254

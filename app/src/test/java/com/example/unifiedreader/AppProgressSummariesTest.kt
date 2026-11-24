@@ -14,6 +14,22 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class AppProgressSummariesTest {
+    @Test
+    fun `a place that came from another device names the chapter it is in`() {
+        // twelve chapters, the reader last saved chapter 8 (it starts at 7/12)
+        val starts = (0 until 12).map { it / 12f }
+        val saved = ReaderChapterPosition(index = 8, count = 12, title = "Chapter 8", starts = starts)
+        // the desk's place came down at 83%: chapter 10
+        assertEquals(10, chapterOfShare(0.8333f, saved))
+        // in the saved chapter, or a hair past its edges (rounded shares): the saved one stands
+        assertNull(chapterOfShare(0.62f, saved))
+        assertNull(chapterOfShare(7 / 12f - 0.001f, saved))
+        assertNull(chapterOfShare(8 / 12f + 0.001f, saved))
+        // an earlier chapter, and no starts known
+        assertEquals(1, chapterOfShare(0.02f, saved))
+        assertNull(chapterOfShare(0.9f, saved.copy(starts = emptyList())))
+    }
+
     private val book = ReadableItem(
         id = "local:book",
         sourceType = SourceType.LOCAL,
@@ -67,8 +83,9 @@ class AppProgressSummariesTest {
             book.id to ReaderProgressSnapshot(
                 itemId = book.id,
                 locatorType = LocatorType.CFI,
-                page = 47,
-                percent = 0.64,
+                page = 22,
+                // inside chapter 3 (it runs from 24% to 38%), where the reader saved it
+                percent = 0.30,
                 isFinished = isFinished,
             ),
         ),

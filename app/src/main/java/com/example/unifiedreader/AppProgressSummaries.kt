@@ -56,18 +56,35 @@ internal fun buildProgressSummaries(
     item.id to summary.withChapter(sessionByItemId[item.id]?.chapterPosition)
 }
 
-/** The chapter the reader saved (number and title), while the book is not finished; how many it has and where they start, always. */
-private fun ItemProgressSummary.withChapter(position: ReaderChapterPosition?): ItemProgressSummary =
-    if (position == null) {
-        this
-    } else {
-        copy(
-            chapter = position.index.takeUnless { isFinished },
-            chapterCount = position.count,
-            chapterTitle = position.title.takeUnless { isFinished },
-            chapterStarts = position.starts,
-        )
-    }
+/**
+ * The chapter the reader saved (number and title), while the book is not finished; how many it has and where they
+ * start, always. A place that came since from another device (Grimmory, Katana Desk) while the book stayed closed
+ * is named by the chapter its share falls in, without the saved chapter's title.
+ */
+private fun ItemProgressSummary.withChapter(position: ReaderChapterPosition?): ItemProgressSummary {
+    if (position == null) return this
+    val moved = chapterOfShare(fraction, position)?.takeIf { it != position.index }
+    return copy(
+        chapter = (moved ?: position.index).takeUnless { isFinished },
+        chapterCount = position.count,
+        chapterTitle = position.title.takeUnless { isFinished || moved != null },
+        chapterStarts = position.starts,
+    )
+}
+
+/**
+ * The chapter (from 1) [share] of the book falls in, by the chapters' starts, when it's clearly outside the chapter the
+ * reader saved; null when the starts aren't known or the place is (about) in the saved chapter.
+ */
+internal fun chapterOfShare(share: Float, position: ReaderChapterPosition): Int? {
+    val starts = position.starts.takeIf { it.size == position.count } ?: return null
+    val from = starts[position.index - 1] - CHAPTER_EDGE_MARGIN
+    val until = starts.getOrNull(position.index)?.plus(CHAPTER_EDGE_MARGIN) ?: Float.MAX_VALUE
+    return (starts.indexOfLast { it <= share } + 1).takeIf { it >= 1 && share !in from..until }
+}
+
+// A place this close to a chapter's edge counts as the saved chapter (the shares are rounded to four places).
+private const val CHAPTER_EDGE_MARGIN = 0.002f
 
 private fun buildItemProgressSummary(
     pageIndex: Int,

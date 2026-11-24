@@ -113,6 +113,8 @@ class LocalDocumentRepository private constructor(
             }
             comicPages.clearItem(itemId)
             coverSupport.clear(itemId)
+            // A book that came from Katana Desk lives in the app's own space: its file goes with it.
+            katanaDeskDownloadAt(context.filesDir, record.uri)?.delete()
             true
         }
     }

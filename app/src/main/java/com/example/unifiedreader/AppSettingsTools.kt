@@ -307,7 +307,8 @@ internal fun coverCacheBytes(context: Context): Long =
 
 /**
  * What the books imported from this device keep in the app's own space: their covers, the EPUB a MOBI, AZW, AZW3
- * or FB2 is read from, a DjVu's copy and a comic's copy. The picked files themselves stay where they are.
+ * or FB2 is read from, a DjVu's copy and a comic's copy, and the books that came from Katana Desk. The picked files
+ * themselves stay where they are.
  */
 internal fun importedBookBytes(filesDir: File, cacheDir: File): Long =
     (ImportedBookFolders.map { name -> File(filesDir, name) } + ImportedBookCacheFolders.map { name -> File(cacheDir, name) })
@@ -315,7 +316,7 @@ internal fun importedBookBytes(filesDir: File, cacheDir: File): Long =
         .sumOf { folder -> folder.walkTopDown().filter(File::isFile).sumOf(File::length) }
 
 private const val PERCENT = 100
-private val ImportedBookFolders = listOf("imported-cover-cache")
+private val ImportedBookFolders = listOf("imported-cover-cache", KATANA_DESK_BOOKS_DIR, KATANA_DESK_PARTIAL_DIR)
 private val ImportedBookCacheFolders = listOf(
     "epub-imports",
     "djvu-imports",

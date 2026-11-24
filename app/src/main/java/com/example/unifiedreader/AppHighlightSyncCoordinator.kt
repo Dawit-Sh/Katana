@@ -85,6 +85,14 @@ class AppHighlightSyncCoordinator @Inject constructor(
         if (!started.compareAndSet(false, true)) return
         localCopies.start()
         desk.start()
+        // A book on Katana Desk that opens here gets the desk's newest place and marks first, as Grimmory's does.
+        scope.launch {
+            var before = emptySet<String>()
+            readerWork.activeReaderItemIds.collect { open ->
+                desk.onBooksOpened(open - before)
+                before = open
+            }
+        }
         readStatusUpdates.start()
         grimmoryReadStatuses.start()
         scope.launch { store.observeWaiting().collect { keys -> waiting.value = keys } }
