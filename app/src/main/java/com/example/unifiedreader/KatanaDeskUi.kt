@@ -71,6 +71,8 @@ internal fun KatanaDeskHost(viewModel: KatanaDeskViewModel = hiltViewModel()) {
             onDismiss = viewModel::closeSheet,
         )
     }
+    val question by viewModel.question.collectAsState()
+    question?.let { asked -> KatanaDeskQuestionDialog(asked, onAnswer = viewModel::answer) }
     val toasts = LocalAppToastState.current
     val events = viewModel.events
     val placeOf: (String) -> String? = viewModel::placeOf

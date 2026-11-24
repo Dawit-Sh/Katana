@@ -133,19 +133,6 @@ class KatanaDeskConnection @Inject constructor(@param:ApplicationContext context
     /** The desk the links were made with, so another desk doesn't take them over. */
     val linkedDeskId: String? get() = prefs.getString(KEY_DESK, null)
 
-    /**
-     * The desk's book whose coming here is settled (it came, was here, or was given up): a sync brings the book being
-     * read on the PC when it's another one. Null after pairing, so the first sync brings the PC's book.
-     */
-    var broughtBookId: String?
-        get() = prefs.getString(KEY_BROUGHT, null)
-        set(value) = prefs.edit().putString(KEY_BROUGHT, value).remove(KEY_BRING).apply()
-
-    /** The desk's book the tries below are for. */
-    var bringingBookId: String?
-        get() = prefs.getString(KEY_BRINGING, null)
-        set(value) = prefs.edit().putString(KEY_BRINGING, value).apply()
-
     /** When the last reading session sent to the paired desk for [itemId] ended (each session goes once). */
     fun readingSentUntil(itemId: String): Long = prefs.getLong(readingKey(itemId), 0L)
 
@@ -153,11 +140,6 @@ class KatanaDeskConnection @Inject constructor(@param:ApplicationContext context
 
     // per desk: another desk hears every session again
     private fun readingKey(itemId: String) = "$KEY_READING_SENT${prefs.getString(KEY_DESK, null).orEmpty()}/$itemId"
-
-    /** How many syncs have tried to bring it and failed. */
-    var bringTries: Int
-        get() = prefs.getInt(KEY_BRING_TRIES, 0)
-        set(value) = prefs.edit().putInt(KEY_BRING_TRIES, value).apply()
 
     private fun readPaired(): KatanaDeskPaired? {
         val address = prefs.getString(KEY_ADDRESS, null)
@@ -471,6 +453,9 @@ class KatanaDeskSync @Inject constructor(
         reading = KatanaDeskReadingTime(journal, connection),
     )
     private val grimmoryCopy = KatanaDeskGrimmoryCopy(catalog, itemLookup, downloads)
+    /** Which books moved each way, and the question before more than five move at once. */
+    val moves = KatanaDeskMoves(context.getSharedPreferences(MOVES_PREFS, Context.MODE_PRIVATE)) { syncSoon() }
+    private val sender = KatanaDeskBookSender(context, httpClient, localDocuments, readerSessionStore, moves)
     private val bringer = KatanaDeskBookBringer(
         context = context,
         httpClient = httpClient,
@@ -530,13 +515,15 @@ class KatanaDeskSync @Inject constructor(
             }
         }
         connection.save(paired)
-        connection.broughtBookId = null
-        connection.bringTries = 0
+        moves.clear()
         syncSoon()
         return paired
     }
 
-    fun forget() = connection.forget()
+    fun forget() {
+        connection.forget()
+        moves.clear()
+    }
 
     @OptIn(FlowPreview::class)
     fun start() {
@@ -616,7 +603,7 @@ class KatanaDeskSync @Inject constructor(
         val api = KtorGrimmoryApi(httpClient = httpClient, baseUrl = desk.baseUrl)
         // The book being read on the PC comes here (downloaded when it isn't), at the first sync after pairing and
         // whenever the PC moves on to another book.
-        outcome.brought = bringReadingBook(desk)
+        outcome.brought = bringReadingBooks(desk)
         val grimmory = grimmoryCopies.get()
         val known = connection.links.value
         // A book here once linked to the desk stays with it; one linked to Grimmory syncs there.
@@ -628,6 +615,8 @@ class KatanaDeskSync @Inject constructor(
             fingerprints.of(uri.toString())?.let { file -> KatanaDeskBookAsk(item.id, file, item.format.name) }
         }
         val links = known + client.match(desk, asks)
+        // the books being read here that the PC hasn't go up to it; the next sync links them, once the PC has them
+        if (sender.send(desk, books.filter { it.id !in links }) > 0) syncSoon()
         outcome.reached = true
         if (links != known) connection.saveLinks(links)
         val linked = books.filter { it.id in links }
@@ -649,49 +638,42 @@ class KatanaDeskSync @Inject constructor(
         return linked.size
     }
 
-    // The book being read on the PC. No desk to reach: the next sync asks again. Any other failure (a download
-    // that broke off, a file that came damaged) doesn't hold up the rest of the sync, and is tried again a few
-    // times; then it's left.
-    private suspend fun bringReadingBook(desk: KatanaDeskPaired): KatanaDeskBringing {
-        var title: String? = null
-        var bringing: String? = null
-        val brought = runSuspendCatching {
-            val reading = client.reading(desk) ?: return@runSuspendCatching KatanaDeskBringing.NothingRead
-            if (reading.bookId == connection.broughtBookId) return@runSuspendCatching KatanaDeskBringing.NothingRead
-            if (reading.bookId != connection.bringingBookId) {
-                connection.bringingBookId = reading.bookId
-                connection.bringTries = 0
+    // The books being read on the PC that aren't settled here yet come (downloaded when they aren't on this device):
+    // at the first sync after pairing and whenever the PC starts another. More than five wait for the question's
+    // answer. No desk to reach: the next sync asks again. Any other failure (a download that broke off, a file that
+    // came damaged) doesn't hold up the rest of the sync, and is tried again a few times; then it's left.
+    private suspend fun bringReadingBooks(desk: KatanaDeskPaired): KatanaDeskBringing {
+        val settled = moves.settled(toThisDevice = true)
+        val waiting = katanaDeskReadingList(httpClient, desk) { client.reading(desk) }.filter { it.bookId !in settled }
+        if (waiting.isEmpty() || !moves.decide(toThisDevice = true, waiting.map { it.bookId })) return KatanaDeskBringing.NothingRead
+        var shown: KatanaDeskBringing = KatanaDeskBringing.NothingRead
+        for (reading in waiting) {
+            val brought = runSuspendCatching {
+                val getting = { bytes: Long ->
+                    activityState.value = activityState.value?.copy(getting = KatanaDeskGetting(reading.title, bytes, reading.sizeBytes))
+                }
+                bringer.bring(desk, reading, connection.links.value, getting) { itemId, deskBookId ->
+                    connection.saveLinks(connection.links.value + (itemId to deskBookId))
+                }
+            }.getOrElse { failure ->
+                failure.rethrowIfServerAddressUnreachable()
+                if (failure is KatanaDeskRefused) throw failure
+                Log.w(LOG_TAG, "Bringing the PC's book failed.", failure)
+                KatanaDeskBringing.Failed(
+                    title = reading.title,
+                    problem = failure.message ?: "The book didn't come from the PC.",
+                    triesAgain = moves.tried(reading.bookId) < KATANA_DESK_BRING_TRIES,
+                )
             }
-            bringing = reading.bookId
-            title = reading.title
-            val getting = { bytes: Long ->
-                activityState.value = activityState.value?.copy(getting = KatanaDeskGetting(reading.title, bytes, reading.sizeBytes))
-            }
-            bringer.bring(desk, reading, connection.links.value, getting) { itemId, deskBookId ->
-                connection.saveLinks(connection.links.value + (itemId to deskBookId))
-            }
-        }.getOrElse { failure ->
-            failure.rethrowIfServerAddressUnreachable()
-            if (failure is KatanaDeskRefused) throw failure
-            Log.w(LOG_TAG, "Bringing the PC's book failed.", failure)
-            val tries = connection.bringTries + 1
-            connection.bringTries = tries
-            KatanaDeskBringing.Failed(
-                title = title,
-                problem = failure.message ?: "The book didn't come from the PC.",
-                triesAgain = tries < KATANA_DESK_BRING_TRIES,
-            )
+            if (brought !is KatanaDeskBringing.Failed || !brought.triesAgain) moves.settle(toThisDevice = true, listOf(reading.bookId))
+            if (shown == KatanaDeskBringing.NothingRead || brought is KatanaDeskBringing.Arrived) shown = brought
         }
-        val settled = brought != KatanaDeskBringing.NothingRead && (brought !is KatanaDeskBringing.Failed || !brought.triesAgain)
-        if (bringing != null && settled) {
-            connection.broughtBookId = bringing
-            connection.bringTries = 0
-        }
-        return brought
+        return shown
     }
 
     private companion object {
         const val LOG_TAG = "KatanaDesk"
+        const val MOVES_PREFS = "katana_desk_moves"
         const val SOON_MILLIS = 1_500L
         const val PLACE_SETTLE_MILLIS = 5_000L
         const val EVERY_MILLIS = 2 * 60_000L
