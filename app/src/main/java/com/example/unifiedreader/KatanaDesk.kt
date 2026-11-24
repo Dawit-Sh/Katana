@@ -154,6 +154,11 @@ class KatanaDeskConnection @Inject constructor(@param:ApplicationContext context
     // per desk: another desk hears every session again
     private fun readingKey(itemId: String) = "$KEY_READING_SENT${prefs.getString(KEY_DESK, null).orEmpty()}/$itemId"
 
+    /** The day the paired desk's own reading time is asked from next (null: all of it), per desk. */
+    var deskTimeSince: String?
+        get() = prefs.getString("desk_time_since/${prefs.getString(KEY_DESK, null).orEmpty()}", null)
+        set(value) = prefs.edit().putString("desk_time_since/${prefs.getString(KEY_DESK, null).orEmpty()}", value).apply()
+
     /** How many syncs have tried to bring it and failed. */
     var bringTries: Int
         get() = prefs.getInt(KEY_BRING_TRIES, 0)
@@ -462,6 +467,7 @@ class KatanaDeskSync @Inject constructor(
     journal: JournalRepository,
 ) {
     private val client = KatanaDeskClient(httpClient)
+    private val timeIn = KatanaDeskTimeIn(httpClient, journal, connection)
     private val fingerprints = LocalFileFingerprints(context)
     private val bookSync = KatanaDeskBookSync(
         highlights = HighlightSyncEngine(highlightStore),
@@ -632,6 +638,7 @@ class KatanaDeskSync @Inject constructor(
         if (links != known) connection.saveLinks(links)
         val linked = books.filter { it.id in links }
         outcome.books = linked.size
+        timeIn.pullQuietly(desk, linked, links)
         val placesBefore = linkedPlaces(linked)
         var firstFailure: Throwable? = null
         linked.forEach { item ->
