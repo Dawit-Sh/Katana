@@ -4,12 +4,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.unifiedreader.core.model.SourceType
 import com.example.unifiedreader.feature.downloads.DownloadEntryStatus
 import com.example.unifiedreader.feature.downloads.KeptBookActions
 import com.example.unifiedreader.feature.downloads.KeptBooksSnapshot
 import com.example.unifiedreader.feature.settings.BackupSettings
+import com.example.unifiedreader.feature.settings.KatanaDeskSourceRow
 import com.example.unifiedreader.feature.settings.NewBookLookSettings
 import com.example.unifiedreader.feature.settings.SettingsTools
 import com.example.unifiedreader.feature.settings.StorageSettings
@@ -31,8 +33,14 @@ internal fun rememberKeptBooksForSheet(viewModel: AppViewModel): KeptBooksForShe
 
 /** Settings' look for new books, Storage, and Highlights and backup, from the tools; empty without them. */
 @Composable
-internal fun rememberSettingsTools(uiState: AppUiState, viewModel: AppViewModel): SettingsTools {
-    val tools = LocalAppSettingsTools.current ?: return SettingsTools()
+internal fun rememberSettingsTools(
+    uiState: AppUiState,
+    viewModel: AppViewModel,
+    desk: KatanaDeskViewModel = hiltViewModel(),
+): SettingsTools {
+    val deskRow by desk.sourceRow.collectAsStateWithLifecycle()
+    val katanaDesk = KatanaDeskSourceRow(supporting = deskRow.text, tone = deskRow.tone, onOpen = desk::openSheet)
+    val tools = LocalAppSettingsTools.current ?: return SettingsTools(katanaDesk = katanaDesk)
     val look by tools.newBookLook.collectAsStateWithLifecycle()
     val storage by tools.storage.collectAsStateWithLifecycle()
     // Measured when Settings opens, and again once covers have cleared or the Downloads sheet closes.
@@ -53,6 +61,7 @@ internal fun rememberSettingsTools(uiState: AppUiState, viewModel: AppViewModel)
             onManageBooks = viewModel::showDownloadsSheet,
         ),
         backup = backup,
+        katanaDesk = katanaDesk,
     )
 }
 

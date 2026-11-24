@@ -2,6 +2,7 @@ package com.example.unifiedreader
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,7 +24,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -87,6 +90,7 @@ import com.example.unifiedreader.feature.updates.AppUpdateActions
 import com.example.unifiedreader.feature.updates.AppUpdateState
 import com.example.unifiedreader.ui.components.AppBackground
 import com.example.unifiedreader.ui.components.AppBarSwitch
+import com.example.unifiedreader.ui.components.AppLayout
 import com.example.unifiedreader.ui.components.AppScreenBack
 import com.example.unifiedreader.ui.components.AppScreenHost
 import com.example.unifiedreader.ui.components.AppToastHost
@@ -490,6 +494,11 @@ fun UnifiedReaderScaffold(
             }
         },
     ) {
+        // A sync with Katana Desk shows a slim bar under the library's top bar; the library moves down under it.
+        val deskBar = rememberKatanaDeskBar().takeIf { uiState.topLevel == TopLevelDestination.Library }
+        val deskBarShown = deskBar != null
+        var deskBarHeight by remember { mutableStateOf(0.dp) }
+        val density = LocalDensity.current
         Scaffold(
             // See-through: the root AppBackground under it is the ground, with the theme's pattern.
             containerColor = Color.Transparent,
@@ -616,7 +625,8 @@ fun UnifiedReaderScaffold(
                                     onLibrarySearchQueryChanged = viewModel::onLibrarySearchQueryChanged,
                                     bookPageRequest = pendingBookPageItemId,
                                     onBookPageRequestHandled = { pendingBookPageItemId = null },
-                                    contentTopInset = AppTopBarDefaults.contentInset,
+                                    contentTopInset = AppTopBarDefaults.contentInset +
+                                        if (deskBarShown) deskBarHeight + AppLayout.headingGap else 0.dp,
                                     modifier = Modifier.fillMaxSize(),
                                 )
                             }
@@ -725,7 +735,7 @@ fun UnifiedReaderScaffold(
                         }
                     }
                 }
-                Box(modifier = Modifier.align(Alignment.TopCenter)) {
+                Column(modifier = Modifier.align(Alignment.TopCenter), horizontalAlignment = Alignment.CenterHorizontally) {
                     CompositionLocalProvider(LocalDrawerButtonDot provides (waitingUpdateVersion != null)) {
                         // The bar changes with the screen under it, on the screen's change.
                         AppBarSwitch(
@@ -852,6 +862,12 @@ fun UnifiedReaderScaffold(
                                 )
                             }
                         }
+                    }
+                    if (deskBar != null) {
+                        KatanaDeskSyncBar(
+                            activity = deskBar,
+                            modifier = Modifier.onSizeChanged { size -> deskBarHeight = with(density) { size.height.toDp() } },
+                        )
                     }
                 }
                 if (uiState.topLevel == TopLevelDestination.Library && activeLibraryShelfBrowser == null) {

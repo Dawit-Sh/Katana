@@ -29,6 +29,7 @@ import com.example.unifiedreader.feature.annotations.HighlightSyncEngine
 import com.example.unifiedreader.feature.annotations.HighlightSyncStore
 import com.example.unifiedreader.feature.reader.core.ReaderProgressSnapshot
 import com.example.unifiedreader.feature.reader.core.ReaderSessionStore
+import com.example.unifiedreader.journal.JournalRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.ResponseException
@@ -133,6 +134,14 @@ class KatanaDeskConnection @Inject constructor(@param:ApplicationContext context
         get() = prefs.getBoolean(KEY_BRING, false)
         set(value) = prefs.edit().putBoolean(KEY_BRING, value).apply()
 
+    /** When the last reading session sent to the paired desk for [itemId] ended (each session goes once). */
+    fun readingSentUntil(itemId: String): Long = prefs.getLong(readingKey(itemId), 0L)
+
+    fun markReadingSent(itemId: String, until: Long) = prefs.edit().putLong(readingKey(itemId), until).apply()
+
+    // per desk: another desk hears every session again
+    private fun readingKey(itemId: String) = "$KEY_READING_SENT${prefs.getString(KEY_DESK, null).orEmpty()}/$itemId"
+
     /** How many syncs have tried to bring it and failed. */
     var bringTries: Int
         get() = prefs.getInt(KEY_BRING_TRIES, 0)
@@ -162,6 +171,7 @@ class KatanaDeskConnection @Inject constructor(@param:ApplicationContext context
         const val KEY_DEVICE = "device_id"
         const val KEY_BRING = "bring_reading_book"
         const val KEY_BRING_TRIES = "bring_tries"
+        const val KEY_READING_SENT = "reading_sent:"
     }
 }
 
@@ -212,7 +222,7 @@ private fun refusalOf(status: Int, reason: String): KatanaDeskPairRefusal = when
 // [saidWrong]: the desk said the code is wrong (an older desk says only that it's no good: wrong or ran out).
 private fun refusalWords(refusal: KatanaDeskPairRefusal, saidWrong: Boolean, status: Int): String = when (refusal) {
     KatanaDeskPairRefusal.CodeRanOut -> "That code ran out. On the PC, press Pair a device for a new one, then type it here."
-    KatanaDeskPairRefusal.NoCode -> "The PC isn't showing a code now. In Katana Desk: Settings › Sync and backup › Pair a device."
+    KatanaDeskPairRefusal.NoCode -> "The PC isn't showing a code now. In Katana Desk: Settings › Sync on this Wi-Fi › Pair a device."
     KatanaDeskPairRefusal.WrongCode -> if (saidWrong) {
         "That isn't the code on the PC. Check it and type it again."
     } else {
@@ -431,6 +441,7 @@ class KatanaDeskSync @Inject constructor(
     private val markServerMove: ReaderMarkServerMoveDao,
     private val readerSessionStore: ReaderSessionStore,
     private val readStatuses: ReadStatusStore,
+    journal: JournalRepository,
 ) {
     private val client = KatanaDeskClient(httpClient)
     private val fingerprints = LocalFileFingerprints(context)
@@ -439,6 +450,7 @@ class KatanaDeskSync @Inject constructor(
         bookmarks = BookmarkSyncEngine(bookmarkStore),
         readerSessionStore = readerSessionStore,
         statuses = readStatuses,
+        reading = KatanaDeskReadingTime(journal, connection),
     )
     private val bringer = KatanaDeskBookBringer(
         context = context,
@@ -460,6 +472,7 @@ class KatanaDeskSync @Inject constructor(
     private val syncingState = MutableStateFlow(false)
     private val problemState = MutableStateFlow<String?>(null)
     private val lastResultState = MutableStateFlow<KatanaDeskSyncResult?>(null)
+    private val activityState = MutableStateFlow<KatanaDeskActivity?>(null)
     private val eventsFlow = MutableSharedFlow<KatanaDeskSyncEvent>(extraBufferCapacity = 8, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     val syncing: StateFlow<Boolean> = syncingState.asStateFlow()
@@ -469,6 +482,9 @@ class KatanaDeskSync @Inject constructor(
 
     /** How the last sync went (null before the first since the app started). */
     val lastResult: StateFlow<KatanaDeskSyncResult?> = lastResultState.asStateFlow()
+
+    /** The sync going on now (and the book coming over in it), for the bar under the top bar; null between syncs. */
+    val activity: StateFlow<KatanaDeskActivity?> = activityState.asStateFlow()
 
     private val placesChangedFlow = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
@@ -553,6 +569,7 @@ class KatanaDeskSync @Inject constructor(
         val tally = KatanaDeskTally()
         val outcome = KatanaDeskOutcome()
         syncingState.value = true
+        activityState.value = KatanaDeskActivity(desk.name, since)
         eventsFlow.tryEmit(KatanaDeskSyncEvent.Started(since, desk.name))
         Log.i(LOG_TAG, "Sync with ${desk.name} started.")
         try {
@@ -573,6 +590,7 @@ class KatanaDeskSync @Inject constructor(
             result.getOrNull()
         } finally {
             syncingState.value = false
+            activityState.value = null
         }
     }
 
@@ -620,7 +638,10 @@ class KatanaDeskSync @Inject constructor(
         val brought = runSuspendCatching {
             val reading = client.reading(desk) ?: return@runSuspendCatching KatanaDeskBringing.NothingRead
             title = reading.title
-            bringer.bring(desk, reading, connection.links.value) { itemId, deskBookId ->
+            val getting = { bytes: Long ->
+                activityState.value = activityState.value?.copy(getting = KatanaDeskGetting(reading.title, bytes, reading.sizeBytes))
+            }
+            bringer.bring(desk, reading, connection.links.value, getting) { itemId, deskBookId ->
                 connection.saveLinks(connection.links.value + (itemId to deskBookId))
             }
         }.getOrElse { failure ->
@@ -679,6 +700,7 @@ private class KatanaDeskBookSync(
     private val bookmarks: BookmarkSyncEngine,
     private val readerSessionStore: ReaderSessionStore,
     private val statuses: ReadStatusStore,
+    private val reading: KatanaDeskReadingTime,
 ) {
     private val progressStore = ReaderSessionProgressStoreAdapter(readerSessionStore)
 
@@ -714,6 +736,7 @@ private class KatanaDeskBookSync(
         if (pushStatus(api, token, item, bookId)) tally.statusesSent++
         if (item.format == FormatType.EPUB) syncHighlights(api, token, item.annotatedBook(), bookId, tally)
         syncBookmarks(api, token, item, bookId, tally)
+        reading.send(api, token, item, bookId)
     }
 
     // This device's place, when it stayed and goes up: not sent yet (as Grimmory's queued saves) or newer.

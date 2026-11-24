@@ -2,15 +2,24 @@ package com.example.unifiedreader.feature.settings
 
 import com.example.unifiedreader.core.model.formatStorageSize
 import com.example.unifiedreader.feature.reader.preferences.ReaderBookLookDescription
+import com.example.unifiedreader.ui.components.AppStatusTone
 
 /**
  * The Katana groups of the settings hub that the app fills: the look for new books, Storage, and
- * Highlights and backup. A null part leaves its row or group out.
+ * Highlights and backup, and the Katana Desk row in Sources. A null part leaves its row or group out.
  */
 data class SettingsTools(
     val newBookLook: NewBookLookSettings? = null,
     val storage: StorageSettings? = null,
     val backup: BackupSettings? = null,
+    val katanaDesk: KatanaDeskSourceRow? = null,
+)
+
+/** Settings › Sources › Katana Desk (under Grimmory): how the pairing with the PC stands, and what a tap opens. */
+data class KatanaDeskSourceRow(
+    val supporting: String,
+    val tone: AppStatusTone?,
+    val onOpen: () -> Unit,
 )
 
 /** Settings › Reading › Default look for new books: what "Use these for new books" saved. */

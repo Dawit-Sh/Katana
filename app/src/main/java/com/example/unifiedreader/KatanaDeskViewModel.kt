@@ -2,21 +2,83 @@ package com.example.unifiedreader
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.unifiedreader.core.model.DeviceClock
+import com.example.unifiedreader.core.model.LocatorType
+import com.example.unifiedreader.feature.reader.core.ReaderProgressSnapshot
+import com.example.unifiedreader.feature.reader.core.ReaderSessionStore
+import com.example.unifiedreader.ui.components.AppStatusTone
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
+import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** Pairing with Katana Desk, and how its sync stands. */
+/** Whether the Katana Desk sheet is open: one sheet for Settings › Sources and the Local library's ⋮ alike. */
+@Singleton
+class KatanaDeskSheetState @Inject constructor() {
+    private val openState = MutableStateFlow(false)
+    val open: StateFlow<Boolean> = openState.asStateFlow()
+
+    fun show() {
+        openState.value = true
+    }
+
+    fun hide() {
+        openState.value = false
+    }
+}
+
+/** The Katana Desk row in Settings › Sources: its line, and the dot beside it. */
+data class KatanaDeskRowStatus(val text: String, val tone: AppStatusTone?)
+
+/** What the Sources row says: not paired, paired and when it last synced, syncing, or the PC out of reach. */
+internal fun katanaDeskRowStatus(
+    paired: KatanaDeskPaired?,
+    syncing: Boolean,
+    problem: String?,
+    syncedAtEpochMillis: Long,
+    timeOf: (Long) -> String = ::syncedWhen,
+): KatanaDeskRowStatus = when {
+    paired == null -> KatanaDeskRowStatus("Not paired · sync with your PC on this Wi-Fi", null)
+    syncing -> KatanaDeskRowStatus("Syncing…", AppStatusTone.Neutral)
+    problem != null -> KatanaDeskRowStatus("Paired with ${paired.name} · can't reach it now", AppStatusTone.Problem)
+    syncedAtEpochMillis > 0 -> KatanaDeskRowStatus("Paired with ${paired.name} · synced ${timeOf(syncedAtEpochMillis)}", AppStatusTone.Good)
+    else -> KatanaDeskRowStatus("Paired with ${paired.name}", AppStatusTone.Good)
+}
+
+/** A time today ("2:14 PM", as the device shows times), else the day. */
+internal fun syncedWhen(epochMillis: Long, now: Long = System.currentTimeMillis()): String =
+    if (android.text.format.DateUtils.isToday(epochMillis) || now - epochMillis < java.util.concurrent.TimeUnit.HOURS.toMillis(1)) {
+        DeviceClock.format(epochMillis)
+    } else {
+        java.text.DateFormat.getDateInstance(java.text.DateFormat.SHORT).format(java.util.Date(epochMillis))
+    }
+
+/** Where a book stands, in words for the note after a sync: its page when it has one ("p. 7"), else how far through. */
+internal fun placeInWords(place: ReaderProgressSnapshot?): String? {
+    val page = place?.page?.takeIf { place.locatorType == LocatorType.PAGE }
+    val percent = place?.percent
+    return when {
+        page != null -> "p. ${page + 1}"
+        percent != null -> "${(percent.coerceIn(0.0, 1.0) * PERCENT_OF_BOOK).toInt()}%"
+        else -> null
+    }
+}
+
+private const val PERCENT_OF_BOOK = 100
+
+/** Pairing with Katana Desk, how its sync stands, and the sheet that shows both. */
 @HiltViewModel
 class KatanaDeskViewModel @Inject constructor(
     private val sync: KatanaDeskSync,
-    private val finder: KatanaDeskFinder,
+    private val sheet: KatanaDeskSheetState,
+    private val places: ReaderSessionStore,
+    finder: KatanaDeskFinder,
     connection: KatanaDeskConnection,
 ) : ViewModel() {
     val paired = connection.paired
@@ -25,59 +87,23 @@ class KatanaDeskViewModel @Inject constructor(
     val syncing = sync.syncing
     val problem = sync.problem
     val lastResult = sync.lastResult
+    val activity = sync.activity
+    val events = sync.events
+    val sheetOpen = sheet.open
 
-    private val formState = MutableStateFlow(KatanaDeskPairForm())
+    /** The pairing screen of the sheet. */
+    val pairing = KatanaDeskPairing(finder, sync, viewModelScope)
 
-    /** The pairing screen: desks found, the address, the code, what went wrong. */
-    val form: StateFlow<KatanaDeskPairForm> = formState.asStateFlow()
+    /** The Katana Desk row in Settings › Sources. */
+    val sourceRow: StateFlow<KatanaDeskRowStatus> = combine(paired, syncing, problem, lastSyncedAt) { desk, busy, failed, at ->
+        katanaDeskRowStatus(desk, busy, failed, at)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, katanaDeskRowStatus(paired.value, false, null, lastSyncedAt.value))
 
-    private var looking: Job? = null
+    fun openSheet() = sheet.show()
 
-    /** Looks for Katana Desk on this Wi-Fi while the pairing screen shows. */
-    fun startLooking() {
-        if (looking?.isActive == true) return
-        formState.update { it.withFound(it.found, stillLooking = true) }
-        looking = viewModelScope.launch {
-            finder.look { desks, stillLooking -> formState.update { it.withFound(desks, stillLooking) } }
-        }
-    }
-
-    fun stopLooking() {
-        looking?.cancel()
-        looking = null
-    }
-
-    fun pick(desk: KatanaDeskFound) = formState.update { it.picked(desk) }
-
-    fun typeAddress() = formState.update { it.openAddress() }
-
-    fun onAddress(text: String) = formState.update { it.addressTyped(text) }
-
-    /** The code as typed; the sixth digit pairs at once when the desk's address is known. */
-    fun onCode(text: String) {
-        formState.update { it.codeTyped(text) }
-        if (formState.value.canPair) pair()
-    }
-
-    fun pair() {
-        val now = formState.value
-        if (!now.canPair) return
-        formState.update { it.started() }
-        viewModelScope.launch {
-            try {
-                sync.pair(now.address, now.code)
-                formState.update { it.ended() }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (refused: KatanaDeskRefused) {
-                formState.update { it.refused(refused) }
-            } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
-                formState.update { it.refused(noAnswerRefusal(now.address).apply { initCause(failure) }) }
-            } finally {
-                // never left on "Pairing…"
-                formState.update { if (it.pairing) it.ended() else it }
-            }
-        }
+    fun closeSheet() {
+        sheet.hide()
+        pairing.stop()
     }
 
     fun syncNow() {
@@ -86,8 +112,11 @@ class KatanaDeskViewModel @Inject constructor(
 
     fun forget() {
         sync.forget()
-        formState.value = KatanaDeskPairForm()
+        pairing.reset()
     }
 
-    override fun onCleared() = stopLooking()
+    /** Where [itemId] stands now, in words for the note after a sync ("p. 7", "53%"); null when it has no place. */
+    fun placeOf(itemId: String): String? = placeInWords(places.progressByItemIdFlow.value[itemId])
+
+    override fun onCleared() = pairing.stop()
 }

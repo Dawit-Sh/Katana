@@ -24,6 +24,7 @@ object AppIcons {
     val Close: ImageVector @Composable get() = icon(R.drawable.ic_close)
     val Cloud: ImageVector @Composable get() = icon(R.drawable.ic_cloud)
     val CollectionsBookmark: ImageVector @Composable get() = icon(R.drawable.ic_collections_bookmark)
+    val Computer: ImageVector @Composable get() = icon(R.drawable.ic_computer)
     val ContentCopy: ImageVector @Composable get() = icon(R.drawable.ic_content_copy)
     val Delete: ImageVector @Composable get() = icon(R.drawable.ic_delete)
     val DeleteSweep: ImageVector @Composable get() = icon(R.drawable.ic_delete_sweep)

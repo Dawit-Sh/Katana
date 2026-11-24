@@ -94,6 +94,11 @@ internal fun SettingsHub(
                     selected = selectedPage == page,
                     onClick = { onOpenPage(page) },
                 )
+                // Katana Desk, the PC on this Wi-Fi, sits under Grimmory: it answers as Grimmory does.
+                if (entry.sourceType == SourceType.GRIMMORY) tools.katanaDesk?.let { desk -> KatanaDeskRow(desk) }
+            }
+            if (sources.none { it.sourceType == SourceType.GRIMMORY }) {
+                tools.katanaDesk?.let { desk -> KatanaDeskRow(desk, divider = sources.isNotEmpty()) }
             }
             // What waits to upload belongs with the servers it goes to.
             if (sources.isNotEmpty()) AppSettingsRowDivider()
@@ -236,4 +241,17 @@ internal fun filterChipsSummary(
 ): String = sourceOrder.ifEmpty { SourceType.entries }.joinToString { sourceType ->
     val count = resolveLibraryFilterPanels(sourceType = sourceType, preferredPanels = filterPanelsBySource[sourceType]).size
     "$count in ${sourceType.displayName()}"
+}
+
+/** The Katana Desk row, after a divider when it follows another row. */
+@Composable
+private fun KatanaDeskRow(desk: KatanaDeskSourceRow, divider: Boolean = true) {
+    if (divider) AppSettingsRowDivider()
+    AppSettingsRow(
+        title = "Katana Desk",
+        icon = AppIcons.Computer,
+        supporting = desk.supporting,
+        supportingTone = desk.tone,
+        onClick = desk.onOpen,
+    )
 }

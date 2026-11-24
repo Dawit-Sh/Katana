@@ -293,6 +293,7 @@ fun UnifiedReaderAppContent(
                         notice = uiState.progressSyncNotice,
                         viewModel = viewModel,
                     )
+                    KatanaDeskHost()
                     ReaderFinishedHost(
                         uiState = uiState,
                         viewModel = viewModel,

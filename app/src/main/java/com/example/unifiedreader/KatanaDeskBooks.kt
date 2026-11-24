@@ -11,6 +11,10 @@ import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** What became of the book being read on the PC, after pairing. */
@@ -70,6 +74,7 @@ internal class KatanaDeskBookBringer(
         desk: KatanaDeskPaired,
         reading: KatanaDeskReading,
         links: Map<String, String>,
+        progress: (bytes: Long) -> Unit,
         link: (itemId: String, deskBookId: String) -> Unit,
     ): KatanaDeskBringing {
         val items = documents.getImportedItems()
@@ -84,7 +89,7 @@ internal class KatanaDeskBookBringer(
                 KatanaDeskBringing.AlreadyHere(sameFile.id, sameFile.title)
             }
             reading.grimmoryId != null && onGrimmoryHere(reading.grimmoryId) -> KatanaDeskBringing.OnGrimmory(reading.title)
-            else -> downloadAndImport(desk, reading, format, link)
+            else -> downloadAndImport(desk, reading, format, progress, link)
         }
     }
 
@@ -97,9 +102,10 @@ internal class KatanaDeskBookBringer(
         desk: KatanaDeskPaired,
         reading: KatanaDeskReading,
         format: FormatType,
+        progress: (Long) -> Unit,
         link: (String, String) -> Unit,
     ): KatanaDeskBringing {
-        val file = download(desk, reading, format)
+        val file = download(desk, reading, format, progress)
         val item = documents.import(Uri.fromFile(file))
         if (item == null) file.delete()
         val imported = item?.let { documents.getDocumentUri(it) }?.toString()?.let(::fileOfUri)
@@ -126,15 +132,29 @@ internal class KatanaDeskBookBringer(
         }
     }
 
-    private suspend fun download(desk: KatanaDeskPaired, reading: KatanaDeskReading, format: FormatType): File {
+    private suspend fun download(desk: KatanaDeskPaired, reading: KatanaDeskReading, format: FormatType, progress: (Long) -> Unit): File {
         // In the app's own files, not its cache: a file moved out of the cache keeps the cache's group, and Android
         // would count the book as cache.
         val partial = PartialDownloadFile(
             File(File(context.filesDir, KATANA_DESK_PARTIAL_DIR), "${desk.deskId.fileSafe()}-${reading.bookId.fileSafe()}.part"),
         )
-        // Resumes a download a lost connection broke off (the desk answers ranges for the same file).
-        KtorGrimmoryApi(httpClient = httpClient, baseUrl = desk.baseUrl)
-            .downloadBookContentResumably(accessToken = desk.token, bookId = reading.bookId, target = partial, bookType = null)
+        // Resumes a download a lost connection broke off (the desk answers ranges for the same file). How much is
+        // here is looked at a few times a second, for the bar that shows it.
+        coroutineScope {
+            val watch = launch {
+                while (isActive) {
+                    progress(partial.downloadedBytes)
+                    delay(PROGRESS_EVERY_MILLIS)
+                }
+            }
+            try {
+                KtorGrimmoryApi(httpClient = httpClient, baseUrl = desk.baseUrl)
+                    .downloadBookContentResumably(accessToken = desk.token, bookId = reading.bookId, target = partial, bookType = null)
+            } finally {
+                watch.cancel()
+            }
+        }
+        progress(partial.downloadedBytes)
         return withContext(Dispatchers.IO) {
             val got = RandomAccessFile(partial.dataFile, "r").use { fingerprintOf(it.channel) }
             val sizeOk = reading.sizeBytes == null || got.sizeBytes == reading.sizeBytes
@@ -191,3 +211,4 @@ private fun String.fileSafe(): String = map { if (it.isLetterOrDigit() || it == 
 private const val UNSAFE_FILE_CHARS = "\\/:*?\"<>|"
 private const val MAX_FILE_STEM = 120
 private const val MAX_ID_CHARS = 40
+private const val PROGRESS_EVERY_MILLIS = 250L

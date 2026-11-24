@@ -17,6 +17,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -55,7 +56,11 @@ internal fun LocalBookActions.menuItems(): LibraryLocalBookItems = LibraryLocalB
  * library shows. What changed shows as a toast.
  */
 @Composable
-internal fun rememberLocalBookActions(localBooks: AppLocalBooksViewModel, viewModel: AppViewModel): LocalBookActions {
+internal fun rememberLocalBookActions(
+    localBooks: AppLocalBooksViewModel,
+    viewModel: AppViewModel,
+    katanaDesk: KatanaDeskViewModel = hiltViewModel(),
+): LocalBookActions {
     val context = LocalContext.current
     val toasts = viewModel.toasts
     val report: (LocalBookRefresh, Boolean) -> Unit = { result, asked ->
@@ -94,7 +99,6 @@ internal fun rememberLocalBookActions(localBooks: AppLocalBooksViewModel, viewMo
             onDismiss = { showingBookFolders = false },
         )
     }
-    val openKatanaDesk = rememberKatanaDeskDialog()
     return remember(localBooks, localBooks.shownPlaces) {
         LocalBookActions(
             onAddFolder = { folderPicker.launch(null) },
@@ -112,16 +116,8 @@ internal fun rememberLocalBookActions(localBooks: AppLocalBooksViewModel, viewMo
             onCheckForNewBooks = { localBooks.refresh { result -> report(result, true) } },
             hasPlaces = localBooks.shownPlaces.any,
             onBookFolders = { showingBookFolders = true },
-        ).apply { onKatanaDesk = openKatanaDesk }
+        ).apply { onKatanaDesk = katanaDesk::openSheet }
     }
-}
-
-/** Katana Desk's dialog while it shows; the returned call opens it. */
-@Composable
-private fun rememberKatanaDeskDialog(): () -> Unit {
-    var showing by rememberSaveable { mutableStateOf(false) }
-    if (showing) KatanaDeskDialog(onDismiss = { showing = false })
-    return remember { { showing = true } }
 }
 
 // Android's All files access screen for Katana; the general list where a phone doesn't open it for one app.

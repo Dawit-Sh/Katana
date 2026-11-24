@@ -86,8 +86,11 @@ class KatanaDeskBooksTest {
     fun `a book the PC is reading and this device hasn't comes into Local and is linked`() = runBlocking {
         val documents = FakeDocuments()
         val links = mutableMapOf<String, String>()
-        val brought = bringer(documents).bring(desk, reading(), links) { item, book -> links[item] = book }
+        val seen = mutableListOf<Long>()
+        val brought = bringer(documents).bring(desk, reading(), links, { seen += it }) { item, book -> links[item] = book }
         assertTrue(brought is KatanaDeskBringing.Arrived)
+        // how much came over is told as it comes, ending with the whole file
+        assertEquals(bookBytes.size.toLong(), seen.last())
         val item = documents.items.single()
         assertEquals(mapOf(item.id to "7"), links)
         val file = fileOfUri(documents.uris.getValue(item.id))!!
@@ -102,12 +105,12 @@ class KatanaDeskBooksTest {
         val documents = FakeDocuments()
         val here = documents.add(bookFile)
         val links = mutableMapOf<String, String>()
-        val brought = bringer(documents).bring(desk, reading(), links) { item, book -> links[item] = book }
+        val brought = bringer(documents).bring(desk, reading(), links, {}) { item, book -> links[item] = book }
         assertEquals(KatanaDeskBringing.AlreadyHere(here.id, here.title), brought)
         assertEquals(mapOf(here.id to "7"), links)
         assertEquals(0, requests)
         // linked before: nothing to do
-        val again = bringer(documents).bring(desk, reading(), links) { _, _ -> error("linked twice") }
+        val again = bringer(documents).bring(desk, reading(), links, {}) { _, _ -> error("linked twice") }
         assertTrue(again is KatanaDeskBringing.AlreadyHere)
     }
 
@@ -115,7 +118,7 @@ class KatanaDeskBooksTest {
     fun `a file that comes damaged isn't kept`() = runBlocking {
         val documents = FakeDocuments()
         try {
-            bringer(documents).bring(desk, reading(md5 = "00000000000000000000000000000000"), mutableMapOf()) { _, _ -> }
+            bringer(documents).bring(desk, reading(md5 = "00000000000000000000000000000000"), mutableMapOf(), {}) { _, _ -> }
             error("a damaged file was kept")
         } catch (damaged: java.io.IOException) {
             assertTrue(damaged.message!!.contains("damaged"))
@@ -127,9 +130,10 @@ class KatanaDeskBooksTest {
     @Test
     fun `a Grimmory book on Grimmory here, and a kind that doesn't sync, stay where they are`() = runBlocking {
         val documents = FakeDocuments()
-        val onGrimmory = bringer(documents, onGrimmory = true).bring(desk, reading().copy(grimmoryId = "812"), mutableMapOf()) { _, _ -> }
+        val onGrimmory = bringer(documents, onGrimmory = true)
+            .bring(desk, reading().copy(grimmoryId = "812"), mutableMapOf(), {}) { _, _ -> }
         assertEquals(KatanaDeskBringing.OnGrimmory("Sync Test Novel"), onGrimmory)
-        val mobi = bringer(documents).bring(desk, reading().copy(formatName = "mobi"), mutableMapOf()) { _, _ -> }
+        val mobi = bringer(documents).bring(desk, reading().copy(formatName = "mobi"), mutableMapOf(), {}) { _, _ -> }
         assertEquals(KatanaDeskBringing.NotSynced("Sync Test Novel", "MOBI"), mobi)
         assertEquals(0, requests)
     }
