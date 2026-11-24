@@ -91,6 +91,9 @@ class KatanaDeskViewModel @Inject constructor(
     val events = sync.events
     val sheetOpen = sheet.open
 
+    /** The question before more than five books move one way. */
+    val question = sync.moves.question
+
     /** The pairing screen of the sheet. */
     val pairing = KatanaDeskPairing(finder, sync, viewModelScope)
 
@@ -117,6 +120,8 @@ class KatanaDeskViewModel @Inject constructor(
 
     /** Where [itemId] stands now, in words for the note after a sync ("p. 7", "53%"); null when it has no place. */
     fun placeOf(itemId: String): String? = placeInWords(places.progressByItemIdFlow.value[itemId])
+
+    fun answer(yes: Boolean) = sync.moves.answer(yes)
 
     override fun onCleared() = pairing.stop()
 }
