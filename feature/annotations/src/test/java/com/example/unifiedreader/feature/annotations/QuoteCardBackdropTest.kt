@@ -49,8 +49,8 @@ class QuoteCardBackdropTest {
     @Test
     fun `a card on a picture shows the picture, darkened, blurred or sharp`() {
         val red = createBitmap(300, 450).apply { eraseColor(Color.rgb(220, 40, 40)) }
-        listOf(true, false).forEach { blurred ->
-            val card = render(QuoteCardBackdrop(red, blurred = blurred))
+        listOf(QuoteCardEffect.Blur, QuoteCardEffect.None).forEach { effect ->
+            val card = render(QuoteCardBackdrop(red, effect = effect))
             assertEquals(1080, card.width)
             assertEquals(1080, card.height)
             // The top corner: the picture's red under the scrim, not the card's own ground.
