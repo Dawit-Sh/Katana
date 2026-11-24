@@ -460,6 +460,7 @@ class KatanaDeskSync @Inject constructor(
     private val readerSessionStore: ReaderSessionStore,
     private val readStatuses: ReadStatusStore,
     journal: JournalRepository,
+    private val words: KatanaDeskWords,
 ) {
     private val client = KatanaDeskClient(httpClient)
     private val fingerprints = LocalFileFingerprints(context)
@@ -640,6 +641,11 @@ class KatanaDeskSync @Inject constructor(
                 Log.w(LOG_TAG, "Katana Desk sync of ${item.id} failed.", failure)
                 if (firstFailure == null) firstFailure = failure
             }
+        }
+        // My words of the books both have, both ways (after the marks; a failure here doesn't hold up the rest).
+        runSuspendCatching { words.sync(desk, links) }.onFailure { failure ->
+            failure.rethrowIfServerAddressUnreachable()
+            Log.w(LOG_TAG, "Katana Desk sync of saved words failed.", failure)
         }
         // A place the desk changed here (another device read on, or marked it finished or unread) shows at once.
         val placesAfter = linkedPlaces(linked)
