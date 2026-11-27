@@ -146,9 +146,11 @@ private fun ReaderWorkEffect(
  * move when they return.
  *
  * On Android 12 and later the bars hide with the default behaviour, so with gesture navigation the
- * back gesture leaves the book in one swipe (with transient bars the first swipe only showed them);
- * bars swiped in from an edge hide again after [ReaderRevealedBarsHideMillis], as transient ones did.
- * Android 9 to 11 (the Fire 7) keep the transient bars.
+ * back gesture leaves the book in one swipe (with transient bars the first swipe only showed them).
+ * Android 9 to 11 (the Fire 7) keep the transient bars. On every version, bars that come back while
+ * the book is open hide again after [ReaderRevealedBarsHideMillis]: on the Fire a card or dialog over
+ * the book could bring them back for good, and its Back and Recents buttons then sat on the page's
+ * footer (2026-11-27).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -175,7 +177,6 @@ private fun ReaderWindowEffect(
             return@LaunchedEffect
         }
         controller.hide(WindowInsetsCompat.Type.systemBars())
-        if (barsBehavior != WindowInsetsControllerCompat.BEHAVIOR_DEFAULT) return@LaunchedEffect
         snapshotFlow { barsVisible.value }.collectLatest { visible ->
             if (visible) {
                 delay(ReaderRevealedBarsHideMillis)
@@ -197,5 +198,5 @@ internal fun readerSystemBarsBehavior(sdkInt: Int): Int =
         WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
     }
 
-/** How long bars swiped into view stay before the reader hides them again, as long as transient bars stay. */
+/** How long bars that come back into view stay before the reader hides them again. */
 internal const val ReaderRevealedBarsHideMillis = 3_000L
