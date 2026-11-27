@@ -275,6 +275,8 @@ internal fun ReadiumEpubNavigatorHost(
         fun installSameFileLinks() {
             footnoteNavigationScope.launch {
                 navigatorFragment?.evaluateJavascript(EpubSameFileLinksScript)
+                // Readium runs scripts on the page it shows, so each chapter gets the fit when it comes up.
+                navigatorFragment?.let { applyEpubFitToPage(it, publication) }
             }
         }
         val fragmentFactory = navigatorFactory.createFragmentFactory(
@@ -513,6 +515,7 @@ internal fun ReadiumEpubNavigatorHost(
                 paddingPx = viewportSpacing.contentPaddingPx,
                 textScale = textScale,
             )
+            applyEpubFitToPage(it, publication)
         }
     }
 
