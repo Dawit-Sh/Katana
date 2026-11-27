@@ -11,8 +11,8 @@ android {
     defaultConfig {
         applicationId = "com.example.unifiedreader"
         targetSdk = 35
-        versionCode = 77
-        versionName = "1.3.1"
+        versionCode = 78
+        versionName = "1.3.2"
         vectorDrawables.useSupportLibrary = true
     }
 
